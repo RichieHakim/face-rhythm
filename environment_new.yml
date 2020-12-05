@@ -1,0 +1,11 @@
+name: torch_env
+channels:
+  - defaults
+dependencies:
+  - python
+  - pytorch
+  - torchvision
+  - cudatoolkit=11.0
+  - torchaudio
+prefix: /home/rich/miniconda3/envs/torch_env
+
