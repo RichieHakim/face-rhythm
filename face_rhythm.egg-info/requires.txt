@@ -8,3 +8,4 @@ imageio
 matplotlib
 scikit-learn
 scikit-image
+librosa

@@ -14,5 +14,9 @@ face_rhythm/features/mtaper_specgram.py
 face_rhythm/models/__init__.py
 face_rhythm/models/predict_model.py
 face_rhythm/models/train_model.py
+face_rhythm/util/__init__.py
+face_rhythm/util/helpers.py
+face_rhythm/util/io.py
+face_rhythm/util/set_roi.py
 face_rhythm/visualization/__init__.py
 face_rhythm/visualization/visualize.py

@@ -1,6 +1,6 @@
-.idea/
-data/
-face_rhythm.egg-info/
-face_rhythm/__pychache__/
-face_rhythm/util/__pychache__/
-notebooks/.ipynb_checkpoints/
+.idea/*
+data/*
+face_rhythm.egg-info/*
+face_rhythm/__pychache__/*
+face_rhythm/util/__pychache__/*
+notebooks/.ipynb_checkpoints/*

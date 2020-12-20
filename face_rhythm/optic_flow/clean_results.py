@@ -1,10 +1,8 @@
 import numpy as np
+from face_rhythm.util import helpers
 
-def clean_workflow(displacements):
-    outlier_threshold_positions = 40 ## in pixels. If position goes past this, short time window before and including outlier timepoint has displacement set to 0 
-    outlier_threshold_displacements = 6 ## in pixels. If displacement goes past this, displacement set to 0 at those time points
-    framesHalted_beforeOutlier = 30 # in frames. best to make even
-    framesHalted_afterOutlier = 10 # in frames. best to make even
+def clean_workflow(config_filepath, displacements):
+    config = helpers.load_config(config_filepath)
 
     relaxation_factor = 0.01 # This is the speed at which the integrated position exponentially relaxes back to its anchored position
 
