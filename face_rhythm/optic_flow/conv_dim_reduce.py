@@ -6,6 +6,7 @@ import multiprocessing
 from multiprocessing import Pool
 import copy
 import time
+from functools import partial
 
 from face_rhythm.util import helpers
 
@@ -86,9 +87,9 @@ def points_show(config_filepath, pts_all, pts_spaced_convDR):
     cv2.destroyAllWindows()
 
 
-def makeConvDR(ii):
+def makeConvDR(ii, input_traces, cos_kernel, cos_kernel_mean, pca, rank_reduced, dots_new):
     #     print(ii)
-    influence_weightings = cosKernel[int(dots_new[ii][0][1]), int(dots_new[ii][0][0]), :]
+    influence_weightings = cos_kernel[int(dots_new[ii][0][1]), int(dots_new[ii][0][0]), :]
 
     idx_nonZero = np.array(np.where(influence_weightings != 0))[0, :]
 
@@ -106,10 +107,10 @@ def makeConvDR(ii):
     positions_convDR_meanSub = np.zeros((2, input_traces.shape[2]))
     positions_convDR_meanSub[0, :] = np.mean(
         np.dot(output_PCA_loadings0[:, :rank_reduced], output_PCA_scores0[:, :rank_reduced].T), axis=1) / \
-                                     cosKernel_mean[ii]
+                                     cos_kernel_mean[ii]
     positions_convDR_meanSub[1, :] = np.mean(
         np.dot(output_PCA_loadings1[:, :rank_reduced], output_PCA_scores1[:, :rank_reduced].T), axis=1) / \
-                                     cosKernel_mean[ii]
+                                     cos_kernel_mean[ii]
     return positions_convDR_meanSub
 
 
@@ -127,7 +128,7 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     pca = sk.decomposition.PCA(n_components=num_components)
     # p = Pool(multiprocessing.cpu_count())
     p = Pool(int(multiprocessing.cpu_count() / 3))
-    positions_convDR_meanSub_list = p.map(makeConvDR, range(dots_new.shape[0]))
+    positions_convDR_meanSub_list = p.map(partial(makeConvDR, ), range(dots_new.shape[0]))
     p.close()
     p.terminate()
     p.join()
@@ -155,6 +156,7 @@ def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_
     printFPS_pref = config['printFPS_pref']
     fps_counterPeriod = config['fps_counterPeriod']  ## number of frames to do a tic toc over
     path_vid_allFiles = config['path_vid_allFiles']
+    numFrames_allFiles = config['numFrames_allFiles']
 
     ## Define random colors for points in cloud
     color_tuples = list(np.arange(positions_toUse.shape[0]))

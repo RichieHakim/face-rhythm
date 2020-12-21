@@ -203,7 +203,8 @@ def get_video_data(config_filepath):
     ok, frame = video.read()
     vid_height = frame.shape[0]
     vid_width = frame.shape[1]
-    
+
+    config['numFrames_allFiles'] = numFrames_allFiles
     config['vid_height'] = vid_height
     config['vid_width'] = vid_width
     
