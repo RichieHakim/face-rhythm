@@ -93,4 +93,4 @@ def roi_workflow(config_filepath):
     ('pts_y_displacement', pts_y_displacement),
     ('mask_frame_displacement', mask_frame_displacement)
     ])
-    return pts_all
+    helpers.save_data(config_filepath, 'path_pts_all', pts_all)

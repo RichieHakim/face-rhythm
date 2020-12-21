@@ -209,3 +209,17 @@ def get_video_data(config_filepath):
     config['vid_width'] = vid_width
     
     save_config(config, config_filepath)
+
+
+def save_data(config_filepath, save_name, data_to_save):
+    config = load_config(config_filepath)
+    save_dir = config['save_dir']
+    save_path = f'{save_dir}/{save_name}.npy'
+    np.save(save_path, data_to_save, allow_pickle=True)
+    config[f'path_{save_name}'] = save_path
+    save_config(config, config_filepath)
+
+
+def load_data(config_filepath, data_key):
+    config = load_config(config_filepath)
+    return np.load(config[data_key], allow_pickle=True)

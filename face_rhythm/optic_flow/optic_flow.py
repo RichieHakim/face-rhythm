@@ -157,7 +157,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
     displacements = displacements[:,:,~np.isnan(displacements[0,0,:])]
 
-    return displacements
+    return displacements, numFrames_total
     
 
 def importVid(config, vidNum_iter, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
@@ -226,15 +226,22 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
 
     displacements = displacements[:,:,~np.isnan(displacements[0,0,:])]
     numFrames_total = displacements.shape[2]
-    return displacements
+
+    return displacements, numFrames_total
     
     
 def optic_workflow(config_filepath):
     config = helpers.load_config(config_filepath)  
     pts_all = np.load(config['path_pts_all'], allow_pickle=True)[()]
-    pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced = setup(config, pts_all)
+    pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples = setup(config, pts_all)
     if config['optic_multithread']:
-        displacements =  displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
+        displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
     else: 
-        displacements = displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced)
-    return displacements, pointInds_toUse
+        displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced)
+
+    config['numFrames_total'] = numFrames_total
+    helpers.save_config(config, config_filepath)
+
+    helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
+    helpers.save_data(config_filepath, 'displacements', displacements)
+

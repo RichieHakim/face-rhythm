@@ -1,9 +1,27 @@
-def tca(config_filepath, positions)
+import sys
+import time
+import imageio
+
+import cv2
+import matplotlib
+from matplotlib import pyplot as plt
+import numpy as np
+import scipy
+import tensorly as tl
+import tensorly.decomposition
+import sklearn as sk
+
+from face_rhythm.util import helpers
+
+
+def tca(config_filepath, positions):
     
     config = helpers.load_config(config_filepath)
     pref_useGPU = config['tca_pref_useGPU']
     device = config['tca_device']
     rank = config['tca_rank']
+
+    input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
     
     tl.set_backend('pytorch')
     
@@ -91,7 +109,14 @@ def plot_factors(factors_np):
     # plt.plot(output_PCA)
     
     
-def factor_videos(factors_np):
+def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
+    config = helpers.load_config(config_filepath)
+    Fs = config['Fs']
+    vid_width = config['vid_width']
+    vid_height = config['vid_height']
+    numFrames_allFiles = config['numFrames_allFiles']
+    path_vid_allFiles = config['path_vid_allFiles']
+
     # Display video of factors
 
     factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
@@ -272,9 +297,17 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
 
     plt.figure()
     plt.plot(output_PCA[:,5])
+
+    config['modelRank'] = modelRank
+    helpers.save_config(config, config_filepath)
+
+    return factors_temporal
     
     
-def correlations(factors_np):
+def correlations(config_filepath, factors_np):
+    config = helpers.load_config(config_filepath)
+    modelRank = config['modelRank']
+
     input_factors = factors_np
     factors_xcorr = np.zeros((input_factors[2].shape[0] , input_factors[2].shape[1] , input_factors[2].shape[1]))
     for ii in range(input_factors[2].shape[1]):
@@ -290,8 +323,14 @@ def correlations(factors_np):
         
     return factors_xcorr
 
-def more_factors_videos(factors_np, positions_convDR_absolute):
-    
+def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
+    config = helpers.load_config(config_filepath)
+    Fs = config['Fs']
+    vid_width = config['vid_width']
+    vid_height = config['vid_height']
+    numFrames_allFiles = config['numFrames_allFiles']
+    path_vid_allFiles = config['path_vid_allFiles']
+
     # Display video of factors
     factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
     # factors_toShow = [3]  # zero-indexed
@@ -400,3 +439,47 @@ def more_factors_videos(factors_np, positions_convDR_absolute):
     out.release()
     video.release()
     cv2.destroyAllWindows()
+
+
+def factor_tsne(factors):
+    print("Computing t-SNE embedding")
+    tsne = sk.manifold.TSNE(n_components=2, init='pca',
+                         random_state=0, perplexity=200)
+    X_tsne = tsne.fit_transform(factors)
+    print("Finished computing t-SNE embedding")
+
+    factor_toCMap = 8  # 1 indexed
+
+    plt.figure(figsize=(5, 5))
+    # plt.plot(X_tsne[:,0] , X_tsne[:,1] , linewidth=0.05)
+    # plt.scatter(X_tsne[:,0] , X_tsne[:,1], 'r.' , markersize=0.6)
+    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
+
+
+def positional_tca_workflow(config_filepath):
+    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
+
+    factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
+
+    plot_factors(factors_np_positional)
+    factor_videos(factors_np_positional)
+
+    helpers.save_data(config_filepath, 'path_factors_np_positional', factors_np_positional)
+
+
+def full_tca_workflow(config_filepath):
+    tmp = helpers.load_data(config_filepath, 'path_tmp')
+    positions_convDR_absolute = helpers.load_data(config_filepath, 'path_positions_convDR_absolute')
+    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+    Sxx_allPixels_normFactor = helpers.load_data(config_filepath, 'path_Sxx_allPixels_normFactor')
+
+    factors_np = tca(config_filepath, tmp[:,:,:,:])
+    factors_xcorr = correlations(config_filepath, factors_np)
+    factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+
+    more_factors_videos(factors_np, positions_convDR_absolute)
+
+    factor_tsne(factors_temporal)
+
+    helpers.save_data(config_filepath, 'path_factors_np', factors_np)
+    helpers.save_data(config_filepath, 'path_factors_np', factors_np)

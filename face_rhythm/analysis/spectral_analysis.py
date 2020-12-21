@@ -1,11 +1,18 @@
-def cqt_all(config_filepath, positions_convDR_meanSub, freqs_Sxx):
+import time
+import sys
+
+import numpy as np
+import scipy.stats
+import librosa
+from matplotlib import pyplot as plt
+
+from face_rhythm.util import helpers
+
+
+def cqt_all(config_filepath):
     
     print(f'== Starting CQT spectrogram calculations ==')
     tic_all = time.time()
-
-    ## define positions traces to use
-    # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
-    input_sgram = np.single(np.squeeze(positions_convDR_meanSub))[:,:,:]
 
     ## get parameters
     config = helpers.load_config(config_filepath)
@@ -15,6 +22,14 @@ def cqt_all(config_filepath, positions_convDR_meanSub, freqs_Sxx):
     n_bins = config['cqt_n_bins']
     bins_per_octave = config['cqt_bins_per_octave']
     fmin = config['cqt_fmin']
+
+    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
+    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+
+
+    ## define positions traces to use
+    # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
+    input_sgram = np.single(np.squeeze(positions_convDR_meanSub))[:,:,:]
 
     ## make a single spectrogram to get some size parameters for preallocation
     Sxx = librosa.cqt(np.squeeze(input_sgram[0,0,:]), 
@@ -74,14 +89,21 @@ def cqt_all(config_filepath, positions_convDR_meanSub, freqs_Sxx):
     ## hold onto the normFactor variable because you can use to it to undo the normalization after subsequent steps
     Sxx_allPixels_normFactor = np.mean(np.sum(Sxx_allPixels , axis=1) , axis=0)
     Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[None,None,:,:]
-    Sxx_allPixels_norm.shape
-    
-    return Sxx_allPixels, Sxx_allPixels_norm, Sxx_allPixels_normFactor, tmp
+    #Sxx_allPixels_norm.shape
 
-def cqt_positions(config_filepath, factors_np_positional, freqs_Sxx):
+    plt.figure()
+    plt.imshow(Sxx_allPixels_norm[500, :, :, 0], aspect='auto', cmap='hot', origin='lower')
 
-    ## define positions traces to use
-    input_sgram = np.single(np.squeeze(factors_np_positional[2][:,3]))
+    plt.figure()
+    plt.plot(Sxx_allPixels_normFactor)
+
+    helpers.save_data(config_filepath, 'path_Sxx_allPixels',Sxx_allPixels)
+    helpers.save_data(config_filepath, 'path_Sxx_allPixels_norm', Sxx_allPixels_norm)
+    helpers.save_data(config_filepath, 'path_Sxx_allPixels_normFactor', Sxx_allPixels_normFactor)
+    helpers.save_data(config_filepath, 'path_tmp', tmp)
+
+
+def cqt_positions(config_filepath):
 
     ## get parameters
     config = helpers.load_config(config_filepath)
@@ -91,6 +113,12 @@ def cqt_positions(config_filepath, factors_np_positional, freqs_Sxx):
     n_bins = config['cqt_n_bins']
     bins_per_octave = config['cqt_bins_per_octave']
     fmin = config['cqt_fmin']
+
+    factors_np_positional = helpers.load_data(config_filepath, 'path_factors_np_positional')
+    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+
+    ## define positions traces to use
+    input_sgram = np.single(np.squeeze(factors_np_positional[2][:,3]))
 
     ## make a single spectrogram to get some size parameters for preallocation
     Sxx_positional = librosa.cqt(np.squeeze(input_sgram), 
@@ -112,5 +140,16 @@ def cqt_positions(config_filepath, factors_np_positional, freqs_Sxx):
 
     test2 = scipy.stats.zscore(Sxx_positional , axis=1)
     test2 = test2 - np.min(test2 , axis=1)[:,None]
+
+    plt.figure()
+    plt.imshow(Sxx_positional, aspect='auto', cmap='hot', origin='lower')
+    plt.figure()
+    plt.imshow(test, aspect='auto', cmap='hot', origin='lower')
+    plt.figure()
+    plt.imshow(test2, aspect='auto', cmap='hot', origin='lower')
+
+    helpers.save_data(config_filepath, 'path_Sxx_positional', Sxx_positional)
+    helpers.save_data(config_filepath, 'path_test', test)
+    helpers.save_data(config_filepath, 'path_test2', test2)
     
     return Sxx_positional, test, test2

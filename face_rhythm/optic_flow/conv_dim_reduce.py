@@ -32,7 +32,7 @@ def create_kernel(config_filepath, point_idxs):
         tmp = copy.deepcopy(cos_kernel[:, :, ii])
         tmp[tmp == 0] = np.nan
         cos_kernel_mean[ii] = np.nanmean(tmp)
-    return cos_kernel
+    return cos_kernel, cos_kernel_mean
 
 
 def space_points(config_filepath, pts_all):
@@ -157,6 +157,7 @@ def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_
     fps_counterPeriod = config['fps_counterPeriod']  ## number of frames to do a tic toc over
     path_vid_allFiles = config['path_vid_allFiles']
     numFrames_allFiles = config['numFrames_allFiles']
+    numFrames_total_rough = config['numFrames_total_rough']
 
     ## Define random colors for points in cloud
     color_tuples = list(np.arange(positions_toUse.shape[0]))
@@ -204,3 +205,32 @@ def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_
                 tic_fps = time.time()
 
     cv2.destroyAllWindows()
+
+def conv_dim_reduce_workflow(config_filepath):
+    config = helpers.load_config(config_filepath)
+    pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
+    pts_all = helpers.load_data(config_filepath, 'path_pts_all')
+
+    # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
+    cosKernel, cosKernel_mean = create_kernel(config_filepath, pointInds_toUse)
+
+    # let's make new dots with wider spacing
+    pts_spaced_convDR = space_points(config_filepath, pts_all)
+    print(f'number of points: {pts_spaced_convDR.shape[0]}')
+    points_show(config_filepath, pts_all, pts_spaced_convDR)
+
+    ## now let's find coefficients of influence from each original dot onto each new dot
+    # CAUTION: Huge memory requirement (Lower number of CPUs in the pool to decrease memory usage. For my runs (1 hr at 120hz, downsampling to ~400 dots, I use 18 cores and it
+    # uses around 150GB of memory. Use single thread version otherwise)
+    positions_convDR_meanSub = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
+                                                                 cosKernel, cosKernel_mean)
+
+    positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
+
+    display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
+
+    helpers.save_data(config_filepath, 'path_cosKernel', cosKernel)
+    helpers.save_data(config_filepath, 'path_positions_convDR_meanSub', positions_convDR_meanSub)
+    helpers.save_data(config_filepath, 'path_positions_convDR_absolute', positions_convDR_absolute)
+    helpers.save_data(config_filepath, 'path_pts_spaced_convDR', pts_spaced_convDR)
+

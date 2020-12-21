@@ -1,8 +1,20 @@
 import numpy as np
 from face_rhythm.util import helpers
+import time
+import scipy.signal
+from matplotlib import pyplot as plt
 
-def clean_workflow(config_filepath, displacements):
+
+def clean_workflow(config_filepath):
     config = helpers.load_config(config_filepath)
+
+    outlier_threshold_positions = config['outlier_threshold_positions']
+    outlier_threshold_displacements = config['outlier_threshold_displacements']
+    framesHalted_beforeOutlier = config['framesHalted_beforeOutlier']
+    framesHalted_afterOutlier = config['framesHalted_afterOutlier']
+
+    displacements = helpers.load_data(config_filepath, 'displacements')
+    pointInds_toUse = helpers.load_data(config_filepath, 'pointInds_toUse')
 
     relaxation_factor = 0.01 # This is the speed at which the integrated position exponentially relaxes back to its anchored position
 
@@ -53,5 +65,12 @@ def clean_workflow(config_filepath, displacements):
             tmp = positions_new_sansOutliers[:,:,ii-1] + displacements_sansOutliers[:,:,ii]
         positions_new_sansOutliers[:,:,ii] = tmp - (tmp)*relaxation_factor
     print(f'Made a new integrated position. Elapsed time: {round(time.time() - tic , 1)} seconds')
-   
-    return positions_new_sansOutliers
+
+    positions_new_absolute_sansOutliers = positions_new_sansOutliers + np.squeeze(pointInds_toUse)[:, :, None]
+
+    pixelNum_toUse = 300
+    plt.figure()
+    plt.plot(positions_new_sansOutliers[pixelNum_toUse, 0, :])
+
+    helpers.save_data(config_filepath, 'positions', positions_new_sansOutliers)
+    helpers.save_data(config_filepath, 'positions_absolute', positions_new_absolute_sansOutliers)

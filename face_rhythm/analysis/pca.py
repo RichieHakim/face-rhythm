@@ -2,6 +2,8 @@ from matplotlib import pyplot as plt
 import numpy as np
 import sklearn as sk
 
+from face_rhythm.util import helpers
+
 
 def plot_diagnostics(output_PCA, pca, scores_points):
     # plt.figure()
@@ -16,7 +18,12 @@ def plot_diagnostics(output_PCA, pca, scores_points):
     plt.figure()
     plt.plot(scores_points[:,:3])
 
-def pca(config_filepath, positions_conv_meanSub):
+
+def pca_workflow(config_filepath):
+    config = helpers.load_config(config_filepath)
+
+    positions_convDR_meanSub = helpers.load_data(config_filepath, 'positions_convDR_meanSub')
+
     # input_dimRed = np.squeeze(positions_new_sansOutliers[:,1,:])
     tmp_x = np.squeeze(positions_convDR_meanSub[:,0,:])
     tmp_y = np.squeeze(positions_convDR_meanSub[:,1,:])
@@ -33,4 +40,6 @@ def pca(config_filepath, positions_conv_meanSub):
     output_PCA = pca.components_.transpose()
     scores_points = np.dot(input_dimRed_meanSub , output_PCA)
     plot_diagnostics(output_PCA, pca, scores_points)
-    return scores_points
+
+    helpers.save_data(config_filepath, 'path_scores_points', scores_points)
+    helpers.save_data(config_filepath, 'path_input_dimRed_meanSub', input_dimRed_meanSub)
