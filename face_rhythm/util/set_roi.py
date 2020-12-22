@@ -4,6 +4,12 @@ import numpy as np
 import skimage.draw
 
 
+import matplotlib.pyplot as plt
+import IPython.display as Disp
+from ipywidgets import widgets
+
+
+
 RED = (0, 0, 255)
 GREEN = (0, 255, 0)
 BLUE = (255, 0, 0)
@@ -92,5 +98,60 @@ def roi_workflow(config_filepath):
     ('pts_x_displacement', pts_x_displacement),
     ('pts_y_displacement', pts_y_displacement),
     ('mask_frame_displacement', mask_frame_displacement)
+    ])
+    helpers.save_data(config_filepath, 'path_pts_all', pts_all)
+
+
+class bbox_select():
+    #% matplotlib notebook
+
+    def __init__(self, im):
+        self.im = im
+        self.selected_points = []
+        self.fig, ax = plt.subplots()
+        self.img = ax.imshow(self.im.copy())
+        self.ka = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+        disconnect_button = widgets.Button(description="Disconnect mpl")
+        Disp.display(disconnect_button)
+        disconnect_button.on_click(self.disconnect_mpl)
+
+    def poly_img(self, img, pts):
+        pts = np.array(pts, np.int32)
+        pts = pts.reshape((-1, 1, 2))
+        cv2.polylines(img, [pts], True,
+                      (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255)), 7)
+        return img
+
+    def onclick(self, event):
+        # display(str(event))
+        self.selected_points.append([event.xdata, event.ydata])
+        if len(self.selected_points) > 1:
+            self.fig
+            self.img.set_data(self.poly_img(self.im.copy(), self.selected_points))
+
+    def disconnect_mpl(self, _):
+        self.fig.canvas.mpl_disconnect(self.ka)
+
+def test_inline_roi(config_filepath):
+    config = helpers.load_config(config_filepath)
+    global frame
+    frame = load_video(config['vidToSet'],config['frameToSet'],config['path_vid_allFiles'])
+    bs = bbox_select(frame)
+    pts = bs.selected_points
+    mask_frame = np.zeros((frame.shape[0], frame.shape[1]))
+    pts_y, pts_x = skimage.draw.polygon(np.array(pts)[:, 1], np.array(pts)[:, 0])
+    mask_frame[pts_y, pts_x] = 1
+
+    bbox = get_bbox(mask_frame)
+    bbox_subframe_displacement = bbox
+    pts_displacement, pts_x_displacement, pts_y_displacement = pts, pts_x, pts_y
+    mask_frame_displacement = mask_frame
+    cv2.destroyAllWindows()
+    pts_all = dict([
+        ('bbox_subframe_displacement', bbox_subframe_displacement),
+        ('pts_displacement', pts_displacement),
+        ('pts_x_displacement', pts_x_displacement),
+        ('pts_y_displacement', pts_y_displacement),
+        ('mask_frame_displacement', mask_frame_displacement)
     ])
     helpers.save_data(config_filepath, 'path_pts_all', pts_all)

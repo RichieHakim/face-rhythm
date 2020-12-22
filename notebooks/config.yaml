@@ -1,5 +1,3 @@
-base_dir: /Users/akshay/Documents/Harvard/face-rhythm/notebooks
-config_filepath: /Users/akshay/Documents/Harvard/face-rhythm/notebooks/config.yaml
 dir_vid: /Users/akshay/Documents/Harvard/face-rhythm/data
 fileName_vid: raw/gmou06_082720_faceTrack_session1.avi
 fileName_vid_numDigitsInIteration: 4
@@ -7,10 +5,14 @@ fileName_vid_prefix: cam3_2020-11-02-185732-
 fileName_vid_suffix: .avi
 frameToSet: 2
 multiple_files_pref: false
+numFrames_allFiles: 109550
 numFrames_total_rough: 109550
 numVids: 1
+path_base_dir: /Users/akshay/Documents/Harvard/face-rhythm/notebooks
+path_config: /Users/akshay/Documents/Harvard/face-rhythm/notebooks/config.yaml
 path_vid_allFiles: [/Users/akshay/Documents/Harvard/face-rhythm/data/raw/gmou06_082720_faceTrack_session1.avi]
 print_fileNames_pref: 1
+save_dir: /Users/akshay/Documents/Harvard/face-rhythm/data/processed
 slash_type: /
 vidToSet: 1
 vid_Fs: 30.0
