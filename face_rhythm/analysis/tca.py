@@ -61,12 +61,13 @@ def tca(config_filepath, positions):
     return factors_np
 
 
-def plot_factors(factors_np):
+def plot_factors(config_filepath, factors_np):
     factors_toUse = factors_np
     modelRank = factors_toUse[0].shape[1]
     ## just for plotting in case 
 #     if 'Fs' not in globals():
 #         Fs = 120
+    config = helpers.load_config(config_filepath)
     Fs = config['vid_Fs']
 
     plt.figure()
@@ -126,7 +127,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
     for factor_iter in factors_toShow:
 
         # vidNums_toUse = range(numVids) ## note zero indexing!
-        vidNums_toUse = 0 ## note zero indexing!
+        vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
 
         if type(vidNums_toUse) == int:
             vidNums_toUse = np.array([vidNums_toUse])
@@ -138,13 +139,15 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
 
     #     modelRank_toUse = 5
         factor_toShow = factor_iter+1
-        save_pref= 0
+        save_pref = config['tca_vid_save']
 
         # save_dir = "F:\\RH_Local\\Rich data\\camera data"
-        save_dir = f'/media/rich/bigSSD RH/res2p/Camera data/round 4 experiments/mouse 6.28/20201102/cam3/run7'
+        save_dir = config['tca_vid_dir']
         save_fileName = f'factor {factor_toShow}'
         # save_pathFull = f'{save_dir}\\{save_fileName}.avi'
         save_pathFull = f'{save_dir}/{save_fileName}.avi'
+        config[f'path_{save_fileName}'] = save_pathFull
+        helpers.save_config(config, config_filepath)
 
         # ensemble_toUse = ensemble
         ensemble_toUse = factors_np
@@ -225,7 +228,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
 
 
     out.release()
-    video.release()
+    #video.release()
     cv2.destroyAllWindows()
     
     
@@ -354,10 +357,13 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
         save_pref= 0
 
         # save_dir = "F:\\RH_Local\\Rich data\\camera data"
-        save_dir = config['save_dir']
+        save_dir = config['tca_vid_dir']
+        
         save_fileName = f'factor {factor_toShow}'
         # save_pathFull = f'{save_dir}\\{save_fileName}.avi'
         save_pathFull = f'{save_dir}/{save_fileName}.avi'
+        config[f'path_{save_fileName}'] = save_pathFull
+        helpers.save_config(config, config_filepath)
 
         # ensemble_toUse = ensemble
         ensemble_toUse = factors_np
@@ -438,7 +444,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
 
 
     out.release()
-    video.release()
+    #video.release()
     cv2.destroyAllWindows()
 
 
@@ -466,8 +472,8 @@ def positional_tca_workflow(config_filepath):
     
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
-    plot_factors(factors_np_positional)
-    factor_videos(config_filepath, factors_np, positions_convDR_absolute)
+    plot_factors(config_filepath, factors_np_positional)
+    factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
 
     helpers.save_data(config_filepath, 'factors_np_positional', factors_np_positional)
     

@@ -10,7 +10,8 @@ setup(
     install_requires=['torch','torchvision','torchaudio',
                       'jupyterlab', 'tensorly', 'opencv-python',
                       'imageio', 'matplotlib','scikit-learn',
-                      'scikit-image','librosa', 'ruamel.yaml'
+                      'scikit-image','librosa', 'ruamel.yaml',
+                      'imageio-ffmpeg'
 
     ]
 )
