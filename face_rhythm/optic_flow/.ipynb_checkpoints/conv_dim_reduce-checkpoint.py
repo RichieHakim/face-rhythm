@@ -1,5 +1,6 @@
 import numpy as np
-import sklearn as sk
+import sklearn.decomposition
+
 import cv2
 import imageio
 import multiprocessing
@@ -125,7 +126,7 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     dots_old = pointInds_toUse
     dots_new = pts_spaced_convDR
 
-    pca = sk.decomposition.PCA(n_components=num_components)
+    pca = sklearn.decomposition.PCA(n_components=num_components)
     # p = Pool(multiprocessing.cpu_count())
     p = Pool(int(multiprocessing.cpu_count() / 3))
     positions_convDR_meanSub_list = p.map(partial(makeConvDR, input_traces = input_traces, cos_kernel = cosKernel, cos_kernel_mean = cosKernel_mean, pca = pca, rank_reduced = rank_reduced, dots_new=dots_new), range(dots_new.shape[0]))
@@ -206,6 +207,7 @@ def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_
 
     cv2.destroyAllWindows()
 
+    
 def conv_dim_reduce_workflow(config_filepath):
     print(f'== Beginning convolutional dimensionality reduction ==')
     tic_all = time.time()
@@ -213,8 +215,9 @@ def conv_dim_reduce_workflow(config_filepath):
     tic = time.time()
     config = helpers.load_config(config_filepath)
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
-    pts_all = helpers.load_data(config_filepath, 'path_pts_all')
-    
+    pts_all = helpers.load_data(config_filepath, 'path_pts_all')[()]
+    positions_new_sansOutliers = helpers.load_data(config_filepath, 'path_positions')
+    print(f'Data Loaded. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
 
     # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
     tic = time.time()
@@ -227,25 +230,33 @@ def conv_dim_reduce_workflow(config_filepath):
     print(f'number of points: {pts_spaced_convDR.shape[0]}')
     print(f'Points spaced out. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
     
-    points_show(config_filepath, pts_all, pts_spaced_convDR)
+    helpers.save_data(config_filepath, 'cosKernel', cosKernel)
+    helpers.save_data(config_filepath, 'cosKernel_mean', cosKernel_mean)
+    helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
+    
+    cosKernel = helpers.load_data(config_filepath, 'path_cosKernel')
+    cosKernel = helpers.load_data(config_filepath, 'path_cosKernel_mean')
+    pts_spaced_convDR = helpers.load_data(config_filepath, 'path_pts_spaced_convDR')
+    
+    #points_show(config_filepath, pts_all, pts_spaced_convDR)
 
     ## now let's find coefficients of influence from each original dot onto each new dot
     # CAUTION: Huge memory requirement (Lower number of CPUs in the pool to decrease memory usage. For my runs (1 hr at 120hz, downsampling to ~400 dots, I use 18 cores and it
     # uses around 150GB of memory. Use single thread version otherwise)
     tic = time.time()
     positions_convDR_meanSub = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
-                                                                 cosKernel, cosKernel_mean)
+                                                                 cosKernel, cosKernel_mean, positions_new_sansOutliers)
     print(f'Influence computed. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
     
     positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
 
-    display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
+    #display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
     
     tic = time.time()
-    helpers.save_data(config_filepath, 'cosKernel', cosKernel)
+    #helpers.save_data(config_filepath, 'cosKernel', cosKernel)
     helpers.save_data(config_filepath, 'positions_convDR_meanSub', positions_convDR_meanSub)
     helpers.save_data(config_filepath, 'positions_convDR_absolute', positions_convDR_absolute)
-    helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
+    #helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
     print(f'Data saved. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
     
     toc = time.time() - tic_all

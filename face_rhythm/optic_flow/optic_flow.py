@@ -232,17 +232,31 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     
     
 def optic_workflow(config_filepath):
+    print(f'== Beginning optic flow computation ==')
+    tic_all = time.time()
+    
     config = helpers.load_config(config_filepath)  
     pts_all = np.load(config['path_pts_all'], allow_pickle=True)[()]
+    
+    tic = time.time()
     pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples = setup(config, pts_all)
+    print(f'Set Up Optic Flow Data. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    
+    tic = time.time()
     if config['optic_multithread']:
         displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
     else: 
         displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced)
+    print(f'Displacements computed. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
 
+    tic = time.time()
     config['numFrames_total'] = numFrames_total
     helpers.save_config(config, config_filepath)
 
     helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
     helpers.save_data(config_filepath, 'displacements', displacements)
-
+    print(f'Data saved. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    
+    toc = time.time() - tic_all
+    print(f'total elapsed time: {round(toc/60,2)} minutes')
+    print(f'== End Optic Flow Computation ==')
