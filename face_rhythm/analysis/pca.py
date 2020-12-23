@@ -22,7 +22,7 @@ def plot_diagnostics(output_PCA, pca, scores_points):
 def pca_workflow(config_filepath):
     config = helpers.load_config(config_filepath)
 
-    positions_convDR_meanSub = helpers.load_data(config_filepath, 'positions_convDR_meanSub')
+    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
 
     # input_dimRed = np.squeeze(positions_new_sansOutliers[:,1,:])
     tmp_x = np.squeeze(positions_convDR_meanSub[:,0,:])

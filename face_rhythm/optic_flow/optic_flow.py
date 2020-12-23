@@ -205,8 +205,7 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     ind_concat = 0
     fps = 0
     p = Pool(multiprocessing.cpu_count())  # where the magic acutally happens
-    displacements_list = p.map(partial(importVid, pointInds_toUse = pointInds_toUse, pts_spaced = pts_spaced),
-                                       list(np.arange(numVids)))
+    displacements_list = p.map(partial(importVid, pointInds_toUse = pointInds_toUse, pts_spaced = pts_spaced), list(np.arange(numVids)))
 
     ## all of the below called for safety.
     p.close()

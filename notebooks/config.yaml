@@ -10,6 +10,7 @@ numFrames_total_rough: 109550
 numVids: 1
 path_base_dir: /Users/akshay/Documents/Harvard/face-rhythm/notebooks
 path_config: /Users/akshay/Documents/Harvard/face-rhythm/notebooks/config.yaml
+path_pts_all: /Users/akshay/Documents/Harvard/face-rhythm/data/processed/pts_all.npy
 path_vid_allFiles: [/Users/akshay/Documents/Harvard/face-rhythm/data/raw/gmou06_082720_faceTrack_session1.avi]
 print_fileNames_pref: 1
 save_dir: /Users/akshay/Documents/Harvard/face-rhythm/data/processed

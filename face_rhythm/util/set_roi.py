@@ -99,11 +99,10 @@ def roi_workflow(config_filepath):
     ('pts_y_displacement', pts_y_displacement),
     ('mask_frame_displacement', mask_frame_displacement)
     ])
-    helpers.save_data(config_filepath, 'path_pts_all', pts_all)
+    helpers.save_data(config_filepath, 'pts_all', pts_all)
 
 
 class bbox_select():
-    #% matplotlib notebook
 
     def __init__(self, im):
         self.im = im
@@ -132,6 +131,7 @@ class bbox_select():
     def disconnect_mpl(self, _):
         self.fig.canvas.mpl_disconnect(self.ka)
 
+
 def test_inline_roi(config_filepath):
     config = helpers.load_config(config_filepath)
     global frame
@@ -154,4 +154,4 @@ def test_inline_roi(config_filepath):
         ('pts_y_displacement', pts_y_displacement),
         ('mask_frame_displacement', mask_frame_displacement)
     ])
-    helpers.save_data(config_filepath, 'path_pts_all', pts_all)
+    helpers.save_data(config_filepath, 'pts_all', pts_all)

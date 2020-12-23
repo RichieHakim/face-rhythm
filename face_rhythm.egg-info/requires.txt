@@ -9,3 +9,4 @@ matplotlib
 scikit-learn
 scikit-image
 librosa
+ruamel.yaml
