@@ -1,7 +1,8 @@
-.idea/*
-data/*
-face_rhythm.egg-info/*
-face_rhythm/__pychache__/*
-face_rhythm/util/__pychache__/*
-notebooks/.ipynb_checkpoints/*
-notebooks/config.yaml
+.idea
+data
+face_rhythm.egg-info
+face_rhythm/__pychache__
+face_rhythm/util/__pychache__
+face_rhythm/analysis/__pychache__
+*.ipynb_checkpoints
+notebooks/config*
