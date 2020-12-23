@@ -92,7 +92,8 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     printFPS_pref = config['printFPS_pref']
 
     lk_names  = [key for key in config.keys() if 'lk_' in key]
-    lk_params = {k: config[k] for k in lk_names}
+    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+                 for k in lk_names}
 
     for vidNum_iter in vidNums_toUse:
         vid = imageio.get_reader(path_vid_allFiles[vidNum_iter],  'ffmpeg')
@@ -157,14 +158,15 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
     displacements = displacements[:,:,~np.isnan(displacements[0,0,:])]
 
-    return displacements
+    return displacements, numFrames_total
     
 
-def importVid(config, vidNum_iter, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
+def importVid(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
     numVids = config['numVids']
     path_vid_allFiles = config['path_vid_allFiles']
     lk_names = [key for key in config.keys() if 'lk_' in key]
-    lk_params = {k: config[k] for k in lk_names}
+    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+                 for k in lk_names}
 
     vid = imageio.get_reader(path_vid_allFiles[vidNum_iter],  'ffmpeg')
 #     metadata = vid.get_meta_data()
@@ -205,8 +207,7 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     ind_concat = 0
     fps = 0
     p = Pool(multiprocessing.cpu_count())  # where the magic acutally happens
-    displacements_list = p.map(partial(importVid, pointInds_toUse = pointInds_toUse, pts_spaced = pts_spaced),
-                                       list(np.arange(numVids)))
+    displacements_list = p.map(partial(importVid, config = config, pointInds_toUse = pointInds_toUse, pts_spaced = pts_spaced),list(np.arange(numVids)))
 
     ## all of the below called for safety.
     p.close()
@@ -226,15 +227,22 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
 
     displacements = displacements[:,:,~np.isnan(displacements[0,0,:])]
     numFrames_total = displacements.shape[2]
-    return displacements
+
+    return displacements, numFrames_total
     
     
 def optic_workflow(config_filepath):
     config = helpers.load_config(config_filepath)  
     pts_all = np.load(config['path_pts_all'], allow_pickle=True)[()]
-    pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced = setup(config, pts_all)
+    pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples = setup(config, pts_all)
     if config['optic_multithread']:
-        displacements =  displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
+        displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
     else: 
-        displacements = displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced)
-    return displacements, pointInds_toUse
+        displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced)
+
+    config['numFrames_total'] = numFrames_total
+    helpers.save_config(config, config_filepath)
+
+    helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
+    helpers.save_data(config_filepath, 'displacements', displacements)
+

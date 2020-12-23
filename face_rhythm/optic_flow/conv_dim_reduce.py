@@ -128,7 +128,7 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     pca = sk.decomposition.PCA(n_components=num_components)
     # p = Pool(multiprocessing.cpu_count())
     p = Pool(int(multiprocessing.cpu_count() / 3))
-    positions_convDR_meanSub_list = p.map(partial(makeConvDR, ), range(dots_new.shape[0]))
+    positions_convDR_meanSub_list = p.map(partial(makeConvDR, input_traces = input_traces, cos_kernel = cosKernel, cos_kernel_mean = cosKernel_mean, pca = pca, rank_reduced = rank_reduced, dots_new=dots_new), range(dots_new.shape[0]))
     p.close()
     p.terminate()
     p.join()
@@ -207,30 +207,47 @@ def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_
     cv2.destroyAllWindows()
 
 def conv_dim_reduce_workflow(config_filepath):
+    print(f'== Beginning convolutional dimensionality reduction ==')
+    tic_all = time.time()
+    
+    tic = time.time()
     config = helpers.load_config(config_filepath)
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
     pts_all = helpers.load_data(config_filepath, 'path_pts_all')
+    
 
     # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
+    tic = time.time()
     cosKernel, cosKernel_mean = create_kernel(config_filepath, pointInds_toUse)
+    print(f'Kernel created. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
 
     # let's make new dots with wider spacing
+    tic = time.time()
     pts_spaced_convDR = space_points(config_filepath, pts_all)
     print(f'number of points: {pts_spaced_convDR.shape[0]}')
+    print(f'Points spaced out. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    
     points_show(config_filepath, pts_all, pts_spaced_convDR)
 
     ## now let's find coefficients of influence from each original dot onto each new dot
     # CAUTION: Huge memory requirement (Lower number of CPUs in the pool to decrease memory usage. For my runs (1 hr at 120hz, downsampling to ~400 dots, I use 18 cores and it
     # uses around 150GB of memory. Use single thread version otherwise)
+    tic = time.time()
     positions_convDR_meanSub = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean)
-
+    print(f'Influence computed. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    
     positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
 
     display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
-
-    helpers.save_data(config_filepath, 'path_cosKernel', cosKernel)
-    helpers.save_data(config_filepath, 'path_positions_convDR_meanSub', positions_convDR_meanSub)
-    helpers.save_data(config_filepath, 'path_positions_convDR_absolute', positions_convDR_absolute)
-    helpers.save_data(config_filepath, 'path_pts_spaced_convDR', pts_spaced_convDR)
-
+    
+    tic = time.time()
+    helpers.save_data(config_filepath, 'cosKernel', cosKernel)
+    helpers.save_data(config_filepath, 'positions_convDR_meanSub', positions_convDR_meanSub)
+    helpers.save_data(config_filepath, 'positions_convDR_absolute', positions_convDR_absolute)
+    helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
+    print(f'Data saved. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    
+    toc = time.time() - tic_all
+    print(f'total elapsed time: {round(toc/60,2)} minutes')
+    print(f'== End convolutional dimensionality reduction ==')

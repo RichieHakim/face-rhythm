@@ -92,7 +92,8 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     printFPS_pref = config['printFPS_pref']
 
     lk_names  = [key for key in config.keys() if 'lk_' in key]
-    lk_params = {k: config[k] for k in lk_names}
+    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+                 for k in lk_names}
 
     for vidNum_iter in vidNums_toUse:
         vid = imageio.get_reader(path_vid_allFiles[vidNum_iter],  'ffmpeg')
@@ -160,11 +161,12 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     return displacements, numFrames_total
     
 
-def importVid(config, vidNum_iter, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
+def importVid(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
     numVids = config['numVids']
     path_vid_allFiles = config['path_vid_allFiles']
     lk_names = [key for key in config.keys() if 'lk_' in key]
-    lk_params = {k: config[k] for k in lk_names}
+    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+                 for k in lk_names}
 
     vid = imageio.get_reader(path_vid_allFiles[vidNum_iter],  'ffmpeg')
 #     metadata = vid.get_meta_data()
@@ -205,8 +207,7 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     ind_concat = 0
     fps = 0
     p = Pool(multiprocessing.cpu_count())  # where the magic acutally happens
-    displacements_list = p.map(partial(importVid, pointInds_toUse = pointInds_toUse, pts_spaced = pts_spaced),
-                                       list(np.arange(numVids)))
+    displacements_list = p.map(partial(importVid, config = config, pointInds_toUse = pointInds_toUse, pts_spaced = pts_spaced),list(np.arange(numVids)))
 
     ## all of the below called for safety.
     p.close()
