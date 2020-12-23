@@ -354,7 +354,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
         save_pref= 0
 
         # save_dir = "F:\\RH_Local\\Rich data\\camera data"
-        save_dir = f'/media/rich/bigSSD RH/res2p/Camera data/round 4 experiments/mouse 6.28/20201102/cam3/run7'
+        save_dir = config['save_dir']
         save_fileName = f'factor {factor_toShow}'
         # save_pathFull = f'{save_dir}\\{save_fileName}.avi'
         save_pathFull = f'{save_dir}/{save_fileName}.avi'
@@ -467,7 +467,7 @@ def positional_tca_workflow(config_filepath):
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
     plot_factors(factors_np_positional)
-    #factor_videos(config_filepath, factors_np, positions_convDR_absolute)
+    factor_videos(config_filepath, factors_np, positions_convDR_absolute)
 
     helpers.save_data(config_filepath, 'factors_np_positional', factors_np_positional)
     
@@ -492,7 +492,7 @@ def full_tca_workflow(config_filepath):
     factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
     factors_xcorr = correlations(config_filepath, factors_np)
     
-    #more_factors_videos(factors_np, positions_convDR_absolute)
+    more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
     factor_tsne(factors_temporal)
 
