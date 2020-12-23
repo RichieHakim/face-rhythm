@@ -1,11 +1,18 @@
-def cqt_all(config_filepath, positions_convDR_meanSub, freqs_Sxx):
-    
-    print(f'== Starting CQT spectrogram calculations ==')
-    tic_all = time.time()
+import time
+import sys
 
-    ## define positions traces to use
-    # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
-    input_sgram = np.single(np.squeeze(positions_convDR_meanSub))[:,:,:]
+import numpy as np
+import scipy.stats
+import librosa
+from matplotlib import pyplot as plt
+
+from face_rhythm.util import helpers
+
+
+def cqt_all(config_filepath):    
+    
+    print(f'== Beginning Spectrogram Computation ==')
+    tic_all = time.time()
 
     ## get parameters
     config = helpers.load_config(config_filepath)
@@ -15,6 +22,14 @@ def cqt_all(config_filepath, positions_convDR_meanSub, freqs_Sxx):
     n_bins = config['cqt_n_bins']
     bins_per_octave = config['cqt_bins_per_octave']
     fmin = config['cqt_fmin']
+
+    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
+    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+
+
+    ## define positions traces to use
+    # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
+    input_sgram = np.single(np.squeeze(positions_convDR_meanSub))[:,:,:]
 
     ## make a single spectrogram to get some size parameters for preallocation
     Sxx = librosa.cqt(np.squeeze(input_sgram[0,0,:]), 
@@ -27,11 +42,12 @@ def cqt_all(config_filepath, positions_convDR_meanSub, freqs_Sxx):
 
     # preallocation
     tic = time.time()
-    print(f'preallocating')
     Sxx_allPixels = np.single(np.zeros((input_sgram.shape[0] , Sxx.shape[0] , Sxx.shape[1] , 2)))  
-    print(f'preallocation done. Elapsed time: {round((time.time() - tic) , 2)} seconds')
+    helpers.print_time('Preallocation completed', time.time() - tic_all)  
+    
 
     print(f'starting spectrogram calculation')
+    tic = time.time()
     for ii in range(input_sgram.shape[0]):
         ## progress tracking
         if ii%50 ==0:
@@ -61,28 +77,41 @@ def cqt_all(config_filepath, positions_convDR_meanSub, freqs_Sxx):
 
             Sxx_allPixels[ii,:,:,jj] = tmp
     # Sxx_allPixels = Sxx_allPixels / np.std(Sxx_allPixels , axis=1)[:,None,:,:]
-
+    
     print(f'completed spectrogram calculation')
     print('Info about Sxx_allPixels:\n')
     print(f'Shape: {Sxx_allPixels.shape}')
     print(f'Number of elements: {Sxx_allPixels.shape[0]*Sxx_allPixels.shape[1]*Sxx_allPixels.shape[2]*Sxx_allPixels.shape[3]}')
     print(f'Data type: {Sxx_allPixels.dtype}')
     print(f'size of Sxx_allPixels: {round(sys.getsizeof(Sxx_allPixels)/1000000000,3)} GB')
-    print(f'== Spectrograms computed. Total elapsed time: {round((time.time() - tic_all)/60 , 2)} minutes ==')
+    helpers.print_time('Spectrograms computed', time.time() - tic_all)    
 
     ### Normalize the spectrograms so that each time point has a similar cumulative spectral amplitude across all dots (basically, sum of power of all frequencies from all dots at a particular time should equal one)
     ## hold onto the normFactor variable because you can use to it to undo the normalization after subsequent steps
     Sxx_allPixels_normFactor = np.mean(np.sum(Sxx_allPixels , axis=1) , axis=0)
     Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[None,None,:,:]
-    Sxx_allPixels_norm.shape
+    #Sxx_allPixels_norm.shape
+
+    plt.figure()
+    plt.imshow(Sxx_allPixels_norm[500, :, :, 0], aspect='auto', cmap='hot', origin='lower')
+
+    plt.figure()
+    plt.plot(Sxx_allPixels_normFactor)
+
+    helpers.save_data(config_filepath, 'Sxx_allPixels',Sxx_allPixels)
+    helpers.save_data(config_filepath, 'Sxx_allPixels_norm', Sxx_allPixels_norm)
+    helpers.save_data(config_filepath, 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor)
+    helpers.save_data(config_filepath, 'tmp', tmp)
     
-    return Sxx_allPixels, Sxx_allPixels_norm, Sxx_allPixels_normFactor, tmp
+    helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'== End spectorgram computation ==')
 
-def cqt_positions(config_filepath, factors_np_positional, freqs_Sxx):
 
-    ## define positions traces to use
-    input_sgram = np.single(np.squeeze(factors_np_positional[2][:,3]))
+def cqt_positions(config_filepath):
 
+    print(f'== Beginning Spectrogram Computation ==')
+    tic_all = time.time()
+    
     ## get parameters
     config = helpers.load_config(config_filepath)
     hop_length = config['cqt_hop_length']
@@ -91,6 +120,15 @@ def cqt_positions(config_filepath, factors_np_positional, freqs_Sxx):
     n_bins = config['cqt_n_bins']
     bins_per_octave = config['cqt_bins_per_octave']
     fmin = config['cqt_fmin']
+
+    factors_np_positional = helpers.load_data(config_filepath, 'path_factors_np_positional')
+    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+
+    print(f'starting spectrogram calculation')
+    tic = time.time()
+    
+    ## define positions traces to use
+    input_sgram = np.single(np.squeeze(factors_np_positional[2][:,3]))
 
     ## make a single spectrogram to get some size parameters for preallocation
     Sxx_positional = librosa.cqt(np.squeeze(input_sgram), 
@@ -109,8 +147,22 @@ def cqt_positions(config_filepath, factors_np_positional, freqs_Sxx):
     test = Sxx_positional / (test_std[None,:] )
     # test = (Sxx_positional) / (test_sum[None,:])
     # test = test - np.min(test , axis=0)[None,:]
+    
+    helpers.print_time('Spectrogram', time.time() - tic_all)
 
     test2 = scipy.stats.zscore(Sxx_positional , axis=1)
     test2 = test2 - np.min(test2 , axis=1)[:,None]
+
+    plt.figure()
+    plt.imshow(Sxx_positional, aspect='auto', cmap='hot', origin='lower')
+    plt.figure()
+    plt.imshow(test, aspect='auto', cmap='hot', origin='lower')
+    plt.figure()
+    plt.imshow(test2, aspect='auto', cmap='hot', origin='lower')
+
+    helpers.save_data(config_filepath, 'Sxx_positional', Sxx_positional)
+    helpers.save_data(config_filepath, 'test', test)
+    helpers.save_data(config_filepath, 'test2', test2)
     
-    return Sxx_positional, test, test2
+    helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'== End spectorgram computation ==')

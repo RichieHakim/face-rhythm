@@ -9,7 +9,6 @@ def clean_workflow(config_filepath):
     print(f'== Beginning outlier removal ==')
     tic_all = time.time()
     
-    tic = time.time()
     config = helpers.load_config(config_filepath)
 
     outlier_threshold_positions = config['outlier_threshold_positions']
@@ -19,14 +18,13 @@ def clean_workflow(config_filepath):
 
     displacements = helpers.load_data(config_filepath, 'path_displacements')
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
-    print(f'Files Loaded. Elapsed time: {round(time.time() - tic , 1)} seconds')
 
     relaxation_factor = 0.01 # This is the speed at which the integrated position exponentially relaxes back to its anchored position
 
     ## Remove flagrant outliers from displacements
     tic = time.time()
     displacements_simpleOutliersRemoved = displacements * (np.abs(displacements) < outlier_threshold_displacements)
-    print(f'Flagrant outliers removed. Elapsed time: {round(time.time() - tic , 1)} seconds')
+    helpers.print_time('Flagrant Outliers Removed', time.time() - tic)
 
     ## Make a convolutional kernel for extending the outlier trace
     kernel = np.zeros(np.max(np.array([framesHalted_beforeOutlier , framesHalted_afterOutlier])) * 2 + 1)
@@ -43,19 +41,19 @@ def clean_workflow(config_filepath):
             tmp = positions_new[:,:,ii-1] + displacements_simpleOutliersRemoved[:,:,ii]  # heres the integration
         positions_new[:,:,ii] = tmp - (tmp)*relaxation_factor  # and the relaxation
         
-    print(f'Made integrated position traces. Elapsed time: {round(time.time() - tic , 1)} seconds')
+    helpers.print_time('Made integrated position traces', time.time() - tic)
 
     ## Define outliers, then extend the outlier trace to include the outlier kernel (before and after a threshold event)
     tic = time.time()
     positions_tracked_outliers = (np.abs(positions_new) > outlier_threshold_positions)
     positions_tracked_outliers_extended = np.apply_along_axis(lambda m: scipy.signal.convolve(m , kernel, mode='same'), axis=2, arr=positions_tracked_outliers)
     positions_tracked_outliers_extended = positions_tracked_outliers_extended > 0
-    print(f'Made extended outliers trace. Elapsed time: {round(time.time() - tic , 1)} seconds')
+    helpers.print_time('Made extended outliers trace', time.time() - tic)
 
     ## Make outlier timepoints zero in 'displacements'
     tic = time.time()
     displacements_sansOutliers = displacements_simpleOutliersRemoved * (~positions_tracked_outliers_extended)
-    print(f'All outliers removed. Elapsed time: {round(time.time() - tic , 1)} seconds')
+    helpers.print_time('All outliers removed', time.time() - tic)
 
     ## Make a new integrated position traces array the displacement traces, but now with the outliers set to zero
     tic = time.time()
@@ -66,11 +64,11 @@ def clean_workflow(config_filepath):
         else: 
             tmp = positions_new_sansOutliers[:,:,ii-1] + displacements_sansOutliers[:,:,ii]
         positions_new_sansOutliers[:,:,ii] = tmp - (tmp)*relaxation_factor
-    print(f'Made a new integrated position. Elapsed time: {round(time.time() - tic , 1)} seconds')
+    helpers.print_time('Made a new integrated position trace', time.time() - tic)
     
     tic = time.time()
     positions_new_absolute_sansOutliers = positions_new_sansOutliers + np.squeeze(pointInds_toUse)[:, :, None]
-    print(f'Final absolute position trace. Elapsed time: {round(time.time() - tic , 1)} seconds')
+    helpers.print_time('Final absolute position trace', time.time() - tic)
     
     pixelNum_toUse = 300
     plt.figure()
@@ -80,8 +78,6 @@ def clean_workflow(config_filepath):
     tic = time.time()
     helpers.save_data(config_filepath, 'positions', positions_new_sansOutliers)
     helpers.save_data(config_filepath, 'positions_absolute', positions_new_absolute_sansOutliers)
-    print(f'Files saved. Elapsed time: {round(time.time() - tic , 1)} seconds')
     
-    toc = time.time() - tic_all
-    print(f'total elapsed time: {round(toc/60,2)} minutes')
+    helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End outlier removal ==')

@@ -223,3 +223,7 @@ def save_data(config_filepath, save_name, data_to_save):
 def load_data(config_filepath, data_key):
     config = load_config(config_filepath)
     return np.load(config[data_key], allow_pickle=True)
+
+
+#def print_time(action, time):
+    

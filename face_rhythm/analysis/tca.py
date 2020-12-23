@@ -6,10 +6,14 @@ import cv2
 import matplotlib
 from matplotlib import pyplot as plt
 import numpy as np
+
 import scipy
+import scipy.signal
 import tensorly as tl
 import tensorly.decomposition
 import sklearn as sk
+import sklearn.decomposition
+import sklearn.manifold
 
 from face_rhythm.util import helpers
 
@@ -20,17 +24,14 @@ def tca(config_filepath, positions):
     pref_useGPU = config['tca_pref_useGPU']
     device = config['tca_device']
     rank = config['tca_rank']
+    init = config['tca_init']
 
     input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
     
     tl.set_backend('pytorch')
     
     ## Prepare the input tensor
-    print(f'== Starting loading tensor ==')
-    tic = time.time()
-
     input_tensor = tl.tensor(positions, dtype=tl.float32, device=device, requires_grad=False)
-    print(f'== Finished loading tensor. Elapsed time: {round(time.time() - tic,2)} seconds ==')
 
     print(f'Size of input (spectrogram): {input_tensor.shape}')
 
@@ -38,8 +39,7 @@ def tca(config_filepath, positions):
     
     ### Fit TCA model
     ## If the input is small, set init='svd'
-
-    weights, factors_positional = tensorly.decomposition.parafac(input_tensor, init='random', tol=1e-06, n_iter_max=800, rank=rank, verbose=True, orthogonalise=False, random_state=1234)
+    weights, factors_positional = tensorly.decomposition.parafac(input_tensor, init=init, tol=1e-06, n_iter_max=800, rank=rank, verbose=1, orthogonalise=False, random_state=1234)
     # weights, factors = tensorly.decomposition.non_negative_parafac(Sxx_allPixels_tensor[:,:,:,:], init='svd', tol=1e-05, n_iter_max=100, rank=rank, verbose=True,)
     # weights, factors = tensorly.decomposition.parafac(Sxx_allPixels_tensor, init='random', tol=1e-05, n_iter_max=1000, rank=rank, verbose=True)
 
@@ -65,8 +65,9 @@ def plot_factors(factors_np):
     factors_toUse = factors_np
     modelRank = factors_toUse[0].shape[1]
     ## just for plotting in case 
-    if 'Fs' not in globals():
-        Fs = 120
+#     if 'Fs' not in globals():
+#         Fs = 120
+    Fs = config['vid_Fs']
 
     plt.figure()
     # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
@@ -111,7 +112,7 @@ def plot_factors(factors_np):
     
 def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
     config = helpers.load_config(config_filepath)
-    Fs = config['Fs']
+    Fs = config['vid_Fs']
     vid_width = config['vid_width']
     vid_height = config['vid_height']
     numFrames_allFiles = config['numFrames_allFiles']
@@ -231,7 +232,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
 def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor):
     
     config = helpers.load_config(config_filepath)
-    Fs = config['Fs']
+    Fs = config['vid_Fs']
 
     factors_toUse = factors_np
     modelRank = factors_toUse[0].shape[1]
@@ -289,7 +290,7 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
 
     input_dimRed = factors_toUse[2][:,:]
     # input_dimRed_meanSub = 
-    pca = sk.decomposition.PCA(n_components=modelRank-2)
+    pca = sklearn.decomposition.PCA(n_components=modelRank-2)
     # pca = sk.decomposition.FactorAnalysis(n_components=3)
     pca.fit(np.single(input_dimRed).transpose())
     output_PCA = pca.components_.transpose()
@@ -325,7 +326,7 @@ def correlations(config_filepath, factors_np):
 
 def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     config = helpers.load_config(config_filepath)
-    Fs = config['Fs']
+    Fs = config['vid_Fs']
     vid_width = config['vid_width']
     vid_height = config['vid_height']
     numFrames_allFiles = config['numFrames_allFiles']
@@ -443,7 +444,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
 
 def factor_tsne(factors):
     print("Computing t-SNE embedding")
-    tsne = sk.manifold.TSNE(n_components=2, init='pca',
+    tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
                          random_state=0, perplexity=200)
     X_tsne = tsne.fit_transform(factors)
     print("Finished computing t-SNE embedding")
@@ -457,29 +458,47 @@ def factor_tsne(factors):
 
 
 def positional_tca_workflow(config_filepath):
+    print(f'== Beginning Positional TCA Workflow ==')
+    tic_all = time.time()
+    
     positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
-
+    positions_convDR_absolute = helpers.load_data(config_filepath, 'path_positions_convDR_absolute')
+    
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
     plot_factors(factors_np_positional)
-    factor_videos(factors_np_positional)
+    #factor_videos(config_filepath, factors_np, positions_convDR_absolute)
 
-    helpers.save_data(config_filepath, 'path_factors_np_positional', factors_np_positional)
+    helpers.save_data(config_filepath, 'factors_np_positional', factors_np_positional)
+    
+    helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'== End Positional TCA ==')
 
 
 def full_tca_workflow(config_filepath):
-    tmp = helpers.load_data(config_filepath, 'path_tmp')
+    print(f'== Beginning Full TCA Workflow ==')
+    tic_all = time.time()
+    
+    Sxx_allPixels_norm = helpers.load_data(config_filepath, 'path_Sxx_allPixels_norm')
     positions_convDR_absolute = helpers.load_data(config_filepath, 'path_positions_convDR_absolute')
     freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
     Sxx_allPixels_normFactor = helpers.load_data(config_filepath, 'path_Sxx_allPixels_normFactor')
 
-    factors_np = tca(config_filepath, tmp[:,:,:,:])
-    factors_xcorr = correlations(config_filepath, factors_np)
+    tic = time.time()
+    factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])
+    helpers.print_time('Decomposition completed', time.time() - tic)
+    
+    
     factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
-
-    more_factors_videos(factors_np, positions_convDR_absolute)
+    factors_xcorr = correlations(config_filepath, factors_np)
+    
+    #more_factors_videos(factors_np, positions_convDR_absolute)
 
     factor_tsne(factors_temporal)
 
-    helpers.save_data(config_filepath, 'path_factors_np', factors_np)
-    helpers.save_data(config_filepath, 'path_factors_np', factors_np)
+    helpers.save_data(config_filepath, 'factors_np', factors_np)
+    helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
+    helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
+    
+    helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'== End Full TCA ==')

@@ -223,3 +223,19 @@ def save_data(config_filepath, save_name, data_to_save):
 def load_data(config_filepath, data_key):
     config = load_config(config_filepath)
     return np.load(config[data_key], allow_pickle=True)
+
+
+def print_time(action, time):
+    hour = 60*60
+    minute = 60
+    if time > hour:
+        reported_time = time / hour
+        unit = 'hours'
+    elif time > 2 * minute:
+        reported_time = time / minute
+        unit = 'minutes'
+    else:
+        reported_time = time
+        unit = 'seconds'
+    reported_time = round(reported_time, 2)
+    print(f'{action}. Elapsed time: {reported_time} {unit}')

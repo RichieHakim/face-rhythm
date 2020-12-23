@@ -212,31 +212,29 @@ def conv_dim_reduce_workflow(config_filepath):
     print(f'== Beginning convolutional dimensionality reduction ==')
     tic_all = time.time()
     
-    tic = time.time()
     config = helpers.load_config(config_filepath)
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
     pts_all = helpers.load_data(config_filepath, 'path_pts_all')[()]
     positions_new_sansOutliers = helpers.load_data(config_filepath, 'path_positions')
-    print(f'Data Loaded. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
 
     # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
     tic = time.time()
     cosKernel, cosKernel_mean = create_kernel(config_filepath, pointInds_toUse)
-    print(f'Kernel created. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    helpers.print_time('Kernel created', time.time() - tic)
 
     # let's make new dots with wider spacing
     tic = time.time()
     pts_spaced_convDR = space_points(config_filepath, pts_all)
     print(f'number of points: {pts_spaced_convDR.shape[0]}')
-    print(f'Points spaced out. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    helpers.print_time('Points spaced out', time.time() - tic)
     
-    helpers.save_data(config_filepath, 'cosKernel', cosKernel)
-    helpers.save_data(config_filepath, 'cosKernel_mean', cosKernel_mean)
-    helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
+#     helpers.save_data(config_filepath, 'cosKernel', cosKernel)
+#     helpers.save_data(config_filepath, 'cosKernel_mean', cosKernel_mean)
+#     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
     
-    cosKernel = helpers.load_data(config_filepath, 'path_cosKernel')
-    cosKernel = helpers.load_data(config_filepath, 'path_cosKernel_mean')
-    pts_spaced_convDR = helpers.load_data(config_filepath, 'path_pts_spaced_convDR')
+#     cosKernel = helpers.load_data(config_filepath, 'path_cosKernel')
+#     cosKernel_mean = helpers.load_data(config_filepath, 'path_cosKernel_mean')
+#     pts_spaced_convDR = helpers.load_data(config_filepath, 'path_pts_spaced_convDR')
     
     #points_show(config_filepath, pts_all, pts_spaced_convDR)
 
@@ -246,19 +244,16 @@ def conv_dim_reduce_workflow(config_filepath):
     tic = time.time()
     positions_convDR_meanSub = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean, positions_new_sansOutliers)
-    print(f'Influence computed. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
+    helpers.print_time('Influence computed', time.time() - tic)
     
     positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
 
     #display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
     
-    tic = time.time()
     #helpers.save_data(config_filepath, 'cosKernel', cosKernel)
     helpers.save_data(config_filepath, 'positions_convDR_meanSub', positions_convDR_meanSub)
     helpers.save_data(config_filepath, 'positions_convDR_absolute', positions_convDR_absolute)
     #helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
-    print(f'Data saved. Elapsed time: {round((time.time() - tic)/60,2)} minutes')
     
-    toc = time.time() - tic_all
-    print(f'total elapsed time: {round(toc/60,2)} minutes')
+    helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End convolutional dimensionality reduction ==')

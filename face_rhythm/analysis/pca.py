@@ -1,6 +1,7 @@
 from matplotlib import pyplot as plt
 import numpy as np
-import sklearn as sk
+import sklearn.decomposition
+import time
 
 from face_rhythm.util import helpers
 
@@ -20,6 +21,9 @@ def plot_diagnostics(output_PCA, pca, scores_points):
 
 
 def pca_workflow(config_filepath):
+    print(f'== Beginning pca ==')
+    tic_all = time.time()
+    
     config = helpers.load_config(config_filepath)
 
     positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
@@ -33,13 +37,19 @@ def pca_workflow(config_filepath):
 
     # input_dimRed_meanSub = input_dimRed_concat - np.matlib.repmat( np.expand_dims(np.mean(input_dimRed_concat , axis=1) , axis=1) , 1 , input_dimRed_concat.shape[1])
     # input_dimRed_meanSub = input_dimRed_concat - input_dimRed_concat.mean(1)[:,None]
-
-    pca = sk.decomposition.PCA(n_components=10)
+    
+    tic = time.time()
+    pca = sklearn.decomposition.PCA(n_components=10)
     # pca = sk.decomposition.FastICA(n_components=10)
     pca.fit(np.float32(input_dimRed_meanSub))
     output_PCA = pca.components_.transpose()
     scores_points = np.dot(input_dimRed_meanSub , output_PCA)
+    helpers.print_time('PCA complete', time.time() - tic)
+    
     plot_diagnostics(output_PCA, pca, scores_points)
 
-    helpers.save_data(config_filepath, 'path_scores_points', scores_points)
-    helpers.save_data(config_filepath, 'path_input_dimRed_meanSub', input_dimRed_meanSub)
+    helpers.save_data(config_filepath, 'scores_points', scores_points)
+    helpers.save_data(config_filepath, 'input_dimRed_meanSub', input_dimRed_meanSub)
+    
+    helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'== End pca ==')
