@@ -7,6 +7,19 @@ from face_rhythm.util import helpers
 
 
 def plot_diagnostics(output_PCA, pca, scores_points):
+    """
+    displays some pca diagnostics like explained variance
+
+    Parameters
+    ----------
+    output_PCA ():
+    pca ():
+    scores_points ():
+
+    Returns
+    -------
+
+    """
     # plt.figure()
     # plt.imshow(positions_tracked[:,])
     plt.figure()
@@ -21,10 +34,20 @@ def plot_diagnostics(output_PCA, pca, scores_points):
 
 
 def pca_workflow(config_filepath):
+    """
+    performs pca on the cleaned optic flow output
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+
     print(f'== Beginning pca ==')
     tic_all = time.time()
-    
-    config = helpers.load_config(config_filepath)
 
     positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
 

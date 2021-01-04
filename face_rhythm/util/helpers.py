@@ -3,9 +3,12 @@ import cv2
 import torch
 import sys
 import numpy as np
+import os
+import os.path
+
 
 def version_check(config_filepath):
-    '''
+    """
     Checks the versions of various important softwares.
     Prints those versions
     
@@ -16,7 +19,7 @@ def version_check(config_filepath):
     Returns
     -------
     
-    '''
+    """
     ### find version of openCV
     # script currently works with v4.4.0
     (major_ver, minor_ver, subminor_ver) = (cv2.__version__).split('.')
@@ -46,7 +49,7 @@ def version_check(config_filepath):
 
     
 def load_config(config_filepath):
-    '''
+    """
     Loads config file into memory
     
     Parameters
@@ -57,14 +60,14 @@ def load_config(config_filepath):
     -------
     config (dict) : actual config dict
     
-    '''
+    """
     with open(config_filepath, 'r') as f:
         config = yaml.safe_load(f)
     return config
 
         
 def save_config(config, config_filepath):
-    '''
+    """
     Dumps config file to yaml
     
     Parameters
@@ -75,13 +78,13 @@ def save_config(config, config_filepath):
     Returns
     -------
     
-    '''
+    """
     with open(config_filepath, 'w') as f:
         yaml.safe_dump(config, f)  
         
         
 def generate_config(config_filepath):
-    '''
+    """
     Generates bare config file with just basic info
     
     Parameters
@@ -91,7 +94,7 @@ def generate_config(config_filepath):
     Returns
     -------
     
-    '''
+    """
     
     basic_config = {'path_base_dir': str(config_filepath.parent),
                     'path_config' : str(config_filepath)}
@@ -101,7 +104,7 @@ def generate_config(config_filepath):
         
         
 def import_videos(config_filepath):
-    '''
+    """
     Define the directory of videos
     Import the videos as read objects
     
@@ -114,7 +117,7 @@ def import_videos(config_filepath):
     Returns
     -------
     
-    '''
+    """
     
     config = load_config(config_filepath)
     multiple_files_pref = config['multiple_files_pref']
@@ -151,7 +154,7 @@ def import_videos(config_filepath):
 
     
 def get_video_data(config_filepath):
-    '''
+    """
     get info on the imported video(s): num of frames, video height and width, framerate
     
     Parameters
@@ -161,7 +164,7 @@ def get_video_data(config_filepath):
     Returns
     -------
     
-    '''
+    """
     
     config = load_config(config_filepath)
     multiple_files_pref = config['multiple_files_pref']
@@ -212,6 +215,20 @@ def get_video_data(config_filepath):
 
 
 def save_data(config_filepath, save_name, data_to_save):
+    """
+    save an npy file with data
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    save_name (str): name of the object to be saved
+    data_to_save (np.ndarray): (usually) a numpy array
+
+    Returns
+    -------
+
+    """
+
     config = load_config(config_filepath)
     save_dir = config['save_dir']
     save_path = f'{save_dir}/{save_name}.npy'
@@ -221,11 +238,38 @@ def save_data(config_filepath, save_name, data_to_save):
 
 
 def load_data(config_filepath, data_key):
+    """
+    load an npy file with data
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    data_key (str): config key for the target data
+
+    Returns
+    -------
+    data (np.ndarray): (usually) an np array with data
+
+    """
+
     config = load_config(config_filepath)
     return np.load(config[data_key], allow_pickle=True)
 
 
 def print_time(action, time):
+    """
+    prints the time adjusted for hours/minutes/seconds based on length
+
+    Parameters
+    ----------
+    action (str): description of the completed action
+    time (float): elapsed time
+
+    Returns
+    -------
+
+    """
+
     hour = 60*60
     minute = 60
     if time > hour:

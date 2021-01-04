@@ -23,6 +23,20 @@ pts = []
 
 
 def load_video(vidToSet, frameToSet, path_vid_allFiles):
+    """
+    loads the chosen video and returns chosen frame
+
+    Parameters
+    ----------
+    vidToSet (int): index of vid to load
+    frameToSet (int): index of frame to load
+    path_vid_allFiles (list): list of all video paths
+
+    Returns
+    -------
+    frame (cv2.image): frame read using cv2
+
+    """
     path_vid = path_vid_allFiles[vidToSet-1]
     video = cv2.VideoCapture(path_vid)
     
@@ -36,6 +50,17 @@ def load_video(vidToSet, frameToSet, path_vid_allFiles):
 ## outline of the ROI to use. 'pts' are the clicked points.
  # prepare for appending. I'm using this global in functions like a pleb. please forgive
 def draw(x):
+    """
+    draws line using clicks
+
+    Parameters
+    ----------
+    x :
+
+    Returns
+    -------
+
+    """
     d = cv2.getTrackbarPos('thickness', 'window')
     d = 1 if d==0 else d
     i = cv2.getTrackbarPos('color', 'window')
@@ -47,12 +72,36 @@ def draw(x):
 
 
 def mouse(event, x, y, flags, param):
+    """
+    tracks mouse events and adds click locations to the list
+
+    Parameters
+    ----------
+    event (event object): event object
+    x (int): x location
+    y (int): y location
+
+    Returns
+    -------
+
+    """
     if event == cv2.EVENT_LBUTTONDOWN:
         pts.append((x, y))
         draw(0)
 
         
 def create_seg(frame):
+    """
+    complete polygon from lines, then fill to create mask
+
+    Parameters
+    ----------
+    frame (cv2.image): the frame of interest
+
+    Returns
+    -------
+
+    """
     cv2.imshow('window', frame)
     cv2.setMouseCallback('window', mouse)
     cv2.createTrackbar('color', 'window', 0, 6, draw)
@@ -73,6 +122,18 @@ def create_seg(frame):
 
 
 def get_bbox(mask_frame):
+    """
+    get rectangular bounding box for irregular roi
+
+    Parameters
+    ----------
+    mask_frame (np.ndarray): the frame containing the mask
+
+    Returns
+    -------
+    bbox (np.ndarray): numpy array containing the indexes of the bounding box
+
+    """
     bbox = np.zeros(4)
     bbox[0] = np.min(np.where(np.max(mask_frame , axis=0))) # x top left
     bbox[1] = np.min(np.where(np.max(mask_frame , axis=1))) # y top left
@@ -83,6 +144,17 @@ def get_bbox(mask_frame):
 
 
 def roi_workflow(config_filepath):
+    """
+    manages the workflow for loading and collecting rois
+
+    Parameters
+    ----------
+    config_filepath (Path): path to config
+
+    Returns
+    -------
+
+    """
     config = helpers.load_config(config_filepath)
     global frame
     frame = load_video(config['vidToSet'],config['frameToSet'],config['path_vid_allFiles'])
@@ -102,7 +174,7 @@ def roi_workflow(config_filepath):
     helpers.save_data(config_filepath, 'pts_all', pts_all)
 
 
-class bbox_select():
+class BBoxSelect:
 
     def __init__(self, im):
         self.im = im
@@ -136,7 +208,7 @@ def test_inline_roi(config_filepath):
     config = helpers.load_config(config_filepath)
     global frame
     frame = load_video(config['vidToSet'],config['frameToSet'],config['path_vid_allFiles'])
-    bs = bbox_select(frame)
+    bs = BBoxSelect(frame)
     pts = bs.selected_points
     mask_frame = np.zeros((frame.shape[0], frame.shape[1]))
     pts_y, pts_x = skimage.draw.polygon(np.array(pts)[:, 1], np.array(pts)[:, 0])

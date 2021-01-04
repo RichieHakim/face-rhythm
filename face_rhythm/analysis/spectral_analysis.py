@@ -9,7 +9,18 @@ from matplotlib import pyplot as plt
 from face_rhythm.util import helpers
 
 
-def cqt_all(config_filepath):    
+def cqt_all(config_filepath):
+    """
+    computes spectral analysis on the cleaned optic flow output
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
     
     print(f'== Beginning Spectrogram Computation ==')
     tic_all = time.time()
@@ -108,6 +119,18 @@ def cqt_all(config_filepath):
 
 
 def cqt_positions(config_filepath):
+    """
+    computes spectral analysis on the cleaned optic flow output
+    similar to cqt_all (consider removing/refactoring)
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
 
     print(f'== Beginning Spectrogram Computation ==')
     tic_all = time.time()

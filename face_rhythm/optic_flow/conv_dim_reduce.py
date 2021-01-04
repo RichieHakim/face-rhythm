@@ -13,11 +13,40 @@ from face_rhythm.util import helpers
 
 
 def make_distance_matrix(center_idx, vid_height, vid_width):
+    """
+    creates a matrix of cartesian coordinate distances from the center
+
+    Parameters
+    ----------
+    center_idx (): chosen center index
+    vid_height (): height of the video
+    vid_width (): width of the video
+
+    Returns
+    -------
+    distance_matrix (): array of distances to the center index
+
+    """
+
     x, y = np.meshgrid(range(vid_width), range(vid_height))  # note dim 1:X and dim 2:Y
     return np.sqrt((y - int(center_idx[1])) ** 2 + (x - int(center_idx[0])) ** 2)
 
 
 def create_kernel(config_filepath, point_idxs):
+    """
+    creates convolutional kernel
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    point_idxs ():
+
+    Returns
+    -------
+    cos_kernel ():
+    cos_kernel_mean ():
+    """
+
     config = helpers.load_config(config_filepath)
     width_cos_kernel = config['cdr_width_cosKernel']
     num_dots = config['cdr_num_dots']
@@ -37,11 +66,23 @@ def create_kernel(config_filepath, point_idxs):
 
 
 def space_points(config_filepath, pts_all):
+    """
+    spaces out the points
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    pts_all (dict): dict of point arrays
+
+    Returns
+    -------
+    pts_spaced_convDR (): spaced out point array
+    """
+
     config = helpers.load_config(config_filepath)
     spacing = config['cdr_spacing']
 
     bbox_subframe_displacement = pts_all['bbox_subframe_displacement']
-    pts_displacement = pts_all['pts_displacement']
     pts_x_displacement = pts_all['pts_x_displacement']
     pts_y_displacement = pts_all['pts_y_displacement']
 
@@ -61,22 +102,29 @@ def space_points(config_filepath, pts_all):
 
 
 def points_show(config_filepath, pts_all, pts_spaced_convDR):
+    """
+    shows the points
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    pts_all (dict): dict of point arrays
+    pts_spaced_convDR (): array of spaced points
+
+    Returns
+    -------
+
+    """
+
     config = helpers.load_config(config_filepath)
     vidNum_toUse = config['cdr_vidNum']
     frameNum_toUse = config['cdr_frameNum']
     dot_size = config['cdr_dot_size']
     path_vid_allFiles = config['path_vid_allFiles']
 
-    pts_x_displacement = pts_all['pts_x_displacement']
-    pts_y_displacement = pts_all['pts_y_displacement']
-
-    # Define random colors for points in cloud
-    color_tuples = list(np.arange(len(pts_x_displacement)))
-    for ii in range(len(pts_x_displacement)):
-        color_tuples[ii] = (np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255)
+    color_tuples = helpers.load_data(config_filepath, 'path_color_tuples')
 
     vid = imageio.get_reader(path_vid_allFiles[vidNum_toUse], 'ffmpeg')
-    frameToSet = 0
     frame = vid.get_data(
         frameNum_toUse)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
     pointInds_tuple = list(np.arange(pts_spaced_convDR.shape[0]))
@@ -89,7 +137,26 @@ def points_show(config_filepath, pts_all, pts_spaced_convDR):
 
 
 def makeConvDR(ii, input_traces, cos_kernel, cos_kernel_mean, pca, rank_reduced, dots_new):
-    #     print(ii)
+    """
+    performs the convolutional dimensionality reduction
+    called within the multithreading
+
+    Parameters
+    ----------
+    ii ():
+    input_traces ():
+    cos_kernel ():
+    cos_kernel_mean ():
+    pca ():
+    rank_reduced ():
+    dots_new ():
+
+    Returns
+    -------
+    positions_convDR_meanSub ():
+
+    """
+
     influence_weightings = cos_kernel[int(dots_new[ii][0][1]), int(dots_new[ii][0][0]), :]
 
     idx_nonZero = np.array(np.where(influence_weightings != 0))[0, :]
@@ -116,6 +183,25 @@ def makeConvDR(ii, input_traces, cos_kernel, cos_kernel_mean, pca, rank_reduced,
 
 
 def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKernel, cosKernel_mean, positions_new_sansOutliers):
+    """
+    calls the multithreaded convolutional dimensionality reducer
+
+    Parameters
+    ----------
+    config_filepath ():
+    pointInds_toUse ():
+    pts_spaced_convDR ():
+    cosKernel ():
+    cosKernel_mean ():
+    positions_new_sansOutliers ():
+
+    Returns
+    -------
+    positions_convDR_meanSub ():
+
+    """
+
+
     config = helpers.load_config(config_filepath)
     num_components = config['cdr_num_components']
 
@@ -142,6 +228,21 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
 
 
 def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR):
+    """
+    displays newly computed displacements after convolutional dr
+
+    Parameters
+    ----------
+    config_filepath  ():
+    positions_convDR_meanSub ():
+    pts_spaced_convDR ():
+
+    Returns
+    -------
+    positions_convDR_meanSub ():
+
+    """
+
     config = helpers.load_config(config_filepath)
 
     # positions_toUse = positions_new_absolute_sansOutliers
@@ -209,6 +310,18 @@ def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_
 
     
 def conv_dim_reduce_workflow(config_filepath):
+    """
+    sequences the steps of the convolutional dimensionality reduction
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+
     print(f'== Beginning convolutional dimensionality reduction ==')
     tic_all = time.time()
     

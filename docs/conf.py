@@ -231,7 +231,7 @@ man_pages = [
 texinfo_documents = [
     ('index', 'face-rhythm', u'face-rhythm Documentation',
      u"Akshay Jaggi", 'face-rhythm',
-     'Project structure for Rich Hakim's Face Rhythms', 'Miscellaneous'),
+     "Project structure for Rich Hakim's Face Rhythms", 'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.

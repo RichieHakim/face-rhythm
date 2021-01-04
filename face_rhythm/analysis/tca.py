@@ -11,7 +11,6 @@ import scipy
 import scipy.signal
 import tensorly as tl
 import tensorly.decomposition
-import sklearn as sk
 import sklearn.decomposition
 import sklearn.manifold
 
@@ -19,6 +18,19 @@ from face_rhythm.util import helpers
 
 
 def tca(config_filepath, positions):
+    """
+    computes the tca of the provided dataframe
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    positions ():
+
+    Returns
+    -------
+    factors_np ():
+
+    """
     
     config = helpers.load_config(config_filepath)
     pref_useGPU = config['tca_pref_useGPU']
@@ -62,6 +74,19 @@ def tca(config_filepath, positions):
 
 
 def plot_factors(config_filepath, factors_np):
+    """
+    plots the positional factors for visualization / analysis
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    factors_np ():
+
+    Returns
+    -------
+
+    """
+
     factors_toUse = factors_np
     modelRank = factors_toUse[0].shape[1]
     ## just for plotting in case 
@@ -112,6 +137,20 @@ def plot_factors(config_filepath, factors_np):
     
     
 def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
+    """
+    creates videos of the points colored by their positional factor values
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    factors_np ():
+    positions_convDR_absolute ():
+
+    Returns
+    -------
+
+    """
+
     config = helpers.load_config(config_filepath)
     Fs = config['vid_Fs']
     vid_width = config['vid_width']
@@ -233,7 +272,21 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
     
     
 def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor):
-    
+    """
+    plots the full set of factors
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    factors_np ():
+    freqs_Sxx ():
+    Sxx_allPixels_normFactor  ():
+
+    Returns
+    -------
+
+    """
+
     config = helpers.load_config(config_filepath)
     Fs = config['vid_Fs']
 
@@ -309,6 +362,19 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     
     
 def correlations(config_filepath, factors_np):
+    """
+    finds correlations between the factors
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    factors_np ():
+
+    Returns
+    -------
+
+    """
+
     config = helpers.load_config(config_filepath)
     modelRank = config['modelRank']
 
@@ -328,6 +394,20 @@ def correlations(config_filepath, factors_np):
     return factors_xcorr
 
 def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
+    """
+    creates videos of points colored by a variety of factors
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    factors_np ():
+    positions_convDR_absolute ():
+
+    Returns
+    -------
+
+    """
+
     config = helpers.load_config(config_filepath)
     Fs = config['vid_Fs']
     vid_width = config['vid_width']
@@ -449,6 +529,18 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
 
 
 def factor_tsne(factors):
+    """
+    creates and plots tsne of the factors
+
+    Parameters
+    ----------
+    factors ():
+
+    Returns
+    -------
+
+    """
+
     print("Computing t-SNE embedding")
     tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
                          random_state=0, perplexity=200)
@@ -464,6 +556,18 @@ def factor_tsne(factors):
 
 
 def positional_tca_workflow(config_filepath):
+    """
+    sequences the steps for tca of the positions of the optic flow data
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
     
@@ -482,6 +586,18 @@ def positional_tca_workflow(config_filepath):
 
 
 def full_tca_workflow(config_filepath):
+    """
+    sequences the steps for tca of the spectral decomposition of the optic flow data
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+
     print(f'== Beginning Full TCA Workflow ==')
     tic_all = time.time()
     
