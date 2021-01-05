@@ -1,3 +1,5 @@
 .idea
 data
 notebooks/config*
+docs/_build
+*__pycache__*

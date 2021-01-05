@@ -6,14 +6,22 @@
 face-rhythm documentation!
 ==============================================
 
-Contents:
+User Guide
+-------------------
 
 .. toctree::
-   :maxdepth: 2
 
-   getting-started
-   commands
+   installation
+   support
 
+Programmer Reference
+--------------------
+
+.. toctree::
+
+   face_rhythm.util
+   face_rhythm.optic_flow
+   face_rhythm.analysis
 
 
 Indices and tables
