@@ -434,7 +434,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
 
     #     modelRank_toUse = 5
         factor_toShow = factor_iter+1
-        save_pref= 0
+        save_pref = config['tca_vid_save']
 
         # save_dir = "F:\\RH_Local\\Rich data\\camera data"
         save_dir = config['tca_vid_dir']
