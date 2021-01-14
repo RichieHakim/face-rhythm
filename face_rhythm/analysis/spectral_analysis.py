@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from face_rhythm.util import helpers
 
 
-def cqt_all(config_filepath):
+def cqt_all(config_filepath, data_key):
     """
     computes spectral analysis on the cleaned optic flow output
 
@@ -34,7 +34,7 @@ def cqt_all(config_filepath):
     bins_per_octave = config['cqt_bins_per_octave']
     fmin = config['cqt_fmin']
 
-    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
+    positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
     freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
 
 

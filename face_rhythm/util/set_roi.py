@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import IPython.display as Disp
 from ipywidgets import widgets
 
+from pathlib import Path
+
 
 
 RED = (0, 0, 255)
@@ -156,6 +158,11 @@ def roi_workflow(config_filepath):
 
     """
     config = helpers.load_config(config_filepath)
+    if config['load_from_file']:
+        pts_all = np.load(Path(config['path_data']) / 'pts_all.npy', allow_pickle=True)
+        helpers.save_data(config_filepath, 'pts_all', pts_all)
+        return
+
     global frame
     frame = load_video(config['vidToSet'],config['frameToSet'],config['path_vid_allFiles'])
     pts_y, pts_x, mask_frame = create_seg(frame)

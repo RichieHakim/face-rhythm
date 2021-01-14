@@ -10,6 +10,9 @@ import multiprocessing
 from multiprocessing import Pool
 from functools import partial
 
+from tqdm import tqdm
+import sys
+
 
 def setup(config, pts_all):
     """
@@ -170,7 +173,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
         print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
         #     while True:
-        for iter_frame, new_frame in enumerate(vid):
+        for iter_frame, new_frame in enumerate(tqdm(vid, total=numFrames_rough)):
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
             ##calculate optical flow
@@ -263,8 +266,9 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
     displacements_tmp = np.zeros((pts_spaced.shape[0], 2, np.uint64(numFrames + (numVids * 1000)))) * np.nan
 
     print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
+
     #     while True:
-    for iter_frame, new_frame in enumerate(vid):
+    for iter_frame, new_frame in enumerate(tqdm(vid, total=numFrames)):
         new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
         ##calculate optical flow
@@ -303,7 +307,7 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
 
     numVids = config['numVids']
 
-    p = Pool(multiprocessing.cpu_count())  # where the magic acutally happens
+    p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock,initargs=(tqdm.get_lock(),))  # where the magic acutally happens
     displacements_list = p.map(
         partial(analyze_video, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced),
         list(np.arange(numVids)))

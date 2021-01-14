@@ -33,7 +33,7 @@ def plot_diagnostics(output_PCA, pca, scores_points):
     plt.plot(scores_points[:,:3])
 
 
-def pca_workflow(config_filepath):
+def pca_workflow(config_filepath, data_key):
     """
     performs pca on the cleaned optic flow output
 
@@ -49,7 +49,7 @@ def pca_workflow(config_filepath):
     print(f'== Beginning pca ==')
     tic_all = time.time()
 
-    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
+    positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
 
     # input_dimRed = np.squeeze(positions_new_sansOutliers[:,1,:])
     tmp_x = np.squeeze(positions_convDR_meanSub[:,0,:])
