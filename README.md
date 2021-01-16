@@ -9,14 +9,8 @@ Project Organization
     ├── LICENSE
     ├── Makefile           <- Makefile with commands like `make data` or `make train`
     ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── viz            <- Derived videos and plots
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
     │
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
     │
     ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
     │                         the creator's initials, and a short `-` delimited description, e.g.
@@ -64,7 +58,11 @@ pip install -e .
 ```
 conda install cudatoolkit=10.2
 ```
-5. Copy your video(s) into the raw video folder
+5. Go ahead and create a "project directory" where you'd like your intermediate files, videos, and config files saved. Ideally outside of this repo so you don't have to worry about it when pushing and pulling.
+```
+cd ..
+mkdir face_rhythm_runs
+```
 
 6. Get started! I like to use jupyter lab for this stuff
 ```
