@@ -7,11 +7,12 @@ import cv2
 import imageio
 
 import multiprocessing
-from multiprocessing import Pool
+from multiprocessing import Pool, RLock, freeze_support
 from functools import partial
 
-from tqdm import tqdm
-import sys
+from tqdm.notebook import tqdm
+
+from time import sleep
 
 
 def setup(config, pts_all):
@@ -258,29 +259,28 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
         cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
 
     frameToSet = 0
-    frame = vid.get_data(
-        frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+    frame = vid.get_data(frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
     new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     old_frame = new_frame_gray
 
     displacements_tmp = np.zeros((pts_spaced.shape[0], 2, np.uint64(numFrames + (numVids * 1000)))) * np.nan
 
+    print(' ', end='', flush=True)
+    text = "progresser #{}".format(vidNum_iter)
     print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
 
-    #     while True:
-    for iter_frame, new_frame in enumerate(tqdm(vid, total=numFrames)):
+    for iter_frame, new_frame in enumerate(tqdm(vid, total=numFrames, desc=text, position=vidNum_iter)):
         new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
         ##calculate optical flow
         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
                                                                 **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
-        ## Calculate displacement and place into variable 'displacements' (changes in size every iter) 
+        ## Calculate displacement and place into variable 'displacements' (changes in size every iter)
         if iter_frame == 0:
             displacements_tmp[:, :, iter_frame] = np.zeros((pts_spaced.shape[0], 2))
         else:
-            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((
-                                                                                   pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
         old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
@@ -306,8 +306,10 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     """
 
     numVids = config['numVids']
-
-    p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock,initargs=(tqdm.get_lock(),))  # where the magic acutally happens
+    cv2.setNumThreads(0)
+    freeze_support()
+    tqdm.set_lock(RLock())
+    p = Pool(multiprocessing.cpu_count(),initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
     displacements_list = p.map(
         partial(analyze_video, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced),
         list(np.arange(numVids)))

@@ -7,11 +7,10 @@ setup(
     description="Project structure for Face Rhythms",
     author='Rich Hakim',
     license='MIT',
-    install_requires=['torch','torchvision','torchaudio',
+    install_requires=['torch', 'torchvision', 'torchaudio',
                       'jupyterlab', 'tensorly', 'opencv-python',
-                      'imageio', 'matplotlib','scikit-learn',
-                      'scikit-image','librosa', 'pyyaml',
-                      'imageio-ffmpeg'
-
-    ]
+                      'imageio', 'matplotlib', 'scikit-learn',
+                      'scikit-image', 'librosa', 'pyyaml',
+                      'imageio-ffmpeg', 'tqdm'
+                      ]
 )
