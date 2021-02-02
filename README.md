@@ -58,7 +58,7 @@ pip install -e .
 ```
 conda install cudatoolkit=10.2
 ```
-5. Go ahead and create a "project directory" where you'd like your intermediate files, videos, and config files saved. Ideally outside of this repo so you don't have to worry about it when pushing and pulling.
+5. Go ahead and create a "project directory" where you'd like your intermediate files, videos, and config files saved. Ideally outside of this repo so you don't have to worry about it when pushing and pulling. Again, given that your ipynb will change a lot (get populated with plots and new parameters, it's good to copy this out of the repo while you're doing analysis. 
 ```
 cd ..
 mkdir face_rhythm_runs
