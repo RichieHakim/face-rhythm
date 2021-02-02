@@ -359,7 +359,8 @@ def conv_dim_reduce_workflow(config_filepath):
     
     positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
 
-    #display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
+    if config['display_displacements']:
+        display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
     
 
     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)

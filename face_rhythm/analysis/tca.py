@@ -40,6 +40,7 @@ def tca(config_filepath, positions):
     rank = config['tca_rank']
     init = config['tca_init']
     verbosity = config['tca_verbosity']
+    n_iters = config['tca_n_iters']
 
     input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
     
@@ -54,9 +55,7 @@ def tca(config_filepath, positions):
     
     ### Fit TCA model
     ## If the input is small, set init='svd'
-    #weights, factors_positional = tensorly.decomposition.parafac(input_tensor, init=init, tol=1e-06, n_iter_max=800, rank=rank, verbose=1, orthogonalise=False, random_state=1234)
-    weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=1e-05, n_iter_max=100, rank=rank, verbose=verbosity)
-    # weights, factors = tensorly.decomposition.parafac(Sxx_allPixels_tensor, init='random', tol=1e-05, n_iter_max=1000, rank=rank, verbose=True)
+    weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=1e-05, n_iter_max=n_iters, rank=rank, verbose=verbosity)
 
     ## make numpy version of tensorly output
 
@@ -554,7 +553,7 @@ def factor_tsne(factors):
     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
-def positional_tca_workflow(config_filepath, data_key):
+def positional_tca_workflow(config_filepath):
     """
     sequences the steps for tca of the positions of the optic flow data
 
@@ -569,14 +568,16 @@ def positional_tca_workflow(config_filepath, data_key):
 
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
+    config = helpers.load_config(config_filepath)
     
-    positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
-    positions_convDR_absolute = helpers.load_data(config_filepath, data_key)
+    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
+    positions_convDR_absolute = helpers.load_data(config_filepath, 'path_positions_convDR_absolute')
     
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
     plot_factors(config_filepath, factors_np_positional)
-    #factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
+    if config['tca_vid_display']:
+        factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
 
     helpers.save_data(config_filepath, 'factors_np_positional', factors_np_positional)
     
@@ -599,6 +600,7 @@ def full_tca_workflow(config_filepath, data_key):
 
     print(f'== Beginning Full TCA Workflow ==')
     tic_all = time.time()
+    config = helpers.load_config(config_filepath)
     
     Sxx_allPixels_norm = helpers.load_data(config_filepath, 'path_Sxx_allPixels_norm')
     positions_convDR_absolute = helpers.load_data(config_filepath, data_key)
@@ -608,12 +610,12 @@ def full_tca_workflow(config_filepath, data_key):
     tic = time.time()
     factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])
     helpers.print_time('Decomposition completed', time.time() - tic)
-    
-    
+
     factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
     factors_xcorr = correlations(config_filepath, factors_np)
-    
-    #more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
+
+    if config['tca_vid_display']:
+        more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
     factor_tsne(factors_temporal)
 

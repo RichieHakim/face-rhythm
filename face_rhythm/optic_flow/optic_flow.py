@@ -78,7 +78,7 @@ def setup(config, pts_all):
     return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples
 
 
-def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters):
+def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough):
     """
     plots a checkup
 
@@ -96,7 +96,6 @@ def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_t
 
     """
     dot_size = config['dot_size']
-    numFrames_rough = config['numFrames_rough']
     vidNums_toUse = config['vidNums_toUse']
     numFrames_total_rough = config['numFrames_total_rough']
 
@@ -118,7 +117,7 @@ def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_t
 
 
 def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
-                             pts_spaced):
+                             pts_spaced, color_tuples):
     """
     the workhorse of the optic flow
     Opens each video in the list of videos
@@ -197,7 +196,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                 pointInds_tracked = pointInds_tracked - (
                         pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, counters)
+                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough)
                 k = cv2.waitKey(1) & 0xff
                 if k == 27: break
 
@@ -363,7 +362,7 @@ def optic_workflow(config_filepath):
         displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
     else:
         displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
-                                                                  pointInds_tracked_tuple, displacements, pts_spaced)
+                                                                  pointInds_tracked_tuple, displacements, pts_spaced, color_tuples)
     helpers.print_time('Displacements computed', time.time() - tic)
 
     tic = time.time()
