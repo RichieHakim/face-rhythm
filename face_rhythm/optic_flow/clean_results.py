@@ -86,7 +86,7 @@ def clean_workflow(config_filepath):
     positions_new_absolute_sansOutliers = positions_new_sansOutliers + np.squeeze(pointInds_toUse)[:, :, None]
     helpers.print_time('Final absolute position trace', time.time() - tic)
 
-    pixelNum_toUse = 300
+    pixelNum_toUse = 10
     plt.figure()
     plt.plot(positions_new_sansOutliers[pixelNum_toUse, 0, :])
     plt.show()
