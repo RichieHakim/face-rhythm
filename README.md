@@ -65,9 +65,9 @@ mkdir face_rhythm_runs
 cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/
 ```
 
-6. Get started! I like to use jupyter lab for this stuff
+6. Get started! The plots display better using Jupyter Notebook
 ```
-jupyter lab
+jupyter notebook
 ```
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
