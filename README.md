@@ -62,6 +62,7 @@ conda install cudatoolkit=10.2
 ```
 cd ..
 mkdir face_rhythm_runs
+cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/
 ```
 
 6. Get started! I like to use jupyter lab for this stuff
