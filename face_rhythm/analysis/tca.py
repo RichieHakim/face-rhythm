@@ -159,6 +159,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
     vid_height = config['vid_height']
     numFrames_allFiles = config['numFrames_allFiles']
     path_vid_allFiles = config['path_vid_allFiles']
+    numFrames = config['tca_display_frames']
 
     # Display video of factors
 
@@ -226,7 +227,6 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
             vid = imageio.get_reader(path_vid,  'ffmpeg')
 
     #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-            numFrames = 600
 
     #         frameToSet = 0
     #         video.set(1,frameToSet)
