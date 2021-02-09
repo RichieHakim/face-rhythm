@@ -13,6 +13,7 @@ User Guide
 
    installation
    support
+   standards
 
 Programmer Reference
 --------------------
