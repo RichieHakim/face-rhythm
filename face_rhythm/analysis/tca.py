@@ -556,7 +556,7 @@ def factor_tsne(factors):
     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
-def positional_tca_workflow(config_filepath, data_key):
+def positional_tca_workflow(config_filepath):
     """
     sequences the steps for tca of the positions of the optic flow data
 
@@ -572,8 +572,8 @@ def positional_tca_workflow(config_filepath, data_key):
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
     
-    positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
-    positions_convDR_absolute = helpers.load_data(config_filepath, data_key)
+    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
+    positions_convDR_absolute = helpers.load_data(config_filepath, 'path_positions_convDR_absolute')
     
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 

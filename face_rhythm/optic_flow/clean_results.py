@@ -28,6 +28,7 @@ def clean_workflow(config_filepath):
     framesHalted_beforeOutlier = config['framesHalted_beforeOutlier']
     framesHalted_afterOutlier = config['framesHalted_afterOutlier']
     relaxation_factor = config['relaxation_factor']
+    pixelNum_toUse = config['pixelNum_toUse']
     
     displacements = helpers.load_data(config_filepath, 'path_displacements')
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
@@ -86,7 +87,6 @@ def clean_workflow(config_filepath):
     positions_new_absolute_sansOutliers = positions_new_sansOutliers + np.squeeze(pointInds_toUse)[:, :, None]
     helpers.print_time('Final absolute position trace', time.time() - tic)
 
-    pixelNum_toUse = 300
     plt.figure()
     plt.plot(positions_new_sansOutliers[pixelNum_toUse, 0, :])
     plt.show()

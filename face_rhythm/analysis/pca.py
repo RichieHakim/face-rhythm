@@ -25,7 +25,7 @@ def plot_diagnostics(output_PCA, pca, scores_points):
     plt.figure()
     plt.plot(output_PCA[:,:3])
     plt.figure()
-    plt.plot(pca.explained_variance_)
+    plt.plot(pca.explained_variance_ratio_)
     plt.figure()
     plt.plot(output_PCA[:,0] , output_PCA[:,1]  , linewidth=.1)
 
@@ -68,6 +68,31 @@ def pca_workflow(config_filepath, data_key):
     output_PCA = pca.components_.transpose()
     scores_points = np.dot(input_dimRed_meanSub , output_PCA)
     helpers.print_time('PCA complete', time.time() - tic)
+    
+    plot_diagnostics(output_PCA, pca, scores_points)
+
+    helpers.save_data(config_filepath, 'scores_points', scores_points)
+    helpers.save_data(config_filepath, 'input_dimRed_meanSub', input_dimRed_meanSub)
+    
+    helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'== End pca ==')
+    
+
+def pca_akshay(config_filepath, data_key):
+    
+    print(f'== Beginning pca ==')
+    tic_all = time.time()
+
+    positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
+    position_shape = positions_convDR_meanSub.shape
+    
+    tic = time.time()
+    input_dimRed_meanSub = positions_convDR_meanSub.reshape(np.product(position_shape[0:2]),position_shape[-1]).T
+    pca = sklearn.decomposition.PCA(n_components=10)
+    scores_points = pca.fit_transform(input_dimRed_meanSub)
+    output_PCA = pca.components_.T
+    helpers.print_time('PCA complete', time.time() - tic)
+    
     
     plot_diagnostics(output_PCA, pca, scores_points)
 
