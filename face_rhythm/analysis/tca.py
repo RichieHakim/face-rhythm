@@ -227,13 +227,13 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
             vid = imageio.get_reader(path_vid,  'ffmpeg')
 
     #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-            numFrames = 1000
+            numFrames = 600
 
     #         frameToSet = 0
     #         video.set(1,frameToSet)
 
             for iter_frame , new_frame in enumerate(vid):
-
+                    
     #             ind_currentVid = np.int64(video.get(cv2.CAP_PROP_POS_FRAMES))
                 if iter_frame >= numFrames:
                     break
@@ -245,10 +245,8 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
                 if save_pref:
                     out.write(new_frame)
 
-    #             Sxx_frameNum = round( ind_currentVid / (positions_toUse.shape[2] / Sxx_allPixels.shape[2]) ,1)
+
                 cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames}', org=(10,20), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-    #             cv2.putText(new_frame, f'frame #: {Sxx_frameNum}', org=(10,20), fontFace=1, fontScale=1, color=(255,255,255), thickness=2)
-    #             cv2.putText(new_frame, f'vid #: {iter+1}/{len(vidNums_toUse)}', org=(10,40), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
@@ -423,7 +421,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     for factor_iter in factors_toShow:
 
         # vidNums_toUse = range(numVids) ## note zero indexing!
-        vidNums_toUse = 0 ## note zero indexing!
+        vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
 
         if type(vidNums_toUse) == int:
             vidNums_toUse = np.array([vidNums_toUse])
@@ -482,7 +480,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
             vid = imageio.get_reader(path_vid,  'ffmpeg')
 
     #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-            numFrames = 1000
+            numFrames = 600
 
     #         frameToSet = 0
     #         video.set(1,frameToSet)
