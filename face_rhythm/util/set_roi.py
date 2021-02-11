@@ -10,6 +10,8 @@ from ipywidgets import widgets
 
 from pathlib import Path
 
+import h5py
+
 
 
 RED = (0, 0, 255)
@@ -159,8 +161,9 @@ def roi_workflow(config_filepath):
     """
     config = helpers.load_config(config_filepath)
     if config['load_from_file']:
-        pts_all = np.load(Path(config['path_data']) / 'pts_all.npy', allow_pickle=True)
-        helpers.save_data(config_filepath, 'pts_all', pts_all)
+        with h5py.File(Path(config['path_data']) / 'pts_all.h5','r') as pt:
+            pts_all = helpers.h5_to_dict(pt)
+        helpers.save_h5(config_filepath, 'pts_all', pts_all)
         return
 
     global frame
@@ -172,13 +175,13 @@ def roi_workflow(config_filepath):
     mask_frame_displacement = mask_frame
     cv2.destroyAllWindows()
     pts_all = dict([
-    ('bbox_subframe_displacement', bbox_subframe_displacement), 
-    ('pts_displacement', pts_displacement), 
+    ('bbox_subframe_displacement', bbox_subframe_displacement),
+    ('pts_displacement', pts_displacement),
     ('pts_x_displacement', pts_x_displacement),
     ('pts_y_displacement', pts_y_displacement),
     ('mask_frame_displacement', mask_frame_displacement)
     ])
-    helpers.save_data(config_filepath, 'pts_all', pts_all)
+    helpers.save_h5(config_filepath, 'pts_all', pts_all)
 
 
 class BBoxSelect:

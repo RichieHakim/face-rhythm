@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import os
 import os.path
+import h5py
 
 from pathlib import Path
 
@@ -271,6 +272,49 @@ def save_data(config_filepath, save_name, data_to_save):
     save_config(config, config_filepath)
 
 
+def save_h5(config_filepath, save_name, data_dict):
+    """
+    save an h5 file from a data dictionary
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    save_name (str): name of the object to be saved
+    data_dict (dict): dict of numpy arrays
+
+    Returns
+    -------
+
+    """
+    config = load_config(config_filepath)
+    save_dir = Path(config['path_data'])
+    save_path = save_dir / f'{save_name}.h5'
+    to_write = h5py.File(save_path, 'w')
+    dict_to_h5(data_dict, to_write)
+    to_write.close()
+    config[f'path_{save_name}'] = str(save_path)
+    save_config(config, config_filepath)
+
+
+def load_h5(config_filepath, data_key):
+    """
+    load an h5 file into a data dictionary
+    proceed with caution given that this loads the entire h5 file into mem
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    save_name (str): name of the object to be saved
+    data_dict (dict): dict of numpy arrays
+
+    Returns
+    -------
+
+    """
+    config = load_config(config_filepath)
+    return h5_to_dict(config[data_key])
+
+
 def load_data(config_filepath, data_key):
     """
     load an npy file with data
@@ -317,3 +361,53 @@ def print_time(action, time):
         unit = 'seconds'
     reported_time = round(reported_time, 2)
     print(f'{action}. Elapsed time: {reported_time} {unit}')
+
+
+def h5_to_dict(h5file, path='/'):
+    '''
+    Reads all contents from h5 and returns them in a nested dict object.
+
+    Parameters
+    ----------
+    h5file (str): path to h5 file
+    path (str): path to group within h5 file
+
+    Returns
+    -------
+    ans (dict): dictionary of all h5 group contents
+    '''
+
+    ans = {}
+
+    if type(h5file) is str:
+        with h5py.File(h5file, 'r') as f:
+            ans = h5_to_dict(f, path)
+            return ans
+
+    for key, item in h5file[path].items():
+        if isinstance(item, h5py._hl.dataset.Dataset):
+            ans[key] = item[()]
+        elif isinstance(item, h5py._hl.group.Group):
+            ans[key] = h5_to_dict(h5file, path + key + '/')
+    return ans
+
+
+def dict_to_h5(data_dict, h5):
+    '''
+    Quick and dirty dict dumper to h5
+
+    Parameters
+    ----------
+    data_dict (dict): dictionary (potentially nested) of data!
+    h5 (h5py.File): h5 File (or Group) to populate
+
+    Returns
+    -------
+    '''
+
+    for key, item in data_dict.items():
+        if isinstance(item, dict):
+            group = h5.create_group(key)
+            dict_to_h5(item, group)
+        else:
+            h5.create_dataset(key, data=item)

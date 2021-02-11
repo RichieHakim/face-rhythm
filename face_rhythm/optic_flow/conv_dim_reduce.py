@@ -333,7 +333,7 @@ def conv_dim_reduce_workflow(config_filepath):
     
     config = helpers.load_config(config_filepath)
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
-    pts_all = helpers.load_data(config_filepath, 'path_pts_all')[()]
+    pts_all = helpers.load_h5(config_filepath, 'path_pts_all')
     positions_new_sansOutliers = helpers.load_data(config_filepath, 'path_positions')
 
     # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
