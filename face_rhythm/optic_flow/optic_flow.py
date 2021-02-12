@@ -370,7 +370,8 @@ def optic_workflow(config_filepath):
     helpers.save_config(config, config_filepath)
 
     helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
-    helpers.save_data(config_filepath, 'displacements', displacements)
+    helpers.create_nwb_group(config_filepath, 'Optic Flow')
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'displacements', displacements)
     helpers.save_data(config_filepath, 'color_tuples', color_tuples)
     helpers.print_time('Data Saved', time.time() - tic)
 
