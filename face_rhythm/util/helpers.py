@@ -290,7 +290,11 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
                                   data=np.moveaxis(data,-1,0),
                                   unit='mm',
                                   rate=Fs)
-        nwbfile.processing['Face Rhythm'][group_name].add_timeseries(new_ts)
+        if ts_name not in nwbfile.processing['Face Rhythm'][group_name].time_series:
+            nwbfile.processing['Face Rhythm'][group_name].add_timeseries(new_ts)
+        else:
+            ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
+            ts = new_ts
         io.write(nwbfile)
 
 
