@@ -16,7 +16,7 @@ import pynwb
 from pynwb.behavior import BehavioralTimeSeries
 
 
-def setup_project(project_path, video_path, session_name, overwrite_config):
+def setup_project(project_path, video_path, session_name, overwrite_config, remote):
     """
     Creates the project folder and data folder (if they don't exist)
     Creates the config file (if it doesn't exist or overwrite requested)
@@ -37,7 +37,7 @@ def setup_project(project_path, video_path, session_name, overwrite_config):
     video_path.mkdir(parents=True, exist_ok=True)
     config_filepath = project_path / 'configs' / f'config_{session_name}.yaml'
     if not config_filepath.exists() or overwrite_config:
-        generate_config(config_filepath, project_path, video_path)
+        generate_config(config_filepath, project_path, video_path, remote)
 
     version_check(config_filepath)
     return config_filepath
@@ -102,7 +102,7 @@ def save_config(config, config_filepath):
         yaml.safe_dump(config, f)
 
 
-def generate_config(config_filepath, project_path, video_path):
+def generate_config(config_filepath, project_path, video_path, remote):
     """
     Generates bare config file with just basic info
     
@@ -120,7 +120,8 @@ def generate_config(config_filepath, project_path, video_path):
                     'dir_vid': str(video_path),
                     'path_data': str(project_path / 'data'),
                     'path_viz': str(project_path / 'viz'),
-                    'path_config': str(config_filepath)}
+                    'path_config': str(config_filepath),
+                    'remote': remote}
 
     with open(str(config_filepath), 'w') as f:
         yaml.safe_dump(basic_config, f)
@@ -284,6 +285,7 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
     config = load_config(config_filepath)
     nwb_path = config['path_nwb']
     Fs = config['vid_Fs']
+    print(f'Saving {ts_name} in Group {group_name}')
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
         new_ts = pynwb.TimeSeries(name=ts_name,

@@ -161,6 +161,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
     numFrames_allFiles = config['numFrames_allFiles']
     path_vid_allFiles = config['path_vid_allFiles']
     numFrames = config['tca_display_frames']
+    remote = config['remote']
 
     # Display video of factors
 
@@ -212,8 +213,8 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
             colormap_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) *255)[:3]))
 
         # Define the codec and create VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         if save_pref:
+            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
             print(f'saving to file {save_pathFull}')
             out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
 
@@ -250,7 +251,8 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
                 cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.imshow('test',new_frame)
+                if not remote:
+                    cv2.imshow('test',new_frame)
 
 
                 k = cv2.waitKey(1) & 0xff
@@ -413,6 +415,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     vid_height = config['vid_height']
     numFrames_allFiles = config['numFrames_allFiles']
     path_vid_allFiles = config['path_vid_allFiles']
+    remote = config['remote']
 
     # Display video of factors
     factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
@@ -505,7 +508,8 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
                 cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.imshow('test',new_frame)
+                if not remote:
+                    cv2.imshow('test',new_frame)
 
 
                 k = cv2.waitKey(1) & 0xff

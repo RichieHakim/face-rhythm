@@ -12,7 +12,7 @@ from functools import partial
 
 from tqdm.notebook import tqdm
 
-from time import sleep
+from pathlib import Path
 
 
 def setup(config, pts_all):
@@ -78,7 +78,7 @@ def setup(config, pts_all):
     return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples
 
 
-def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough):
+def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len):
     """
     plots a checkup
 
@@ -98,6 +98,7 @@ def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_t
     dot_size = config['dot_size']
     vidNums_toUse = config['vidNums_toUse']
     numFrames_total_rough = config['numFrames_total_rough']
+    remote = config['remote']
 
     iter_frame, vidNum_iter, ind_concat, fps = counters
 
@@ -113,7 +114,11 @@ def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_t
                 fontScale=1, color=(255, 255, 255), thickness=1)
     cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1, color=(255, 255, 255),
                 thickness=1)
-    cv2.imshow('test', new_frame)
+
+    if remote and iter_frame < test_len:
+        out.write(new_frame)
+    else:
+        cv2.imshow('test', new_frame)
 
 
 def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
@@ -153,9 +158,24 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     fps_counterPeriod = config['fps_counterPeriod']
     printFPS_pref = config['printFPS_pref']
 
+    remote = config['remote']
+    Fs = config['vid_Fs']
+    vid_width = config['vid_width']
+    vid_height = config['vid_height']
+    test_len = config['test_len']
+    save_pathFull = str(Path(config['path_project']) / 'optic_test.avi')
+
     lk_names = [key for key in config.keys() if 'lk_' in key]
     lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
                  for k in lk_names}
+
+    # Define the codec and create VideoWriter object
+    if showVideo_pref and remote:
+        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+        print(f'saving to file {save_pathFull}')
+        out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
+    else:
+        out = None
 
     for vidNum_iter in vidNums_toUse:
         vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
@@ -196,7 +216,10 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                 pointInds_tracked = pointInds_tracked - (
                         pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough)
+                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len)
+                if remote and iter_frame == test_len:
+                    out.release()
+
                 k = cv2.waitKey(1) & 0xff
                 if k == 27: break
 
