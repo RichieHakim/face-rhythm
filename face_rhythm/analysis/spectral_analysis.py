@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from tqdm.notebook import tqdm
 
 from face_rhythm.util import helpers
+from face_rhythm.analysis import tca
 
 
 def cqt_all(config_filepath, data_key):
@@ -35,7 +36,7 @@ def cqt_all(config_filepath, data_key):
     bins_per_octave = config['cqt_bins_per_octave']
     fmin = config['cqt_fmin']
 
-    positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
+    positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', data_key)
     freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
 
 
@@ -105,13 +106,13 @@ def cqt_all(config_filepath, data_key):
     plt.figure()
     plt.plot(Sxx_allPixels_normFactor)
 
-    helpers.save_data(config_filepath, 'Sxx_allPixels',Sxx_allPixels)
-    helpers.save_data(config_filepath, 'Sxx_allPixels_norm', Sxx_allPixels_norm)
-    helpers.save_data(config_filepath, 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor)
-    helpers.save_data(config_filepath, 'tmp', tmp)
+    helpers.create_nwb_group(config_filepath, 'CQT')
+    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels', Sxx_allPixels)
+    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm)
+    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor)
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'== End spectorgram computation ==')
+    print(f'== End spectrogram computation ==')
 
 
 def cqt_positions(config_filepath):
@@ -140,7 +141,7 @@ def cqt_positions(config_filepath):
     bins_per_octave = config['cqt_bins_per_octave']
     fmin = config['cqt_fmin']
 
-    factors_np_positional = helpers.load_data(config_filepath, 'path_factors_np_positional')
+    factors_np_positional = tca.load_factors(config_filepath, 'factors_positional')
     freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
 
     print(f'starting spectrogram calculation')
@@ -179,9 +180,14 @@ def cqt_positions(config_filepath):
     plt.figure()
     plt.imshow(test2, aspect='auto', cmap='hot', origin='lower')
 
-    helpers.save_data(config_filepath, 'Sxx_positional', Sxx_positional)
-    helpers.save_data(config_filepath, 'test', test)
-    helpers.save_data(config_filepath, 'test2', test2)
+    # helpers.save_data(config_filepath, 'Sxx_positional', Sxx_positional)
+    # helpers.save_data(config_filepath, 'test', test)
+    # helpers.save_data(config_filepath, 'test2', test2)
+
+    helpers.create_nwb_group(config_filepath, 'CQT')
+    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional', Sxx_positional)
+    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional_norm', test)
+    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional_normFactor', test2)
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'== End spectorgram computation ==')
+    print(f'== End spectrogram computation ==')

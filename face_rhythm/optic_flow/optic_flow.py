@@ -350,7 +350,7 @@ def optic_workflow(config_filepath):
     tic_all = time.time()
 
     config = helpers.load_config(config_filepath)
-    pts_all = np.load(config['path_pts_all'], allow_pickle=True)[()]
+    pts_all = helpers.load_h5(config_filepath, 'path_pts_all')
 
     tic = time.time()
     pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples = setup(config,
@@ -370,7 +370,8 @@ def optic_workflow(config_filepath):
     helpers.save_config(config, config_filepath)
 
     helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
-    helpers.save_data(config_filepath, 'displacements', displacements)
+    helpers.create_nwb_group(config_filepath, 'Optic Flow')
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'displacements', displacements)
     helpers.save_data(config_filepath, 'color_tuples', color_tuples)
     helpers.print_time('Data Saved', time.time() - tic)
 

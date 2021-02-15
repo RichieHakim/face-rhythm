@@ -333,8 +333,9 @@ def conv_dim_reduce_workflow(config_filepath):
     
     config = helpers.load_config(config_filepath)
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
-    pts_all = helpers.load_data(config_filepath, 'path_pts_all')[()]
-    positions_new_sansOutliers = helpers.load_data(config_filepath, 'path_positions')
+
+    pts_all = helpers.load_h5(config_filepath, 'path_pts_all')
+    positions_new_sansOutliers = helpers.load_nwb_ts(config_filepath, 'Optic Flow', 'positions')
 
     # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
     tic = time.time()
@@ -361,11 +362,11 @@ def conv_dim_reduce_workflow(config_filepath):
 
     if config['display_displacements']:
         display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
-    
 
     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
-    helpers.save_data(config_filepath, 'positions_convDR_meanSub', positions_convDR_meanSub)
-    helpers.save_data(config_filepath, 'positions_convDR_absolute', positions_convDR_absolute)
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub)
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute)
+
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End convolutional dimensionality reduction ==')

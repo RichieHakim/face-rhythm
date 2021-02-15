@@ -15,6 +15,7 @@ import sklearn.decomposition
 import sklearn.manifold
 
 from tqdm.notebook import tqdm
+from pynwb import NWBHDF5IO
 
 from face_rhythm.util import helpers
 
@@ -553,7 +554,21 @@ def factor_tsne(factors):
     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
-def positional_tca_workflow(config_filepath):
+def save_factors(config_filepath, factors, ftype):
+    for i, factor in enumerate(factors):
+        helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_dim{i}', factor)
+
+
+def load_factors(config_filepath, stem):
+    config = helpers.load_config(config_filepath)
+    path_nwb = config['path_nwb']
+    with NWBHDF5IO(path_nwb, 'r') as io:
+        nwbfile = io.read()
+        tca_data = nwbfile.processing['Face Rhythm']['TCA']
+        return [tca_data[ts].data[()] for ts in tca_data.time_series if stem in ts]
+
+
+def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     """
     sequences the steps for tca of the positions of the optic flow data
 
@@ -569,9 +584,9 @@ def positional_tca_workflow(config_filepath):
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
     config = helpers.load_config(config_filepath)
-    
-    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
-    positions_convDR_absolute = helpers.load_data(config_filepath, 'path_positions_convDR_absolute')
+
+    positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_meansub)
+    positions_convDR_absolute = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_absolute)
     
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
@@ -579,7 +594,8 @@ def positional_tca_workflow(config_filepath):
     if config['tca_vid_display']:
         factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
 
-    helpers.save_data(config_filepath, 'factors_np_positional', factors_np_positional)
+    helpers.create_nwb_group(config_filepath, 'TCA')
+    save_factors(config_filepath, factors_np_positional, 'positional')
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
@@ -601,11 +617,11 @@ def full_tca_workflow(config_filepath, data_key):
     print(f'== Beginning Full TCA Workflow ==')
     tic_all = time.time()
     config = helpers.load_config(config_filepath)
-    
-    Sxx_allPixels_norm = helpers.load_data(config_filepath, 'path_Sxx_allPixels_norm')
-    positions_convDR_absolute = helpers.load_data(config_filepath, data_key)
+
+    positions_convDR_absolute = helpers.load_nwb_ts(config_filepath,'Optic Flow', data_key)
+    Sxx_allPixels_norm = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_norm')
+    Sxx_allPixels_normFactor = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_normFactor')
     freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
-    Sxx_allPixels_normFactor = helpers.load_data(config_filepath, 'path_Sxx_allPixels_normFactor')
 
     tic = time.time()
     factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])
@@ -619,9 +635,10 @@ def full_tca_workflow(config_filepath, data_key):
 
     factor_tsne(factors_temporal)
 
-    helpers.save_data(config_filepath, 'factors_np', factors_np)
-    helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
-    helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
+    save_factors(config_filepath, factors_np, 'frequential')
+    # helpers.save_data(config_filepath, 'factors_np', factors_np)
+    # helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
+    # helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Full TCA ==')

@@ -49,7 +49,8 @@ def pca_workflow(config_filepath, data_key):
     print(f'== Beginning pca ==')
     tic_all = time.time()
 
-    positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
+    #positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
+    positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', data_key)
 
     # input_dimRed = np.squeeze(positions_new_sansOutliers[:,1,:])
     tmp_x = np.squeeze(positions_convDR_meanSub[:,0,:])
@@ -71,7 +72,8 @@ def pca_workflow(config_filepath, data_key):
     
     plot_diagnostics(output_PCA, pca, scores_points)
 
-    helpers.save_data(config_filepath, 'scores_points', scores_points)
+    helpers.create_nwb_group(config_filepath, 'PCA')
+    helpers.create_nwb_ts(config_filepath, 'PCA','scores_points',scores_points)
     helpers.save_data(config_filepath, 'input_dimRed_meanSub', input_dimRed_meanSub)
     
     helpers.print_time('total elapsed time', time.time() - tic_all)

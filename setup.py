@@ -11,6 +11,6 @@ setup(
                       'jupyterlab', 'tensorly', 'opencv-python',
                       'imageio', 'matplotlib', 'scikit-learn',
                       'scikit-image', 'librosa', 'pyyaml',
-                      'imageio-ffmpeg', 'tqdm'
+                      'imageio-ffmpeg', 'tqdm','h5py'
                       ]
 )

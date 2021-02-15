@@ -30,7 +30,7 @@ def clean_workflow(config_filepath):
     relaxation_factor = config['relaxation_factor']
     pixelNum_toUse = config['pixelNum_toUse']
     
-    displacements = helpers.load_data(config_filepath, 'path_displacements')
+    displacements = helpers.load_nwb_ts(config_filepath, 'Optic Flow', 'displacements')
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
 
     
@@ -92,8 +92,10 @@ def clean_workflow(config_filepath):
     plt.show()
 
     tic = time.time()
-    helpers.save_data(config_filepath, 'positions', positions_new_sansOutliers)
-    helpers.save_data(config_filepath, 'positions_absolute', positions_new_absolute_sansOutliers)
+    #helpers.save_data(config_filepath, 'positions', positions_new_sansOutliers)
+    #helpers.save_data(config_filepath, 'positions_absolute', positions_new_absolute_sansOutliers)
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions', positions_new_sansOutliers)
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_absolute', positions_new_absolute_sansOutliers)
 
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End outlier removal ==')
