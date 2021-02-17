@@ -372,7 +372,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
 
-    return displacements, numFrames_total , positions_tracked
+    return displacements, numFrames_total #, positions_tracked
 
 def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
     """
