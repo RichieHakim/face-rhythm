@@ -483,3 +483,15 @@ def dict_to_h5(data_dict, h5):
             dict_to_h5(item, group)
         else:
             h5.create_dataset(key, data=item)
+
+def dump_nwb(config_filepath):
+    config = load_config(config_filepath)
+    nwb_path = config['path_nwb']
+    io = pynwb.NWBHDF5IO(nwb_path, 'r')
+    nwbfile = io.read()
+    for interface in nwbfile.processing['Face Rhythm'].data_interfaces:
+        print(interface)
+        time_series_list = list(nwbfile.processing['Face Rhythm'][interface].time_series.keys())
+        for ii, time_series in enumerate(time_series_list):
+            print(f"     {time_series}:    {nwbfile.processing['Face Rhythm'][interface][time_series].data.shape}   ,  {nwbfile.processing['Face Rhythm'][interface][time_series].data.dtype}")
+

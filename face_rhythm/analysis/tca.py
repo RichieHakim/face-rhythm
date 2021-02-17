@@ -9,6 +9,7 @@ import numpy as np
 
 import scipy
 import scipy.signal
+import scipy.interpolate
 import tensorly as tl
 import tensorly.decomposition
 import sklearn.decomposition
@@ -394,173 +395,174 @@ def correlations(config_filepath, factors_np):
         
     return factors_xcorr
 
-def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
-    """
-    creates videos of points colored by a variety of factors
+# def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
+#     """
+#     creates videos of points colored by a variety of factors
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    factors_np ():
-    positions_convDR_absolute ():
+#     Parameters
+#     ----------
+#     config_filepath (Path): path to the config file
+#     factors_np ():
+#     positions_convDR_absolute ():
 
-    Returns
-    -------
+#     Returns
+#     -------
 
-    """
+#     """
 
-    config = helpers.load_config(config_filepath)
-    Fs = config['vid_Fs']
-    vid_width = config['vid_width']
-    vid_height = config['vid_height']
-    numFrames_allFiles = config['numFrames_allFiles']
-    path_vid_allFiles = config['path_vid_allFiles']
-    remote = config['remote']
+#     config = helpers.load_config(config_filepath)
+#     Fs = config['vid_Fs']
+#     vid_width = config['vid_width']
+#     vid_height = config['vid_height']
+#     numFrames_allFiles = config['numFrames_allFiles']
+#     path_vid_allFiles = config['path_vid_allFiles']
+#     remote = config['remote']
 
-    # Display video of factors
-    factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
-    # factors_toShow = [3]  # zero-indexed
+#     # Display video of factors
+#     factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
+#     # factors_toShow = [3]  # zero-indexed
 
-    for factor_iter in factors_toShow:
+#     for factor_iter in factors_toShow:
 
-        # vidNums_toUse = range(numVids) ## note zero indexing!
-        vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
+#         # vidNums_toUse = range(numVids) ## note zero indexing!
+#         vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
 
-        if type(vidNums_toUse) == int:
-            vidNums_toUse = np.array([vidNums_toUse])
+#         if type(vidNums_toUse) == int:
+#             vidNums_toUse = np.array([vidNums_toUse])
 
-        dot_size = 2
+#         dot_size = 2
 
-        printFPS_pref = 0
-        fps_counterPeriod = 10 ## number of frames to do a tic toc over
+#         printFPS_pref = 0
+#         fps_counterPeriod = 10 ## number of frames to do a tic toc over
 
-    #     modelRank_toUse = 5
-        factor_toShow = factor_iter+1
-        save_pref = config['tca_vid_save']
+#     #     modelRank_toUse = 5
+#         factor_toShow = factor_iter+1
+#         save_pref = config['tca_vid_save']
 
-        # save_dir = "F:\\RH_Local\\Rich data\\camera data"
-        save_dir = config['tca_vid_dir']
+#         # save_dir = "F:\\RH_Local\\Rich data\\camera data"
+#         save_dir = config['tca_vid_dir']
         
-        save_fileName = f'factor {factor_toShow}'
-        # save_pathFull = f'{save_dir}\\{save_fileName}.avi'
-        save_pathFull = f'{save_dir}/{save_fileName}.avi'
-        config[f'path_{save_fileName}'] = save_pathFull
-        helpers.save_config(config, config_filepath)
+#         save_fileName = f'factor {factor_toShow}'
+#         # save_pathFull = f'{save_dir}\\{save_fileName}.avi'
+#         save_pathFull = f'{save_dir}/{save_fileName}.avi'
+#         config[f'path_{save_fileName}'] = save_pathFull
+#         helpers.save_config(config, config_filepath)
 
-        # ensemble_toUse = ensemble
-        ensemble_toUse = factors_np
-        positions_toUse = positions_convDR_absolute
+#         # ensemble_toUse = ensemble
+#         ensemble_toUse = factors_np
+#         positions_toUse = positions_convDR_absolute
 
-        factor_toShow = factor_toShow-1
-        # input_scores = ensemble_toUse.factors(modelRank_toUse)[0][0]
-        input_scores = np.single(ensemble_toUse[0])
+#         factor_toShow = factor_toShow-1
+#         # input_scores = ensemble_toUse.factors(modelRank_toUse)[0][0]
+#         input_scores = np.single(ensemble_toUse[0])
 
-        range_toUse = np.ceil(np.max(input_scores[:,factor_toShow]) - np.min(input_scores[:,factor_toShow])) + 1
-        offset_toUse = np.min(input_scores[:,factor_toShow])
-        scores_norm = input_scores[:,factor_toShow] - offset_toUse
-        scores_norm = (scores_norm / np.max(scores_norm)) *1000
-        cmap = matplotlib.cm.get_cmap('hot', 1000)
-        # cmap_viridis(np.arange(range_toUse))
+#         range_toUse = np.ceil(np.max(input_scores[:,factor_toShow]) - np.min(input_scores[:,factor_toShow])) + 1
+#         offset_toUse = np.min(input_scores[:,factor_toShow])
+#         scores_norm = input_scores[:,factor_toShow] - offset_toUse
+#         scores_norm = (scores_norm / np.max(scores_norm)) *1000
+#         cmap = matplotlib.cm.get_cmap('hot', 1000)
+#         # cmap_viridis(np.arange(range_toUse))
 
-        colormap_tuples =  list(np.arange(positions_toUse.shape[0]))
-        for ii in range(positions_toUse.shape[0]):
-            colormap_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) *255)[:3]))
+#         colormap_tuples =  list(np.arange(positions_toUse.shape[0]))
+#         for ii in range(positions_toUse.shape[0]):
+#             colormap_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) *255)[:3]))
 
-        # Define the codec and create VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-        if save_pref:
-            print(f'saving to file {save_pathFull}')
-            out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
-
-
-        ## Main loop to pull out displacements in each video   
-        ind_concat = int(np.hstack([0 , np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
-
-        fps = 0
-        tic_fps = time.time()
-        for iter_vid , vidNum_iter in enumerate(vidNums_toUse):
-            path_vid = path_vid_allFiles[vidNum_iter]
-            vid = imageio.get_reader(path_vid,  'ffmpeg')
-
-    #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-            numFrames = 600
-
-    #         frameToSet = 0
-    #         video.set(1,frameToSet)
-
-            for iter_frame , new_frame in enumerate(vid):
-
-    #             ind_currentVid = np.int64(video.get(cv2.CAP_PROP_POS_FRAMES))
-                if iter_frame >= numFrames:
-                    break
-    #             ok, new_frame = video.read()
-
-                for ii in range(positions_toUse.shape[0]):
-                    pointInds_tracked_tuple = tuple(np.int64(np.squeeze(positions_toUse[ii,:,ind_concat])))
-                    cv2.circle(new_frame,pointInds_tracked_tuple, dot_size, colormap_tuples[ii], -1)
-                if save_pref:
-                    out.write(new_frame)
-
-    #             Sxx_frameNum = round( ind_currentVid / (positions_toUse.shape[2] / Sxx_allPixels.shape[2]) ,1)
-                cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames}', org=(10,20), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-    #             cv2.putText(new_frame, f'frame #: {Sxx_frameNum}', org=(10,20), fontFace=1, fontScale=1, color=(255,255,255), thickness=2)
-    #             cv2.putText(new_frame, f'vid #: {iter+1}/{len(vidNums_toUse)}', org=(10,40), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                if not remote:
-                    cv2.imshow('test',new_frame)
+#         # Define the codec and create VideoWriter object
+#         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+#         if save_pref:
+#             print(f'saving to file {save_pathFull}')
+#             out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
 
 
-                k = cv2.waitKey(1) & 0xff
-                if k == 27 : break
+#         ## Main loop to pull out displacements in each video   
+#         ind_concat = int(np.hstack([0 , np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
 
-                ind_concat = ind_concat+1
+#         fps = 0
+#         tic_fps = time.time()
+#         for iter_vid , vidNum_iter in enumerate(vidNums_toUse):
+#             path_vid = path_vid_allFiles[vidNum_iter]
+#             vid = imageio.get_reader(path_vid,  'ffmpeg')
 
+#     #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+#             numFrames = 600
 
-                if ind_concat%fps_counterPeriod==0:
-                    elapsed = time.time() - tic_fps
-                    fps = fps_counterPeriod/elapsed
-                    if printFPS_pref:
-                        print(fps)
-                    tic_fps = time.time()
+#     #         frameToSet = 0
+#     #         video.set(1,frameToSet)
 
+#             for iter_frame , new_frame in enumerate(vid):
 
-    out.release()
-    #video.release()
-    cv2.destroyAllWindows()
+#     #             ind_currentVid = np.int64(video.get(cv2.CAP_PROP_POS_FRAMES))
+#                 if iter_frame >= numFrames:
+#                     break
+#     #             ok, new_frame = video.read()
 
+#                 for ii in range(positions_toUse.shape[0]):
+#                     pointInds_tracked_tuple = tuple(np.int64(np.squeeze(positions_toUse[ii,:,ind_concat])))
+#                     cv2.circle(new_frame,pointInds_tracked_tuple, dot_size, colormap_tuples[ii], -1)
+#                 if save_pref:
+#                     out.write(new_frame)
 
-def factor_tsne(factors):
-    """
-    creates and plots tsne of the factors
-
-    Parameters
-    ----------
-    factors ():
-
-    Returns
-    -------
-
-    """
-
-    print("Computing t-SNE embedding")
-    tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
-                         random_state=0, perplexity=200)
-    X_tsne = tsne.fit_transform(factors)
-    print("Finished computing t-SNE embedding")
-
-    factor_toCMap = 8  # 1 indexed
-
-    plt.figure(figsize=(5, 5))
-    # plt.plot(X_tsne[:,0] , X_tsne[:,1] , linewidth=0.05)
-    # plt.scatter(X_tsne[:,0] , X_tsne[:,1], 'r.' , markersize=0.6)
-    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
+#     #             Sxx_frameNum = round( ind_currentVid / (positions_toUse.shape[2] / Sxx_allPixels.shape[2]) ,1)
+#                 cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames}', org=(10,20), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
+#     #             cv2.putText(new_frame, f'frame #: {Sxx_frameNum}', org=(10,20), fontFace=1, fontScale=1, color=(255,255,255), thickness=2)
+#     #             cv2.putText(new_frame, f'vid #: {iter+1}/{len(vidNums_toUse)}', org=(10,40), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
+#                 cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
+#                 cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
+#                 cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
+#                 if not remote:
+#                     cv2.imshow('test',new_frame)
 
 
-def save_factors(config_filepath, factors, ftype):
-    for i, factor in enumerate(factors):
+#                 k = cv2.waitKey(1) & 0xff
+#                 if k == 27 : break
+
+#                 ind_concat = ind_concat+1
+
+
+#                 if ind_concat%fps_counterPeriod==0:
+#                     elapsed = time.time() - tic_fps
+#                     fps = fps_counterPeriod/elapsed
+#                     if printFPS_pref:
+#                         print(fps)
+#                     tic_fps = time.time()
+
+
+#     out.release()
+#     #video.release()
+#     cv2.destroyAllWindows()
+
+
+# def factor_tsne(factors):
+#     """
+#     creates and plots tsne of the factors
+
+#     Parameters
+#     ----------
+#     factors ():
+
+#     Returns
+#     -------
+
+#     """
+
+#     print("Computing t-SNE embedding")
+#     tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
+#                          random_state=0, perplexity=200)
+#     X_tsne = tsne.fit_transform(factors)
+#     print("Finished computing t-SNE embedding")
+
+#     factor_toCMap = 8  # 1 indexed
+
+#     plt.figure(figsize=(5, 5))
+#     # plt.plot(X_tsne[:,0] , X_tsne[:,1] , linewidth=0.05)
+#     # plt.scatter(X_tsne[:,0] , X_tsne[:,1], 'r.' , markersize=0.6)
+#     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
+
+
+def save_factors(config_filepath, factors_all, factors_temporal_interp, ftype):
+    for i, factor in enumerate(factors_all):
         helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_dim{i}', factor)
+    helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_temporal_interp', factors_temporal_interp)
 
 
 def load_factors(config_filepath, stem):
@@ -604,6 +606,33 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
 
+def interpolate_temporal_factor(y_input , numFrames):
+    """
+    Interpolates the temporal component from the frequential TCA step from CQT time steps into
+    camera time steps. This allows for a 1 to 1 sync of the temporal component with the camera frames.
+    This step assumes non-negativity and rectifies the output to be >0.
+
+    Parameters
+    ----------
+    y_input: This should be the temporal factor matrix [N,M] where N: factors, M: time steps
+    numFrames: This should be the number of frames from the original camera time series
+    ----------
+
+    Returns
+    ----------
+    y_new: This will be the interpolated y_input
+    ----------
+    """
+
+    x_old = np.linspace(0 , y_input.shape[0] , num=y_input.shape[0] , endpoint=True)
+    x_new = np.linspace(0 , y_input.shape[0] , num=numFrames, endpoint=True)
+
+    f_interp = scipy.interpolate.interp1d(x_old, y_input, kind='cubic',axis=0)
+    y_new = f_interp(x_new)
+    y_new[y_new <=0] = 0 # assumes non-negativity
+
+    return y_new
+
 
 def full_tca_workflow(config_filepath, data_key):
     """
@@ -631,18 +660,22 @@ def full_tca_workflow(config_filepath, data_key):
     factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])
     helpers.print_time('Decomposition completed', time.time() - tic)
 
-    factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
-    factors_xcorr = correlations(config_filepath, factors_np)
+    # factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+    # factors_xcorr = correlations(config_filepath, factors_np)
 
-    if config['tca_vid_display']:
-        more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
+    # if config['tca_vid_display']:
+    #     more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
-    factor_tsne(factors_temporal)
+    # factor_tsne(factors_temporal)
 
-    save_factors(config_filepath, factors_np, 'frequential')
+    factors_temporal_interp = interpolate_temporal_factor(factors_np[2] , config['numFrames_total'])
+
+    helpers.create_nwb_group(config_filepath, 'TCA')
+    save_factors(config_filepath, factors_np, factors_temporal_interp, 'frequential')
     # helpers.save_data(config_filepath, 'factors_np', factors_np)
     # helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
     # helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
+
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Full TCA ==')
