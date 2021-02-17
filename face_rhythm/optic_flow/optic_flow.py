@@ -514,8 +514,8 @@ def optic_workflow(config_filepath):
         displacements, numFrames_total = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
                                                             pointInds_tracked_tuple, displacements, pts_spaced, color_tuples, config['optic_recursive_relaxation_factor'])
     else:
-        displacements, numFrames_total, positions_recursive = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
-                                                                  pointInds_tracked_tuple, displacements, pts_spaced, color_tuples)
+        displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
+                             pts_spaced, color_tuples)
     helpers.print_time('Displacements computed', time.time() - tic)
 
     tic = time.time()
