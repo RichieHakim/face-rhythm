@@ -177,7 +177,6 @@ def get_video_data(config_filepath):
     path_vid_allFiles = config['path_vid_allFiles']
     numVids  = config['numVids']
     print_fileNames_pref = config['print_fileNames_pref']
-    trial_inds = config['trial_inds']
 
     video = cv2.VideoCapture(path_vid_allFiles[0])
     numFrames_firstVid = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -191,11 +190,6 @@ def get_video_data(config_filepath):
     print(f'number of videos: {numVids}')
     print(f'number of frames in FIRST video (roughly):  {numFrames_firstVid}')
     print(f'number of frames in ALL videos (roughly):   {numFrames_total_rough}')
-
-    if trial_inds:
-        trial_ind_array = np.load(trial_inds)
-        print(f'number of trials: {trial_ind_array.shape[0]}')
-        print(f'number of frames per trial: {trial_ind_array.shape[1]}')
 
     Fs = video.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
     print(f'Sampling rate pulled from video file metadata:   {round(Fs, 3)} frames per second')
@@ -292,9 +286,8 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
     nwb_path = config['path_nwb']
     Fs = config['vid_Fs']
     print(f'Saving {ts_name} in Group {group_name}')
-
-    with NWBHDF5IO(nwb_path, 'a') as read_io:
-        nwbfile = read_io.read()
+    with NWBHDF5IO(nwb_path, 'a') as io:
+        nwbfile = io.read()
         new_ts = pynwb.TimeSeries(name=ts_name,
                                   data=np.moveaxis(data,-1,0),
                                   unit='mm',
@@ -303,14 +296,8 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
             nwbfile.processing['Face Rhythm'][group_name].add_timeseries(new_ts)
         else:
             ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
-            try:
-                ts.data[()] = new_ts.data
-            except:
-                print('Shape mismatch between old shape and new shape, not NWB supported')
-                print(f"Old Shape: {ts.data.shape}")
-                print(f"New Shape: {new_ts.data.shape}")
-                print('Not Saving')
-        read_io.write(nwbfile)
+            ts = new_ts
+        io.write(nwbfile)
 
 
 def load_nwb_ts(config_filepath, group_name, ts_name):
@@ -497,11 +484,14 @@ def dict_to_h5(data_dict, h5):
         else:
             h5.create_dataset(key, data=item)
 
-
 def dump_nwb(config_filepath):
     config = load_config(config_filepath)
     nwb_path = config['path_nwb']
-    with NWBHDF5IO(nwb_path, 'r') as io:
-        nwbfile = io.read()
-        for interface in nwbfile.processing['Face Rhythm'].data_interfaces:
-            print(nwbfile.processing['Face Rhythm'][interface])
+    io = pynwb.NWBHDF5IO(nwb_path, 'r')
+    nwbfile = io.read()
+    for interface in nwbfile.processing['Face Rhythm'].data_interfaces:
+        print(interface)
+        time_series_list = list(nwbfile.processing['Face Rhythm'][interface].time_series.keys())
+        for ii, time_series in enumerate(time_series_list):
+            print(f"     {time_series}:    {nwbfile.processing['Face Rhythm'][interface][time_series].data.shape}   ,  {nwbfile.processing['Face Rhythm'][interface][time_series].data.dtype}")
+
