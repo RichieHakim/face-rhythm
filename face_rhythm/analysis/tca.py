@@ -91,7 +91,7 @@ def plot_factors(config_filepath, factors_np):
     """
 
     factors_toUse = factors_np
-    modelRank = factors_toUse[0].shape[1]
+    modelRank = factors_toUse[-2].shape[1]
     ## just for plotting in case 
 #     if 'Fs' not in globals():
 #         Fs = 120
@@ -100,8 +100,8 @@ def plot_factors(config_filepath, factors_np):
 
     plt.figure()
     # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
-    factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
-    factors_temporal = factors_toUse[2][:,:]
+    factors_temporal = scipy.stats.zscore(factors_toUse[-1][:,:] , axis=0)
+    factors_temporal = factors_toUse[-1][:,:]
     # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
     # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
     plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,])
@@ -112,20 +112,20 @@ def plot_factors(config_filepath, factors_np):
 
 
     plt.figure()
-    plt.plot(factors_toUse[1][:,:])
+    plt.plot(factors_toUse[-2][:,:])
     plt.legend(np.arange(modelRank)+1)
     plt.xlabel('x vs. y')
     plt.ylabel('a.u.')
 
     plt.figure()
-    plt.plot(factors_toUse[0][:,:])
+    plt.plot(factors_toUse[-3][:,:])
     plt.legend(np.arange(modelRank)+1)
     plt.xlabel('pixel number')
     plt.ylabel('a.u.')
 
 
     plt.figure()
-    plt.imshow(np.single(np.corrcoef(factors_toUse[2][:,:].T)))
+    plt.imshow(np.single(np.corrcoef(factors_toUse[-1][:,:].T)))
 
     # input_dimRed = factors_toUse[2][:,:]
     # # input_dimRed_meanSub = 
@@ -137,6 +137,14 @@ def plot_factors(config_filepath, factors_np):
 
     # plt.figure()
     # plt.plot(output_PCA)
+
+def plot_trial_factor(trial_factor):
+    modelRank = trial_factor.shape[1]
+    plt.figure()
+    plt.plot(trial_factor)
+    plt.legend(np.arange(modelRank) + 1)
+    plt.xlabel('trial number')
+    plt.ylabel('a.u.')
     
     
 def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
@@ -165,7 +173,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
 
     # Display video of factors
 
-    factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
+    factors_toShow = np.arange(factors_np[-3].shape[1])  # zero-indexed
     # factors_toShow = [3]  # zero-indexed
 
     for factor_iter in factors_toShow:
@@ -199,7 +207,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
 
         factor_toShow = factor_toShow-1
         # input_scores = ensemble_toUse.factors(modelRank_toUse)[0][0]
-        input_scores = np.single(ensemble_toUse[0])
+        input_scores = np.single(ensemble_toUse[-3])
 
         range_toUse = np.ceil(np.max(input_scores[:,factor_toShow]) - np.min(input_scores[:,factor_toShow])) + 1
         offset_toUse = np.min(input_scores[:,factor_toShow])
@@ -299,7 +307,7 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     plt.figure()
     # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
     # factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
-    factors_temporal = factors_toUse[2][:,:]
+    factors_temporal = factors_toUse[-2][:,:]
     # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
     # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
     plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,])
@@ -308,20 +316,20 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     plt.xlabel('time (s)')
     plt.ylabel('a.u.')
 
-    plt.figure()
-    # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
-    # factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
-    factors_temporal = factors_toUse[2][:,:] * (np.mean(Sxx_allPixels_normFactor , axis=1)[:,None] **(2/5))
-    # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
+    # plt.figure()
+    # # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
+    # # factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
+    # factors_temporal = factors_toUse[-2][:,:] * (np.mean(Sxx_allPixels_normFactor , axis=1)[:,None] **(2/5))
+    # # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
+    # # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
     # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
-    plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
-    # plt.plot(factors_temporal[:,:])
-    plt.legend(np.arange(modelRank)+1)
-    plt.xlabel('time (s)')
-    plt.ylabel('a.u.')
+    # # plt.plot(factors_temporal[:,:])
+    # plt.legend(np.arange(modelRank)+1)
+    # plt.xlabel('time (s)')
+    # plt.ylabel('a.u.')
 
     plt.figure()
-    plt.plot(freqs_Sxx , (factors_toUse[1][:,:]))
+    plt.plot(freqs_Sxx , (factors_toUse[-3][:,:]))
     # plt.plot(freqXaxis , (factors_toUse[1][:,:]))
     # plt.plot(f , (factors_toUse[1][:,:]))
     # plt.plot((factors_toUse[1][:,:]))
@@ -332,31 +340,31 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     # plt.xscale('log')
 
     plt.figure()
-    plt.plot(factors_toUse[3][:,:])
+    plt.plot(factors_toUse[-1][:,:])
     plt.legend(np.arange(modelRank)+1)
     plt.xlabel('x vs. y')
     plt.ylabel('a.u.')
 
     plt.figure()
-    plt.plot(factors_toUse[0][:,:])
+    plt.plot(factors_toUse[-4][:,:])
     plt.legend(np.arange(modelRank)+1)
     plt.xlabel('pixel number')
     plt.ylabel('a.u.')
 
 
-    plt.figure()
-    plt.imshow(np.single(np.corrcoef(factors_toUse[2][:,:].T)))
+    #plt.figure()
+    #plt.imshow(np.single(np.corrcoef(factors_toUse[2][:,:].T)))
 
-    input_dimRed = factors_toUse[2][:,:]
-    # input_dimRed_meanSub = 
-    pca = sklearn.decomposition.PCA(n_components=modelRank-2)
-    # pca = sk.decomposition.FactorAnalysis(n_components=3)
-    pca.fit(np.single(input_dimRed).transpose())
-    output_PCA = pca.components_.transpose()
-    # scores_points = np.dot(ensemble.factors(4)[0][2] , output_PCA)
-
-    plt.figure()
-    plt.plot(output_PCA[:,5])
+    # input_dimRed = factors_toUse[2][:,:]
+    # # input_dimRed_meanSub =
+    # pca = sklearn.decomposition.PCA(n_components=modelRank-2)
+    # # pca = sk.decomposition.FactorAnalysis(n_components=3)
+    # pca.fit(np.single(input_dimRed).transpose())
+    # output_PCA = pca.components_.transpose()
+    # # scores_points = np.dot(ensemble.factors(4)[0][2] , output_PCA)
+    #
+    # plt.figure()
+    # plt.plot(output_PCA[:,5])
 
     config['modelRank'] = modelRank
     helpers.save_config(config, config_filepath)
@@ -416,6 +424,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     numFrames_allFiles = config['numFrames_allFiles']
     path_vid_allFiles = config['path_vid_allFiles']
     remote = config['remote']
+    numFrames = config['tca_display_frames']
 
     # Display video of factors
     factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
@@ -482,8 +491,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
             path_vid = path_vid_allFiles[vidNum_iter]
             vid = imageio.get_reader(path_vid,  'ffmpeg')
 
-    #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-            numFrames = 600
+
 
     #         frameToSet = 0
     #         video.set(1,frameToSet)
@@ -591,16 +599,19 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
 
     positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_meansub)
     positions_convDR_absolute = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_absolute)
-    
+
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
+
     plot_factors(config_filepath, factors_np_positional)
+    if config['trial_inds']:
+        plot_trial_factor(factors_np_positional[0])
     if config['tca_vid_display']:
         factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
 
     helpers.create_nwb_group(config_filepath, 'TCA')
     save_factors(config_filepath, factors_np_positional, 'positional')
-    
+
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
 
@@ -628,16 +639,16 @@ def full_tca_workflow(config_filepath, data_key):
     freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
 
     tic = time.time()
-    factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])
+    factors_np = tca(config_filepath, Sxx_allPixels_norm)
     helpers.print_time('Decomposition completed', time.time() - tic)
 
     factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
-    factors_xcorr = correlations(config_filepath, factors_np)
+    #factors_xcorr = correlations(config_filepath, factors_np)
 
     if config['tca_vid_display']:
         more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
-    factor_tsne(factors_temporal)
+    #factor_tsne(factors_temporal)
 
     save_factors(config_filepath, factors_np, 'frequential')
     # helpers.save_data(config_filepath, 'factors_np', factors_np)

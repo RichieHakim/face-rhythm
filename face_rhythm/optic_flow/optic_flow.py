@@ -309,6 +309,71 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
     return displacements_tmp
 
 
+def analyze_trial(trial_num, trial_inds, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
+    """
+    computes optic flow for a single video within the multithread command
+    similar to displacements monothread
+    eventually refactor / recombine with displacements monothread
+
+    Parameters
+    ----------
+    vidNum_iter ():
+    config (dict): dictionary of config parameters
+    pointInds_toUse ():
+    displacements ():
+    pts_spaced ():
+
+    Returns
+    -------
+    displacements (): array of displacements
+    """
+
+    vidNum_iter = 0
+    numVids = config['numVids']
+    path_vid_allFiles = config['path_vid_allFiles']
+    current_trial = trial_inds[trial_num].tolist()
+    lk_names = [key for key in config.keys() if 'lk_' in key]
+    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+                 for k in lk_names}
+
+    vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
+    #     metadata = vid.get_meta_data()
+
+    path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
+    video = cv2.VideoCapture(path_vid)  # open the video object with openCV
+    numFrames = trial_inds.shape[1]
+
+    frameToSet = current_trial[0]
+    frame = vid.get_data(frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+    new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    old_frame = new_frame_gray
+
+    displacements_tmp = np.zeros((pts_spaced.shape[0], 2, np.uint64(numFrames))) * np.nan
+
+    print(' ', end='', flush=True)
+    text = "progresser #{}".format(trial_num)
+    print(f'\n Calculating displacement field: video # {trial_num + 1}/{trial_inds.shape[0]}')
+
+
+    for iter_frame,current_frame in enumerate(tqdm(current_trial, total=numFrames, desc=text, position=trial_num)):
+        new_frame = vid.get_data(current_frame)
+        new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
+
+        ##calculate optical flow
+        pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
+                                                                **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+
+        ## Calculate displacement and place into variable 'displacements' (changes in size every iter)
+        if iter_frame == 0:
+            displacements_tmp[:, :, iter_frame] = np.zeros((pts_spaced.shape[0], 2))
+        else:
+            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+
+        old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
+
+    return displacements_tmp
+
+
 def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced):
     """
     wrapper for multithreaded optic flow computation
@@ -356,6 +421,50 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     return displacements, numFrames_total
 
 
+def displacements_trial_separated(config, pointInds_toUse, displacements, pts_spaced):
+    """
+    wrapper for multithreaded optic flow computation
+    operates on multiple videos at once
+
+    Parameters
+    ----------
+    config (dict): dictionary of config parameters
+    pointInds_toUse ():
+    displacements ():
+    pts_spaced ():
+
+    Returns
+    -------
+    displacements (): array of displacements
+    numFrames_total (int): number of frames
+    """
+
+    trial_inds = np.load(config['trial_inds'])[:config['num_trials'],...]
+
+    if config['optic_multithread']:
+        cv2.setNumThreads(0)
+        freeze_support()
+        tqdm.set_lock(RLock())
+        p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
+        displacements_trials = p.map(
+            partial(analyze_trial, trial_inds=trial_inds, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced),
+            list(range(trial_inds.shape[0])))
+        p.close()
+        p.terminate()
+        p.join()
+    else:
+        displacements_trials = []
+        for i, _ in enumerate(trial_inds):
+            displacements_tmp = analyze_trial(i, trial_inds, config, pointInds_toUse, pts_spaced)
+            displacements_trials.append(displacements_tmp)
+
+    displacements = np.stack(displacements_trials)
+    displacements = displacements[..., ~np.isnan(displacements[0, 0, 0, :])]
+    numFrames_total = displacements.shape[2]
+
+    return displacements, numFrames_total
+
+
 def optic_workflow(config_filepath):
     """
     sequences the steps of the optic flow computation
@@ -381,11 +490,14 @@ def optic_workflow(config_filepath):
     helpers.print_time('Optic Flow Set Up', time.time() - tic)
 
     tic = time.time()
-    if config['optic_multithread']:
+    if config['trial_inds']:
+        displacements_trials, numFrames_total = displacements_trial_separated(config, pointInds_toUse, displacements, pts_spaced)
+    elif config['optic_multithread']:
         displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
     else:
         displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
                                                                   pointInds_tracked_tuple, displacements, pts_spaced, color_tuples)
+
     helpers.print_time('Displacements computed', time.time() - tic)
 
     tic = time.time()
@@ -394,7 +506,10 @@ def optic_workflow(config_filepath):
 
     helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
     helpers.create_nwb_group(config_filepath, 'Optic Flow')
-    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'displacements', displacements)
+    if config['trial_inds']:
+        helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'displacements_trials', displacements_trials)
+    else:
+        helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'displacements', displacements)
     helpers.save_data(config_filepath, 'color_tuples', color_tuples)
     helpers.print_time('Data Saved', time.time() - tic)
 

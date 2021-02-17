@@ -48,9 +48,13 @@ def pca_workflow(config_filepath, data_key):
 
     print(f'== Beginning pca ==')
     tic_all = time.time()
+    config = helpers.load_config(config_filepath)
 
     #positions_convDR_meanSub = helpers.load_data(config_filepath, data_key)
     positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', data_key)
+    if config['trial_inds']:
+        old_shape = positions_convDR_meanSub.shape
+        positions_convDR_meanSub = positions_convDR_meanSub.reshape(old_shape[0]*old_shape[1],2,-1)
 
     # input_dimRed = np.squeeze(positions_new_sansOutliers[:,1,:])
     tmp_x = np.squeeze(positions_convDR_meanSub[:,0,:])
