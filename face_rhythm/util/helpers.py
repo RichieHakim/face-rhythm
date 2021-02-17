@@ -496,3 +496,12 @@ def dict_to_h5(data_dict, h5):
             dict_to_h5(item, group)
         else:
             h5.create_dataset(key, data=item)
+
+
+def dump_nwb(config_filepath):
+    config = load_config(config_filepath)
+    nwb_path = config['path_nwb']
+    with NWBHDF5IO(nwb_path, 'r') as io:
+        nwbfile = io.read()
+        for interface in nwbfile.processing['Face Rhythm'].data_interfaces:
+            print(nwbfile.processing['Face Rhythm'][interface])
