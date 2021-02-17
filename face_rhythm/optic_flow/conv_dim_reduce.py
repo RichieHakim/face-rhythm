@@ -9,6 +9,7 @@ import copy
 import time
 from functools import partial
 from tqdm.notebook import tqdm
+from tqdm import trange
 
 from matplotlib import pyplot as plt
 
@@ -188,7 +189,7 @@ def makeConvDR(ii, input_traces, cos_kernel, cos_kernel_mean, pca, rank_reduced,
 
 def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKernel, cosKernel_mean, positions_new_sansOutliers):
     """
-    calls the multithreaded convolutional dimensionality reducer
+    performs single-threaded convolutional dimensionality reduction
 
     Parameters
     ----------
@@ -205,12 +206,11 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
 
     """
 
-
     config = helpers.load_config(config_filepath)
     num_components = config['cdr_num_components']
-
+    
     input_traces = np.float32(positions_new_sansOutliers)
-    num_components = 2
+    # num_components = 3
     rank_reduced = num_components
 
     dots_old = pointInds_toUse
@@ -218,18 +218,29 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
 
     pca = sklearn.decomposition.PCA(n_components=num_components)
 
-    p = Pool(int(multiprocessing.cpu_count() / 3))
-    positions_convDR_meanSub_list = p.map(partial(makeConvDR, input_traces = input_traces, cos_kernel = cosKernel, cos_kernel_mean = cosKernel_mean, pca = pca, rank_reduced = rank_reduced, dots_new=dots_new), range(dots_new.shape[0]))
-    p.close()
-    p.terminate()
-    p.join()
-    
-    positions_convDR_meanSub_list = list(positions_convDR_meanSub_list)
+    positions_convDR_meanSub = np.zeros((dots_new.shape[0] , 2 , input_traces.shape[2]))
+    output_PCA_loadings = np.zeros((dots_new.shape[0] , 2 , input_traces.shape[2] , num_components))
+    output_PCA_scores = list(np.zeros(dots_new.shape[0]))
+    for ii in trange(dots_new.shape[0] , mininterval=1):
+    #     print(ii)
+        influence_weightings = cosKernel[int(dots_new[ii][0][1]) , int(dots_new[ii][0][0]) , :]
+        
+        idx_nonZero = np.array(np.where(influence_weightings !=0))[0,:]
 
-    positions_convDR_meanSub = np.zeros((dots_new.shape[0], 2, input_traces.shape[2]))
-    for ii in range(dots_new.shape[0]):
-        positions_convDR_meanSub[ii, :, :] = positions_convDR_meanSub_list[ii]
-
+        displacements_preConvDR_x = input_traces[idx_nonZero , 0 , :] * influence_weightings[idx_nonZero][:,None]
+        displacements_preConvDR_x = displacements_preConvDR_x - np.mean(displacements_preConvDR_x , axis=1)[:,None]
+        displacements_preConvDR_y = input_traces[idx_nonZero , 1 , :] * influence_weightings[idx_nonZero][:,None]
+        displacements_preConvDR_y = displacements_preConvDR_y - np.mean(displacements_preConvDR_y , axis=1)[:,None]
+        pca.fit(displacements_preConvDR_x)
+        output_PCA_loadings[ii,0,:,:] = pca.components_.T
+        pca.fit(displacements_preConvDR_y)
+        output_PCA_loadings[ii,1,:,:] = pca.components_.T
+        
+        output_PCA_scores[ii] = np.zeros((2,displacements_preConvDR_y.shape[0] , num_components))
+        output_PCA_scores[ii][0,:,:] = np.dot( displacements_preConvDR_x  ,  output_PCA_loadings[ii,0,:,:] )
+        output_PCA_scores[ii][1,:,:] = np.dot( displacements_preConvDR_y  ,  output_PCA_loadings[ii,1,:,:] )
+        positions_convDR_meanSub[ii,0,:] = np.mean(np.dot( output_PCA_loadings[ii,0,:,:rank_reduced] , output_PCA_scores[ii][0,:,:rank_reduced].T ) , axis=1) / cosKernel_mean[ii]
+        positions_convDR_meanSub[ii,1,:] = np.mean(np.dot( output_PCA_loadings[ii,1,:,:rank_reduced] , output_PCA_scores[ii][1,:,:rank_reduced].T ) , axis=1) / cosKernel_mean[ii]
     return positions_convDR_meanSub
 
 
@@ -273,7 +284,7 @@ def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_
         color_tuples[ii] = (np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255)
     #     color_tuples[ii] = (0,255,255)
 
-    ## Main loop to pull out displacements in each video   
+    ## Main loop to pull out displacements in each video
     ind_concat = int(np.hstack([0, np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
 
     fps = 0

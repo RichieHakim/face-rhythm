@@ -9,6 +9,7 @@ import numpy as np
 
 import scipy
 import scipy.signal
+import scipy.interpolate
 import tensorly as tl
 import tensorly.decomposition
 import sklearn.decomposition
@@ -473,7 +474,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
             out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
 
 
-        ## Main loop to pull out displacements in each video   
+        ## Main loop to pull out displacements in each video
         ind_concat = int(np.hstack([0 , np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
 
         fps = 0
@@ -558,9 +559,10 @@ def factor_tsne(factors):
     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
-def save_factors(config_filepath, factors, ftype):
-    for i, factor in enumerate(factors):
+def save_factors(config_filepath, factors_all, factors_temporal_interp, ftype):
+    for i, factor in enumerate(factors_all):
         helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_dim{i}', factor)
+    helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_temporal_interp', factors_temporal_interp)
 
 
 def load_factors(config_filepath, stem):
@@ -604,6 +606,33 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
 
+def interpolate_temporal_factor(y_input , numFrames):
+    """
+    Interpolates the temporal component from the frequential TCA step from CQT time steps into
+    camera time steps. This allows for a 1 to 1 sync of the temporal component with the camera frames.
+    This step assumes non-negativity and rectifies the output to be >0.
+
+    Parameters
+    ----------
+    y_input: This should be the temporal factor matrix [N,M] where N: factors, M: time steps
+    numFrames: This should be the number of frames from the original camera time series
+    ----------
+
+    Returns
+    ----------
+    y_new: This will be the interpolated y_input
+    ----------
+    """
+
+    x_old = np.linspace(0 , y_input.shape[0] , num=y_input.shape[0] , endpoint=True)
+    x_new = np.linspace(0 , y_input.shape[0] , num=numFrames, endpoint=True)
+
+    f_interp = scipy.interpolate.interp1d(x_old, y_input, kind='cubic',axis=0)
+    y_new = f_interp(x_new)
+    y_new[y_new <=0] = 0 # assumes non-negativity
+
+    return y_new
+
 
 def full_tca_workflow(config_filepath, data_key):
     """
@@ -639,10 +668,14 @@ def full_tca_workflow(config_filepath, data_key):
 
     factor_tsne(factors_temporal)
 
-    save_factors(config_filepath, factors_np, 'frequential')
+    factors_temporal_interp = interpolate_temporal_factor(factors_np[2] , config['numFrames_total'])
+
+    helpers.create_nwb_group(config_filepath, 'TCA')
+    save_factors(config_filepath, factors_np, factors_temporal_interp, 'frequential')
     # helpers.save_data(config_filepath, 'factors_np', factors_np)
     # helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
     # helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
+
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Full TCA ==')
