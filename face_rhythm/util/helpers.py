@@ -1,11 +1,10 @@
 import yaml
 import cv2
 import torch
-import sys
 import numpy as np
-import os
-import os.path
+
 import h5py
+import types
 
 from pathlib import Path
 
@@ -16,7 +15,7 @@ import pynwb
 from pynwb.behavior import BehavioralTimeSeries
 
 
-def setup_project(project_path, video_path, session_name, overwrite_config, remote):
+def setup_project(project_path, video_path, run_name, overwrite_config, remote, trials):
     """
     Creates the project folder and data folder (if they don't exist)
     Creates the config file (if it doesn't exist or overwrite requested)
@@ -35,9 +34,9 @@ def setup_project(project_path, video_path, session_name, overwrite_config, remo
     (project_path / 'data').mkdir(parents=True, exist_ok=True)
     (project_path / 'viz').mkdir(parents=True, exist_ok=True)
     video_path.mkdir(parents=True, exist_ok=True)
-    config_filepath = project_path / 'configs' / f'config_{session_name}.yaml'
+    config_filepath = project_path / 'configs' / f'config_{run_name}.yaml'
     if not config_filepath.exists() or overwrite_config:
-        generate_config(config_filepath, project_path, video_path, remote)
+        generate_config(config_filepath, project_path, video_path, remote, trials)
 
     version_check(config_filepath)
     return config_filepath
@@ -102,7 +101,7 @@ def save_config(config, config_filepath):
         yaml.safe_dump(config, f)
 
 
-def generate_config(config_filepath, project_path, video_path, remote):
+def generate_config(config_filepath, project_path, video_path, remote, trials):
     """
     Generates bare config file with just basic info
     
@@ -115,19 +114,71 @@ def generate_config(config_filepath, project_path, video_path, remote):
     
     """
 
-    basic_config = {'path_project': str(project_path),
-                    'path_video': str(video_path),
-                    'dir_vid': str(video_path),
-                    'path_data': str(project_path / 'data'),
-                    'path_viz': str(project_path / 'viz'),
-                    'path_config': str(config_filepath),
-                    'remote': remote}
+    basic_config = {'General':{},
+                    'Video':{},
+                    'Paths':{},
+                    'ROI':{},
+                    'Optic':{},
+                    'Clean':{},
+                    'CDR':{},
+                    'PCA':{},
+                    'CQT':{},
+                    'TCA':{}}
+    basic_config['Paths']['project'] = str(project_path)
+    basic_config['Paths']['video'] = str(video_path)
+    basic_config['Paths']['data'] = str(project_path / 'data')
+    basic_config['Paths']['viz'] = str(project_path / 'viz')
+    basic_config['Paths']['config'] = str(config_filepath)
+    basic_config['General']['remote'] = remote
+    basic_config['General']['trials'] = trials
 
     with open(str(config_filepath), 'w') as f:
         yaml.safe_dump(basic_config, f)
 
 
 def import_videos(config_filepath):
+    """
+    Find all videos
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+
+    paths = load_namespace(config_filepath, 'Paths')
+    video = load_namespace(config_filepath, 'Video')
+    general = load_namespace(config_filepath, 'General')
+
+    general.sessions = {}
+    for path in Path(paths.video).iterdir():
+        if path.is_dir() and video.session_prefix in str(path):
+            general.sessions[path.stem] = {'videos':[]}
+            for vid in path.iterdir():
+                if vid.suffix in ['.avi', '.mp4']:
+                    general.sessions[path.stem]['videos'].append(str(vid))
+                elif vid.suffix in ['.npy'] and general.trials:
+                    general.sessions[path.stem]['trial_inds'] = str(vid)
+
+    save_namespace(config_filepath, 'General', general)
+
+
+def load_namespace(config_filepath, ns_key):
+    config = load_config(config_filepath)
+    return types.SimpleNamespace(**config[ns_key])
+
+
+def save_namespace(config_filepath, ns_key, ns):
+    config = load_config(config_filepath)
+    ns_dict = vars(ns)
+    config[ns_key] = {**config[ns_key], **ns_dict}
+    save_config(config, config_filepath)
+
+
+def import_videos_old(config_filepath):
     """
     Define the directory of videos
     Import the videos as read objects
@@ -160,7 +211,55 @@ def import_videos(config_filepath):
     save_config(config, config_filepath)
 
 
+def print_session_report(session_name, session):
+    print(f'Current Session: {session_name}')
+    print(f'number of videos: {session["num_vids"]}')
+    print(f'number of frames per video (roughly): {session["frames_per_video"]}')
+    print(f'number of frames in ALL videos (roughly): {session["frames_total"]}')
+
+
 def get_video_data(config_filepath):
+    """
+    get info on the imported video(s): num of frames, video height and width, framerate
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+    general = load_namespace(config_filepath,'General')
+    video   = load_namespace(config_filepath, 'Video')
+
+    for session_name, session in general.sessions.items():
+        session['num_vids'] = len(session['videos'])
+        vid_lens = np.ones(session['num_vids'])
+        for i, vid_path in enumerate(session['videos']):
+            vid_reader = cv2.VideoCapture(vid_path)
+            vid_lens[i] = int(vid_reader.get(cv2.CAP_PROP_FRAME_COUNT))
+        session['vid_lens'] = vid_lens.tolist()
+        session['frames_total'] = int(sum(session['vid_lens']))
+        session['frames_per_video'] = int(session['frames_total']/session['num_vids'])
+        print_session_report(session_name, session)
+
+        if video.print_filenames:
+            print(f'\n {np.array(session["videos"]).transpose()}')
+
+    video.Fs = vid_reader.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
+    print(f'Sampling rate pulled from video file metadata:   {round(video.Fs, 3)} frames per second')
+
+    vid_reader.set(1, 1)
+    ok, frame = vid_reader.read()
+    video.height = frame.shape[0]
+    video.width = frame.shape[1]
+
+    save_namespace(config_filepath, 'General', general)
+    save_namespace(config_filepath, 'Video', video)
+
+
+def get_video_data_old(config_filepath):
     """
     get info on the imported video(s): num of frames, video height and width, framerate
     
@@ -209,6 +308,39 @@ def get_video_data(config_filepath):
     config['vid_width'] = vid_width
 
     save_config(config, config_filepath)
+
+
+def create_nwbs(config_filepath):
+    """
+    Create one nwb per session. This file will be used for all future data storage
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+
+    general = load_namespace(config_filepath, 'General')
+    paths   = load_namespace(config_filepath, 'Paths')
+
+    for session_name, session in general.sessions.items():
+        session['nwb'] = str(Path(paths.data) / (session_name + '.nwb'))
+
+        nwbfile = NWBFile(session_description=f'face rhythm data',
+                          identifier=f'{session_name}',
+                          session_start_time=datetime.now(tzlocal()),
+                          file_create_date=datetime.now(tzlocal()))
+
+        nwbfile.create_processing_module(name='Face Rhythm',
+                                         description='all face rhythm related data')
+
+        with NWBHDF5IO(session['nwb'], 'w') as io:
+            io.write(nwbfile)
+
+    save_namespace(config_filepath,'General',general)
 
 
 def create_nwb(config_filepath):
@@ -358,14 +490,14 @@ def save_h5(config_filepath, save_name, data_dict):
     -------
 
     """
-    config = load_config(config_filepath)
-    save_dir = Path(config['path_data'])
+    paths = load_namespace(config_filepath, 'Paths')
+    save_dir = Path(paths.data)
     save_path = save_dir / f'{save_name}.h5'
     to_write = h5py.File(save_path, 'w')
     dict_to_h5(data_dict, to_write)
     to_write.close()
-    config[f'path_{save_name}'] = str(save_path)
-    save_config(config, config_filepath)
+    vars(paths)[save_name] = str(save_path)
+    save_namespace(config_filepath,'Paths',paths)
 
 
 def load_h5(config_filepath, data_key):

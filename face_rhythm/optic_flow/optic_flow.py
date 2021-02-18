@@ -374,6 +374,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
     return displacements, numFrames_total #, positions_tracked
 
+
 def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
     """
     computes optic flow for a single video within the multithread command
@@ -610,6 +611,9 @@ def optic_workflow(config_filepath):
 
     config = helpers.load_config(config_filepath)
     pts_all = helpers.load_h5(config_filepath, 'path_pts_all')
+    if config['optic_recursive'] == True and config['optic_multithread'] == True:
+        raise NameError("Incompatible option combination:  If optic_recursive==True, optic_multithread MUST ==False \n\
+    The recursive calculation is done serially, so it is not possible to parallelize it.")
 
     tic = time.time()
     pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples = setup(config,
