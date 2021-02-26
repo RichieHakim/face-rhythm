@@ -395,7 +395,7 @@ def correlations(config_filepath, factors_np):
         
     return factors_xcorr
 
-def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
+def more_factors_videos(config_filepath, factors_toUse, positions_convDR_absolute, numFrames):
     """
     creates videos of points colored by a variety of factors
 
@@ -419,7 +419,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     remote = config['remote']
 
     # Display video of factors
-    factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
+    factors_toShow = np.arange(factors_toUse.shape[1])  # zero-indexed
     # factors_toShow = [3]  # zero-indexed
 
     for factor_iter in factors_toShow:
@@ -449,12 +449,12 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
         helpers.save_config(config, config_filepath)
 
         # ensemble_toUse = ensemble
-        ensemble_toUse = factors_np
+        ensemble_toUse = factors_toUse
         positions_toUse = positions_convDR_absolute
 
         factor_toShow = factor_toShow-1
         # input_scores = ensemble_toUse.factors(modelRank_toUse)[0][0]
-        input_scores = np.single(ensemble_toUse[0])
+        input_scores = np.single(ensemble_toUse)
 
         range_toUse = np.ceil(np.max(input_scores[:,factor_toShow]) - np.min(input_scores[:,factor_toShow])) + 1
         offset_toUse = np.min(input_scores[:,factor_toShow])
@@ -474,7 +474,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
             out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
 
 
-        ## Main loop to pull out displacements in each video
+        ## Main loop to pull out displacements in each video   
         ind_concat = int(np.hstack([0 , np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
 
         fps = 0
@@ -484,7 +484,7 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
             vid = imageio.get_reader(path_vid,  'ffmpeg')
 
     #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-            numFrames = 600
+            # numFrames = 6000
 
     #         frameToSet = 0
     #         video.set(1,frameToSet)
@@ -532,31 +532,31 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     cv2.destroyAllWindows()
 
 
-def factor_tsne(factors):
-    """
-    creates and plots tsne of the factors
+# def factor_tsne(factors):
+#     """
+#     creates and plots tsne of the factors
 
-    Parameters
-    ----------
-    factors ():
+#     Parameters
+#     ----------
+#     factors ():
 
-    Returns
-    -------
+#     Returns
+#     -------
 
-    """
+#     """
 
-    print("Computing t-SNE embedding")
-    tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
-                         random_state=0, perplexity=200)
-    X_tsne = tsne.fit_transform(factors)
-    print("Finished computing t-SNE embedding")
+#     print("Computing t-SNE embedding")
+#     tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
+#                          random_state=0, perplexity=200)
+#     X_tsne = tsne.fit_transform(factors)
+#     print("Finished computing t-SNE embedding")
 
-    factor_toCMap = 8  # 1 indexed
+#     factor_toCMap = 8  # 1 indexed
 
-    plt.figure(figsize=(5, 5))
-    # plt.plot(X_tsne[:,0] , X_tsne[:,1] , linewidth=0.05)
-    # plt.scatter(X_tsne[:,0] , X_tsne[:,1], 'r.' , markersize=0.6)
-    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
+#     plt.figure(figsize=(5, 5))
+#     # plt.plot(X_tsne[:,0] , X_tsne[:,1] , linewidth=0.05)
+#     # plt.scatter(X_tsne[:,0] , X_tsne[:,1], 'r.' , markersize=0.6)
+#     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
 def save_factors(config_filepath, factors_all, factors_temporal_interp, ftype):
@@ -660,13 +660,13 @@ def full_tca_workflow(config_filepath, data_key):
     factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])
     helpers.print_time('Decomposition completed', time.time() - tic)
 
-    factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
-    factors_xcorr = correlations(config_filepath, factors_np)
+    # factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+    # factors_xcorr = correlations(config_filepath, factors_np)
 
-    if config['tca_vid_display']:
-        more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
+    # if config['tca_vid_display']:
+    #     more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
-    factor_tsne(factors_temporal)
+    # factor_tsne(factors_temporal)
 
     factors_temporal_interp = interpolate_temporal_factor(factors_np[2] , config['numFrames_total'])
 

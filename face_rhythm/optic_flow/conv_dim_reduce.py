@@ -244,86 +244,86 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     return positions_convDR_meanSub
 
 
-def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR):
-    """
-    displays newly computed displacements after convolutional dr
+# def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR):
+#     """
+#     displays newly computed displacements after convolutional dr
 
-    Parameters
-    ----------
-    config_filepath  ():
-    positions_convDR_meanSub ():
-    pts_spaced_convDR ():
+#     Parameters
+#     ----------
+#     config_filepath  ():
+#     positions_convDR_meanSub ():
+#     pts_spaced_convDR ():
 
-    Returns
-    -------
-    positions_convDR_meanSub ():
+#     Returns
+#     -------
+#     positions_convDR_meanSub ():
 
-    """
+#     """
 
-    config = helpers.load_config(config_filepath)
+#     config = helpers.load_config(config_filepath)
 
-    # positions_toUse = positions_new_absolute_sansOutliers
-    positions_toUse = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
+#     # positions_toUse = positions_new_absolute_sansOutliers
+#     positions_toUse = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
 
-    # vidNums_toUse = range(numVids) ## note zero indexing!
-    vidNums_toUse = range(3)  ## note zero indexing!
+#     # vidNums_toUse = range(numVids) ## note zero indexing!
+#     vidNums_toUse = range(3)  ## note zero indexing!
 
-    if type(vidNums_toUse) == int:
-        vidNums_toUse = np.array([vidNums_toUse])
+#     if type(vidNums_toUse) == int:
+#         vidNums_toUse = np.array([vidNums_toUse])
 
-    dot_size = config['cdr_dot_size']
-    printFPS_pref = config['printFPS_pref']
-    fps_counterPeriod = config['fps_counterPeriod']  ## number of frames to do a tic toc over
-    path_vid_allFiles = config['path_vid_allFiles']
-    numFrames_allFiles = config['numFrames_allFiles']
-    numFrames_total_rough = config['numFrames_total_rough']
+#     dot_size = config['cdr_dot_size']
+#     printFPS_pref = config['printFPS_pref']
+#     fps_counterPeriod = config['fps_counterPeriod']  ## number of frames to do a tic toc over
+#     path_vid_allFiles = config['path_vid_allFiles']
+#     numFrames_allFiles = config['numFrames_allFiles']
+#     numFrames_total_rough = config['numFrames_total_rough']
 
-    ## Define random colors for points in cloud
-    color_tuples = list(np.arange(positions_toUse.shape[0]))
-    for ii in range(positions_toUse.shape[0]):
-        color_tuples[ii] = (np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255)
-    #     color_tuples[ii] = (0,255,255)
+#     ## Define random colors for points in cloud
+#     color_tuples = list(np.arange(positions_toUse.shape[0]))
+#     for ii in range(positions_toUse.shape[0]):
+#         color_tuples[ii] = (np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255)
+#     #     color_tuples[ii] = (0,255,255)
 
-    ## Main loop to pull out displacements in each video
-    ind_concat = int(np.hstack([0, np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
+#     ## Main loop to pull out displacements in each video   
+#     ind_concat = int(np.hstack([0, np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
 
-    fps = 0
-    tic_fps = time.time()
-    for iter_vid, vidNum_iter in enumerate(vidNums_toUse):
-        path_vid = path_vid_allFiles[vidNum_iter]
-        vid = imageio.get_reader(path_vid, 'ffmpeg')
+#     fps = 0
+#     tic_fps = time.time()
+#     for iter_vid, vidNum_iter in enumerate(vidNums_toUse):
+#         path_vid = path_vid_allFiles[vidNum_iter]
+#         vid = imageio.get_reader(path_vid, 'ffmpeg')
 
-        video = cv2.VideoCapture(path_vid)
-        numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+#         video = cv2.VideoCapture(path_vid)
+#         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        for iter_frame, new_frame in enumerate(vid):
-            for ii in range(positions_toUse.shape[0]):
-                pointInds_tracked_tuple = tuple(np.int64(np.squeeze(positions_toUse[ii, :, ind_concat])))
-                cv2.circle(new_frame, pointInds_tracked_tuple, dot_size, color_tuples[ii], -1)
+#         for iter_frame, new_frame in enumerate(vid):
+#             for ii in range(positions_toUse.shape[0]):
+#                 pointInds_tracked_tuple = tuple(np.int64(np.squeeze(positions_toUse[ii, :, ind_concat])))
+#                 cv2.circle(new_frame, pointInds_tracked_tuple, dot_size, color_tuples[ii], -1)
 
-            cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames}-ish', org=(10, 20), fontFace=1, fontScale=1,
-                        color=(255, 255, 255), thickness=1)
-            cv2.putText(new_frame, f'vid #: {iter_vid + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
-                        color=(255, 255, 255), thickness=1)
-            cv2.putText(new_frame, f'total frame #: {ind_concat + 1}/{numFrames_total_rough}-ish', org=(10, 60),
-                        fontFace=1, fontScale=1, color=(255, 255, 255), thickness=1)
-            cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1,
-                        color=(255, 255, 255), thickness=1)
-            cv2.imshow('post outlier removal', new_frame)
+#             cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames}-ish', org=(10, 20), fontFace=1, fontScale=1,
+#                         color=(255, 255, 255), thickness=1)
+#             cv2.putText(new_frame, f'vid #: {iter_vid + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
+#                         color=(255, 255, 255), thickness=1)
+#             cv2.putText(new_frame, f'total frame #: {ind_concat + 1}/{numFrames_total_rough}-ish', org=(10, 60),
+#                         fontFace=1, fontScale=1, color=(255, 255, 255), thickness=1)
+#             cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1,
+#                         color=(255, 255, 255), thickness=1)
+#             cv2.imshow('post outlier removal', new_frame)
 
-            k = cv2.waitKey(1) & 0xff
-            if k == 27: break
+#             k = cv2.waitKey(1) & 0xff
+#             if k == 27: break
 
-            ind_concat = ind_concat + 1
+#             ind_concat = ind_concat + 1
 
-            if ind_concat % fps_counterPeriod == 0:
-                elapsed = time.time() - tic_fps
-                fps = fps_counterPeriod / elapsed
-                if printFPS_pref:
-                    print(fps)
-                tic_fps = time.time()
+#             if ind_concat % fps_counterPeriod == 0:
+#                 elapsed = time.time() - tic_fps
+#                 fps = fps_counterPeriod / elapsed
+#                 if printFPS_pref:
+#                     print(fps)
+#                 tic_fps = time.time()
 
-    cv2.destroyAllWindows()
+#     cv2.destroyAllWindows()
 
     
 def conv_dim_reduce_workflow(config_filepath):
@@ -371,8 +371,8 @@ def conv_dim_reduce_workflow(config_filepath):
     
     positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
 
-    if config['display_displacements']:
-        display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
+    # if config['display_displacements']:
+    #     display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
 
     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
     helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub)

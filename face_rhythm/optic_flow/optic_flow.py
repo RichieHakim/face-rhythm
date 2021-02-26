@@ -69,13 +69,15 @@ def setup(config, pts_all):
     # I add a bunch of NaNs to the end because the openCV estimate is usually less than the actual number of frames
     displacements = np.ones((pts_spaced.shape[0], 2, np.uint64(
         numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
+    positions_recursive = np.ones((pts_spaced.shape[0], 2, np.uint64(
+        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
 
     ## Preset point tracking variables
     pointInds_toUse = copy.deepcopy(pts_spaced)
     pointInds_tracked = pointInds_toUse  ## set the first frame to have point locations be positions in the point cloud
     pointInds_tracked_tuple = list(np.arange(pointInds_toUse.shape[0]))
 
-    return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples
+    return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples , positions_recursive
 
 
 def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len):
@@ -246,7 +248,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
     return displacements, numFrames_total
 
-def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
+def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, positions_recursive,
                              pts_spaced, color_tuples, relaxation_factor):
     
     """
@@ -317,6 +319,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
         old_frame = new_frame_gray
         
         
+        
         print(f'\n Calculating displacement field: video # {vidNum_iter+1}/{numVids}')
         pointInds_old = pointInds_toUse
         for iter_frame , new_frame in enumerate(vid):
@@ -326,20 +329,24 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     #         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
             pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, np.single(pointInds_old), None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
-            ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
-            if iter_frame ==0:
-                displacements[:,:,ind_concat] = np.zeros((pts_spaced.shape[0] ,2))
-            else:
-    #             displacements[:,:,ind_concat] =  np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
-                displacements[:,:,ind_concat] =  np.squeeze((pointInds_new - pointInds_old))  # this is the important variable. Simply the difference in the estimate
+
+            # diff =  np.squeeze((pointInds_new - pointInds_old))  # this is the important variable. Simply the difference in the estimate
             
             old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
             
     #             pointInds_tracked = pointInds_tracked + (pointInds_new - pointInds_toUse)  # calculate integrated position
-            pointInds_tracked = pointInds_tracked + displacements[:,:,ind_concat][:,None,:]  # calculate integrated position
-            pointInds_tracked = pointInds_tracked - (pointInds_tracked -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
+            # pointInds_tracked = pointInds_tracked + diff[:,None,:]  # calculate integrated position
+            pointInds_tracked = pointInds_new - (pointInds_new -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
+
+            ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
+            if iter_frame ==0:
+                positions_recursive[:,:,ind_concat] = np.zeros((pts_spaced.shape[0] ,2))
+            else:
+    #             displacements[:,:,ind_concat] =  np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+                positions_recursive[:,:,ind_concat] =  np.squeeze((pointInds_tracked))  # this is the important variable. Simply the difference in the estimate
+
             pointInds_old = pointInds_tracked
-            
+
             ## below is just for visualization. Nothing calculated is maintained
             if showVideo_pref:
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
@@ -370,9 +377,11 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     numFrames_total = ind_concat - 1
     cv2.destroyAllWindows()
 
-    displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
+    positions_recursive = positions_recursive[:, :, ~np.isnan(positions_recursive[0, 0, :])]
+    displacements = np.zeros_like(positions_recursive)
+    displacements[:,:,1:] = np.diff(positions_recursive , axis=2)
 
-    return displacements, numFrames_total #, positions_tracked
+    return displacements, numFrames_total , positions_recursive
 
 def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
     """
@@ -503,7 +512,7 @@ def optic_workflow(config_filepath):
     pts_all = helpers.load_h5(config_filepath, 'path_pts_all')
 
     tic = time.time()
-    pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples = setup(config,
+    pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples , positions_recursive = setup(config,
                                                                                                                  pts_all)
     helpers.print_time('Optic Flow Set Up', time.time() - tic)
 
@@ -511,11 +520,11 @@ def optic_workflow(config_filepath):
     if config['optic_multithread']:
         displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
     elif config['optic_recursive']:
-        displacements, numFrames_total = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
-                                                            pointInds_tracked_tuple, displacements, pts_spaced, color_tuples, config['optic_recursive_relaxation_factor'])
+        displacements, numFrames_total , positions_recursive = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
+                                                            pointInds_tracked_tuple, positions_recursive, pts_spaced, color_tuples, config['optic_recursive_relaxation_factor'])
     else:
-        displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
-                             pts_spaced, color_tuples)
+        displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
+                                                                  pointInds_tracked_tuple, displacements, pts_spaced, color_tuples)
     helpers.print_time('Displacements computed', time.time() - tic)
 
     tic = time.time()
@@ -525,6 +534,7 @@ def optic_workflow(config_filepath):
     helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
     helpers.create_nwb_group(config_filepath, 'Optic Flow')
     helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'displacements', displacements)
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_recursive', positions_recursive)
     helpers.save_data(config_filepath, 'color_tuples', color_tuples)
     helpers.print_time('Data Saved', time.time() - tic)
 
