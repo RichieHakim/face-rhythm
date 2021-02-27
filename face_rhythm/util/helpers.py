@@ -516,7 +516,7 @@ def load_h5(config_filepath, data_key):
 
     """
     config = load_config(config_filepath)
-    return h5_to_dict(config[data_key])
+    return types.SimpleNamespace(**h5_to_dict(config[data_key]))
 
 
 def load_data(config_filepath, data_key):

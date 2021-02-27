@@ -78,7 +78,8 @@ def setup(config, pts_all):
     return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples
 
 
-def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len):
+def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters,
+                       numFrames_rough, out, test_len):
     """
     plots a checkup
 
@@ -103,7 +104,7 @@ def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_t
     iter_frame, vidNum_iter, ind_concat, fps = counters
 
     for ii in range(pointInds_tracked.shape[0]):
-        pointInds_tracked_tuple[ii] = tuple(np.int64(np.squeeze(pointInds_tracked[ii,0,:])))
+        pointInds_tracked_tuple[ii] = tuple(np.int64(np.squeeze(pointInds_tracked[ii, 0, :])))
         cv2.circle(new_frame, pointInds_tracked_tuple[ii], dot_size, color_tuples[ii], -1)
 
     cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames_rough}-ish', org=(10, 20), fontFace=1, fontScale=1,
@@ -198,14 +199,14 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
             ##calculate optical flow
             pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
-                **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+                                                                    **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
             ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
             if iter_frame == 0:
                 displacements[:, :, ind_concat] = np.zeros((pts_spaced.shape[0], 2))
             else:
                 displacements[:, :, ind_concat] = np.single(np.squeeze((
-                    pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+                        pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
             old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
@@ -216,10 +217,11 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                 pointInds_tracked = pointInds_tracked - (
                         pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term. this is just for display purposes. Relaxation term chosen during cleanup will be real
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len)
+                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples,
+                                   counters, numFrames_rough, out, test_len)
                 if remote and iter_frame == test_len:
                     out.release()
-                
+
                 k = cv2.waitKey(1) & 0xff
                 if k == 27: break
 
@@ -246,9 +248,9 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
     return displacements, numFrames_total
 
+
 def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
-                             pts_spaced, color_tuples, relaxation_factor):
-    
+                            pts_spaced, color_tuples, relaxation_factor):
     """
     the workhorse of the optic flow
     Opens each video in the list of videos
@@ -304,54 +306,59 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
         out = None
 
     for vidNum_iter in vidNums_toUse:
-        vid = imageio.get_reader(path_vid_allFiles[vidNum_iter],  'ffmpeg')
-    #     metadata = vid.get_meta_data()
-            
+        vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
+        #     metadata = vid.get_meta_data()
+
         path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
         video = cv2.VideoCapture(path_vid)  # open the video object with openCV
-        numFrames_rough = int(video.get(cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
+        numFrames_rough = int(video.get(
+            cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
 
         frameToSet = 0
-        frame = vid.get_data(0) # Get a single frame to use as the first 'previous frame' in calculating optic flow
-        new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  
+        frame = vid.get_data(0)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+        new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         old_frame = new_frame_gray
-        
-        
-        print(f'\n Calculating displacement field: video # {vidNum_iter+1}/{numVids}')
+
+        print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
         pointInds_old = pointInds_toUse
-        for iter_frame , new_frame in enumerate(vid):
+        for iter_frame, new_frame in enumerate(vid):
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
             ##calculate optical flow
-    #         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
-            pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, np.single(pointInds_old), None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+            #         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+            pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, np.single(pointInds_old),
+                                                                    None,
+                                                                    **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
             ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
-            if iter_frame ==0:
-                displacements[:,:,ind_concat] = np.zeros((pts_spaced.shape[0] ,2))
+            if iter_frame == 0:
+                displacements[:, :, ind_concat] = np.zeros((pts_spaced.shape[0], 2))
             else:
-    #             displacements[:,:,ind_concat] =  np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
-                displacements[:,:,ind_concat] =  np.squeeze((pointInds_new - pointInds_old))  # this is the important variable. Simply the difference in the estimate
-            
+                #             displacements[:,:,ind_concat] =  np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+                displacements[:, :, ind_concat] = np.squeeze((
+                        pointInds_new - pointInds_old))  # this is the important variable. Simply the difference in the estimate
+
             old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
-            
-    #             pointInds_tracked = pointInds_tracked + (pointInds_new - pointInds_toUse)  # calculate integrated position
-            pointInds_tracked = pointInds_tracked + displacements[:,:,ind_concat][:,None,:]  # calculate integrated position
-            pointInds_tracked = pointInds_tracked - (pointInds_tracked -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
+
+            #             pointInds_tracked = pointInds_tracked + (pointInds_new - pointInds_toUse)  # calculate integrated position
+            pointInds_tracked = pointInds_tracked + displacements[:, :, ind_concat][:, None,
+                                                    :]  # calculate integrated position
+            pointInds_tracked = pointInds_tracked - (
+                    pointInds_tracked - pointInds_toUse) * relaxation_factor  # multiplied constant is the relaxation term
             pointInds_old = pointInds_tracked
-            
+
             ## below is just for visualization. Nothing calculated is maintained
             if showVideo_pref:
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len)
+                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples,
+                                   counters, numFrames_rough, out, test_len)
                 if remote and iter_frame == test_len:
                     out.release()
-                
+
                 k = cv2.waitKey(1) & 0xff
                 if k == 27: break
 
             ind_concat = ind_concat + 1
-            
 
             if ind_concat % fps_counterPeriod == 0:
                 elapsed = time.time() - tic_fps
@@ -372,7 +379,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
 
-    return displacements, numFrames_total #, positions_tracked
+    return displacements, numFrames_total  # , positions_tracked
 
 
 def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
@@ -409,7 +416,8 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
         cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
 
     frameToSet = 0
-    frame = vid.get_data(frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+    frame = vid.get_data(
+        frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
     new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     old_frame = new_frame_gray
 
@@ -430,7 +438,8 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
         if iter_frame == 0:
             displacements_tmp[:, :, iter_frame] = np.zeros((pts_spaced.shape[0], 2))
         else:
-            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((
+                    pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
         old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
@@ -472,7 +481,8 @@ def analyze_trial(trial_num, trial_inds, config, pointInds_toUse, pts_spaced):  
     numFrames = trial_inds.shape[1]
 
     frameToSet = current_trial[0]
-    frame = vid.get_data(frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+    frame = vid.get_data(
+        frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
     new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     old_frame = new_frame_gray
 
@@ -482,8 +492,7 @@ def analyze_trial(trial_num, trial_inds, config, pointInds_toUse, pts_spaced):  
     text = "progresser #{}".format(trial_num)
     print(f'\n Calculating displacement field: video # {trial_num + 1}/{trial_inds.shape[0]}')
 
-
-    for iter_frame,current_frame in enumerate(tqdm(current_trial, total=numFrames, desc=text, position=trial_num)):
+    for iter_frame, current_frame in enumerate(tqdm(current_trial, total=numFrames, desc=text, position=trial_num)):
         new_frame = vid.get_data(current_frame)
         new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
@@ -495,7 +504,8 @@ def analyze_trial(trial_num, trial_inds, config, pointInds_toUse, pts_spaced):  
         if iter_frame == 0:
             displacements_tmp[:, :, iter_frame] = np.zeros((pts_spaced.shape[0], 2))
         else:
-            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((
+                    pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
         old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
@@ -524,7 +534,7 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     cv2.setNumThreads(0)
     freeze_support()
     tqdm.set_lock(RLock())
-    p = Pool(multiprocessing.cpu_count(),initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
+    p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
     displacements_list = p.map(
         partial(analyze_video, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced),
         list(np.arange(numVids)))
@@ -567,7 +577,7 @@ def displacements_trial_separated(config, pointInds_toUse, displacements, pts_sp
     numFrames_total (int): number of frames
     """
 
-    trial_inds = np.load(config['trial_inds'])[:config['num_trials'],...]
+    trial_inds = np.load(config['trial_inds'])[:config['num_trials'], ...]
 
     if config['optic_multithread']:
         cv2.setNumThreads(0)
@@ -575,7 +585,8 @@ def displacements_trial_separated(config, pointInds_toUse, displacements, pts_sp
         tqdm.set_lock(RLock())
         p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
         displacements_trials = p.map(
-            partial(analyze_trial, trial_inds=trial_inds, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced),
+            partial(analyze_trial, trial_inds=trial_inds, config=config, pointInds_toUse=pointInds_toUse,
+                    pts_spaced=pts_spaced),
             list(range(trial_inds.shape[0])))
         p.close()
         p.terminate()
@@ -622,15 +633,19 @@ def optic_workflow(config_filepath):
 
     tic = time.time()
     if config['trial_inds']:
-        displacements_trials, numFrames_total = displacements_trial_separated(config, pointInds_toUse, displacements, pts_spaced)
+        displacements_trials, numFrames_total = displacements_trial_separated(config, pointInds_toUse, displacements,
+                                                                              pts_spaced)
     elif config['optic_multithread']:
         displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
     elif config['optic_recursive']:
         displacements, numFrames_total = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
-                                                            pointInds_tracked_tuple, displacements, pts_spaced, color_tuples, config['optic_recursive_relaxation_factor'])
+                                                                 pointInds_tracked_tuple, displacements, pts_spaced,
+                                                                 color_tuples,
+                                                                 config['optic_recursive_relaxation_factor'])
     else:
         displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
-                                                                  pointInds_tracked_tuple, displacements, pts_spaced, color_tuples)
+                                                                  pointInds_tracked_tuple, displacements, pts_spaced,
+                                                                  color_tuples)
 
     helpers.print_time('Displacements computed', time.time() - tic)
 
