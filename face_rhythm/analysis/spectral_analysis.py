@@ -28,86 +28,93 @@ def cqt_trials(config_filepath, data_key):
 
     ## get parameters
     config = helpers.load_config(config_filepath)
-    hop_length = config['cqt_hop_length']
-    fmin_rough = config['cqt_fmin_rough']
-    sr = config['cqt_sr']
-    n_bins = config['cqt_n_bins']
-    bins_per_octave = config['cqt_bins_per_octave']
-    fmin = config['cqt_fmin']
-    pixelNum_toUse = config['pixelNum_toUse']
+    general = config['General']
+    cqt = config['CQT']
 
-    positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', data_key)
-    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+    hop_length = cqt['hop_length']
+    fmin_rough = cqt['fmin_rough']
+    sr = cqt['sr']
+    n_bins = cqt['n_bins']
+    bins_per_octave = cqt['bins_per_octave']
+    fmin = cqt['fmin']
+    pixelNum_toUse = cqt['pixelNum_toUse']
 
-    ## define positions traces to use
-    input_sgram = np.single(np.squeeze(positions_convDR_meanSub))
+    freqs_Sxx = helpers.load_data(config_filepath, 'freqs_Sxx')
 
-    ## make a single spectrogram to get some size parameters for preallocation
-    Sxx = librosa.cqt(np.squeeze(input_sgram[0, 0, 0, :]),
-                      sr=sr,
-                      hop_length=hop_length,
-                      fmin=fmin,
-                      n_bins=n_bins,
-                      bins_per_octave=bins_per_octave,
-                      window='hann')
+    for session in general['sessions']:
 
-    # preallocation
-    tic = time.time()
-    Sxx_allPixels = np.single(np.zeros((input_sgram.shape[0], input_sgram.shape[1], Sxx.shape[0], Sxx.shape[1], 2)))
-    helpers.print_time('Preallocation completed', time.time() - tic_all)
+        positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', data_key)
 
-    print(f'starting spectrogram calculation')
-    tic = time.time()
-    for kk in tqdm(range(input_sgram.shape[0]), total=Sxx_allPixels.shape[0]):
-        for ii in range(input_sgram.shape[0]):
-            ## iterated over x and y
-            for jj in range(2):
-                tmp_input_sgram = np.squeeze(input_sgram[kk, ii, jj, :])
-                tmp = librosa.cqt(np.squeeze(input_sgram[kk, ii, jj, :]),
-                                  sr=sr,
-                                  hop_length=hop_length,
-                                  fmin=fmin,
-                                  n_bins=n_bins,
-                                  bins_per_octave=bins_per_octave,
-                                  window='hann')
+        ## define positions traces to use
+        input_sgram = np.single(np.squeeze(positions_convDR_meanSub))
 
-                ## normalization
-                tmp = abs(tmp) * freqs_Sxx[:, None]
-                #         tmp = scipy.stats.zscore(tmp , axis=0)
-                #         tmp = test - np.min(tmp , axis=0)[None,:]
-                #         tmp = scipy.stats.zscore(tmp , axis=1)
-                #         tmp = tmp - np.min(tmp , axis=1)[:,None]
+        ## make a single spectrogram to get some size parameters for preallocation
+        Sxx = librosa.cqt(np.squeeze(input_sgram[0, 0, 0, :]),
+                          sr=sr,
+                          hop_length=hop_length,
+                          fmin=fmin,
+                          n_bins=n_bins,
+                          bins_per_octave=bins_per_octave,
+                          window='hann')
 
-                Sxx_allPixels[kk, ii, :, :, jj] = tmp
-        # Sxx_allPixels = Sxx_allPixels / np.std(Sxx_allPixels , axis=1)[:,None,:,:]
+        # preallocation
+        tic = time.time()
+        Sxx_allPixels = np.single(np.zeros((input_sgram.shape[0], input_sgram.shape[1], Sxx.shape[0], Sxx.shape[1], 2)))
+        helpers.print_time('Preallocation completed', time.time() - tic_all)
 
-    print(f'completed spectrogram calculation')
-    print('Info about Sxx_allPixels:\n')
-    print(f'Shape: {Sxx_allPixels.shape}')
-    print(f'Number of elements: {np.product(Sxx_allPixels.shape)}')
-    print(f'Data type: {Sxx_allPixels.dtype}')
-    print(f'size of Sxx_allPixels: {round(sys.getsizeof(Sxx_allPixels) / 1000000000, 3)} GB')
-    helpers.print_time('Spectrograms computed', time.time() - tic_all)
+        print(f'starting spectrogram calculation')
+        tic = time.time()
+        for kk in tqdm(range(input_sgram.shape[0]), total=Sxx_allPixels.shape[0]):
+            for ii in range(input_sgram.shape[1]):
+                ## iterated over x and y
+                for jj in range(2):
+                    tmp_input_sgram = np.squeeze(input_sgram[kk, ii, jj, :])
+                    tmp = librosa.cqt(np.squeeze(input_sgram[kk, ii, jj, :]),
+                                      sr=sr,
+                                      hop_length=hop_length,
+                                      fmin=fmin,
+                                      n_bins=n_bins,
+                                      bins_per_octave=bins_per_octave,
+                                      window='hann')
 
-    ### Normalize the spectrograms so that each time point has a similar cumulative spectral amplitude across all dots (basically, sum of power of all frequencies from all dots at a particular time should equal one)
-    ## hold onto the normFactor variable because you can use to it to undo the normalization after subsequent steps
-    Sxx_allPixels_normFactor = np.mean(np.sum(Sxx_allPixels, axis=2), axis=1)
-    Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[:,None, None, :, :]
-    # Sxx_allPixels_norm.shape
+                    ## normalization
+                    tmp = abs(tmp) * freqs_Sxx[:, None]
+                    #         tmp = scipy.stats.zscore(tmp , axis=0)
+                    #         tmp = test - np.min(tmp , axis=0)[None,:]
+                    #         tmp = scipy.stats.zscore(tmp , axis=1)
+                    #         tmp = tmp - np.min(tmp , axis=1)[:,None]
 
-    plt.figure()
-    plt.imshow(Sxx_allPixels_norm[0,pixelNum_toUse, :, :, 0], aspect='auto', cmap='hot', origin='lower')
+                    Sxx_allPixels[kk, ii, :, :, jj] = tmp
+            # Sxx_allPixels = Sxx_allPixels / np.std(Sxx_allPixels , axis=1)[:,None,:,:]
 
-    #plt.figure()
-    #plt.plot(Sxx_allPixels_normFactor)
+        print(f'completed spectrogram calculation')
+        print('Info about Sxx_allPixels:\n')
+        print(f'Shape: {Sxx_allPixels.shape}')
+        print(f'Number of elements: {np.product(Sxx_allPixels.shape)}')
+        print(f'Data type: {Sxx_allPixels.dtype}')
+        print(f'size of Sxx_allPixels: {round(sys.getsizeof(Sxx_allPixels) / 1000000000, 3)} GB')
+        helpers.print_time('Spectrograms computed', time.time() - tic_all)
 
-    helpers.create_nwb_group(config_filepath, 'CQT')
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels', Sxx_allPixels)
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm)
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor)
+        ### Normalize the spectrograms so that each time point has a similar cumulative spectral amplitude across all dots (basically, sum of power of all frequencies from all dots at a particular time should equal one)
+        ## hold onto the normFactor variable because you can use to it to undo the normalization after subsequent steps
+        Sxx_allPixels_normFactor = np.mean(np.sum(Sxx_allPixels, axis=2), axis=1)
+        Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[:,None, None, :, :]
+        # Sxx_allPixels_norm.shape
 
-    helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'== End spectrogram computation ==')
+        plt.figure()
+        plt.imshow(Sxx_allPixels_norm[0,pixelNum_toUse, :, :, 0], aspect='auto', cmap='hot', origin='lower')
+
+        #plt.figure()
+        #plt.plot(Sxx_allPixels_normFactor)
+
+        helpers.create_nwb_group(session['nwb'], 'CQT')
+        helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels', Sxx_allPixels,1.0)
+        helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm,1.0)
+        helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor,1.0)
+
+        helpers.print_time('total elapsed time', time.time() - tic_all)
+        print(f'== End spectrogram computation ==')
+
 
 def cqt_all(config_filepath, data_key):
     """
@@ -127,90 +134,94 @@ def cqt_all(config_filepath, data_key):
 
     ## get parameters
     config = helpers.load_config(config_filepath)
-    hop_length = config['cqt_hop_length']
-    fmin_rough = config['cqt_fmin_rough']
-    sr = config['cqt_sr']
-    n_bins = config['cqt_n_bins']
-    bins_per_octave = config['cqt_bins_per_octave']
-    fmin = config['cqt_fmin']
+    general = config['General']
+    cqt = config['CQT']
 
-    positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', data_key)
-    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+    hop_length = cqt['hop_length']
+    fmin_rough = cqt['fmin_rough']
+    sr = cqt['sr']
+    n_bins = cqt['n_bins']
+    bins_per_octave = cqt['bins_per_octave']
+    fmin = cqt['fmin']
+    pixelNum_toUse = cqt['pixelNum_toUse']
 
+    freqs_Sxx = helpers.load_data(config_filepath, 'freqs_Sxx')
 
-    ## define positions traces to use
-    # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
-    input_sgram = np.single(np.squeeze(positions_convDR_meanSub))[:,:,:]
+    for session in general['sessions']:
+        positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', data_key)
+        ## define positions traces to use
+        # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
+        input_sgram = np.single(np.squeeze(positions_convDR_meanSub))[:,:,:]
 
-    ## make a single spectrogram to get some size parameters for preallocation
-    Sxx = librosa.cqt(np.squeeze(input_sgram[0,0,:]), 
-                      sr=sr, 
-                      hop_length=hop_length, 
-                      fmin=fmin, 
-                      n_bins=n_bins, 
-                      bins_per_octave=bins_per_octave, 
-                      window='hann')
+        ## make a single spectrogram to get some size parameters for preallocation
+        Sxx = librosa.cqt(np.squeeze(input_sgram[0,0,:]),
+                          sr=sr,
+                          hop_length=hop_length,
+                          fmin=fmin,
+                          n_bins=n_bins,
+                          bins_per_octave=bins_per_octave,
+                          window='hann')
 
-    # preallocation
-    tic = time.time()
-    Sxx_allPixels = np.single(np.zeros((input_sgram.shape[0] , Sxx.shape[0] , Sxx.shape[1] , 2)))  
-    helpers.print_time('Preallocation completed', time.time() - tic_all)  
-    
-
-    print(f'starting spectrogram calculation')
-    tic = time.time()
-    for ii in tqdm(range(input_sgram.shape[0]),total=Sxx_allPixels.shape[0]):
-
-        ## iterated over x and y
-        for jj in range(2):
-            tmp_input_sgram = np.squeeze(input_sgram[ii,jj,:])
+        # preallocation
+        tic = time.time()
+        Sxx_allPixels = np.single(np.zeros((input_sgram.shape[0] , Sxx.shape[0] , Sxx.shape[1] , 2)))
+        helpers.print_time('Preallocation completed', time.time() - tic_all)
 
 
-            tmp = librosa.cqt(np.squeeze(input_sgram[ii,jj,:]), 
-                              sr=sr, 
-                              hop_length=hop_length, 
-                              fmin=fmin, 
-                              n_bins=n_bins, 
-                              bins_per_octave=bins_per_octave, 
-                              window='hann')
+        print(f'starting spectrogram calculation')
+        tic = time.time()
+        for ii in tqdm(range(input_sgram.shape[0]),total=Sxx_allPixels.shape[0]):
 
-            ## normalization
-            tmp = abs(tmp) * freqs_Sxx[:,None]
-    #         tmp = scipy.stats.zscore(tmp , axis=0)
-    #         tmp = test - np.min(tmp , axis=0)[None,:]
-    #         tmp = scipy.stats.zscore(tmp , axis=1)
-    #         tmp = tmp - np.min(tmp , axis=1)[:,None]
+            ## iterated over x and y
+            for jj in range(2):
+                tmp_input_sgram = np.squeeze(input_sgram[ii,jj,:])
 
-            Sxx_allPixels[ii,:,:,jj] = tmp
-    # Sxx_allPixels = Sxx_allPixels / np.std(Sxx_allPixels , axis=1)[:,None,:,:]
-    
-    print(f'completed spectrogram calculation')
-    print('Info about Sxx_allPixels:\n')
-    print(f'Shape: {Sxx_allPixels.shape}')
-    print(f'Number of elements: {Sxx_allPixels.shape[0]*Sxx_allPixels.shape[1]*Sxx_allPixels.shape[2]*Sxx_allPixels.shape[3]}')
-    print(f'Data type: {Sxx_allPixels.dtype}')
-    print(f'size of Sxx_allPixels: {round(sys.getsizeof(Sxx_allPixels)/1000000000,3)} GB')
-    helpers.print_time('Spectrograms computed', time.time() - tic_all)    
 
-    ### Normalize the spectrograms so that each time point has a similar cumulative spectral amplitude across all dots (basically, sum of power of all frequencies from all dots at a particular time should equal one)
-    ## hold onto the normFactor variable because you can use to it to undo the normalization after subsequent steps
-    Sxx_allPixels_normFactor = np.mean(np.sum(Sxx_allPixels , axis=1) , axis=0)
-    Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[None,None,:,:]
-    #Sxx_allPixels_norm.shape
+                tmp = librosa.cqt(np.squeeze(input_sgram[ii,jj,:]),
+                                  sr=sr,
+                                  hop_length=hop_length,
+                                  fmin=fmin,
+                                  n_bins=n_bins,
+                                  bins_per_octave=bins_per_octave,
+                                  window='hann')
 
-    plt.figure()
-    plt.imshow(Sxx_allPixels_norm[500, :, :, 0], aspect='auto', cmap='hot', origin='lower')
+                ## normalization
+                tmp = abs(tmp) * freqs_Sxx[:,None]
+        #         tmp = scipy.stats.zscore(tmp , axis=0)
+        #         tmp = test - np.min(tmp , axis=0)[None,:]
+        #         tmp = scipy.stats.zscore(tmp , axis=1)
+        #         tmp = tmp - np.min(tmp , axis=1)[:,None]
 
-    plt.figure()
-    plt.plot(Sxx_allPixels_normFactor)
+                Sxx_allPixels[ii,:,:,jj] = tmp
+        # Sxx_allPixels = Sxx_allPixels / np.std(Sxx_allPixels , axis=1)[:,None,:,:]
 
-    helpers.create_nwb_group(config_filepath, 'CQT')
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels', Sxx_allPixels)
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm)
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor)
-    
-    helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'== End spectrogram computation ==')
+        print(f'completed spectrogram calculation')
+        print('Info about Sxx_allPixels:\n')
+        print(f'Shape: {Sxx_allPixels.shape}')
+        print(f'Number of elements: {Sxx_allPixels.shape[0]*Sxx_allPixels.shape[1]*Sxx_allPixels.shape[2]*Sxx_allPixels.shape[3]}')
+        print(f'Data type: {Sxx_allPixels.dtype}')
+        print(f'size of Sxx_allPixels: {round(sys.getsizeof(Sxx_allPixels)/1000000000,3)} GB')
+        helpers.print_time('Spectrograms computed', time.time() - tic_all)
+
+        ### Normalize the spectrograms so that each time point has a similar cumulative spectral amplitude across all dots (basically, sum of power of all frequencies from all dots at a particular time should equal one)
+        ## hold onto the normFactor variable because you can use to it to undo the normalization after subsequent steps
+        Sxx_allPixels_normFactor = np.mean(np.sum(Sxx_allPixels , axis=1) , axis=0)
+        Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[None,None,:,:]
+        #Sxx_allPixels_norm.shape
+
+        plt.figure()
+        plt.imshow(Sxx_allPixels_norm[500, :, :, 0], aspect='auto', cmap='hot', origin='lower')
+
+        plt.figure()
+        plt.plot(Sxx_allPixels_normFactor)
+
+        helpers.create_nwb_group(session['nwb'], 'CQT')
+        helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels', Sxx_allPixels,1.0)
+        helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm,1.0)
+        helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor,1.0)
+
+        helpers.print_time('total elapsed time', time.time() - tic_all)
+        print(f'== End spectrogram computation ==')
 
 
 def cqt_positions(config_filepath):
@@ -289,3 +300,10 @@ def cqt_positions(config_filepath):
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End spectrogram computation ==')
+
+def cqt_workflow(config_filepath, data_key):
+    config = helpers.load_config(config_filepath)
+    if config['General']['trials']:
+        cqt_trials(config_filepath, data_key)
+    else:
+        cqt_all(config_filepath, data_key)

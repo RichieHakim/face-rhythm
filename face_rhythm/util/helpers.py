@@ -333,7 +333,13 @@ def create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
             nwbfile.processing['Face Rhythm'][group_name].add_timeseries(new_ts)
         else:
             ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
-            ts = new_ts
+            try:
+                ts.data[()] = new_ts.data
+            except:
+                print('Shape mismatch between old shape and new shape, not NWB supported')
+                print(f"Old Shape: {ts.data.shape}")
+                print(f"New Shape: {new_ts.data.shape}")
+                print('Not Saving')
         io.write(nwbfile)
 
 
@@ -518,9 +524,7 @@ def dict_to_h5(data_dict, h5):
         else:
             h5.create_dataset(key, data=item)
 
-def dump_nwb(config_filepath):
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
+def dump_nwb(nwb_path):
     io = pynwb.NWBHDF5IO(nwb_path, 'r')
     nwbfile = io.read()
     for interface in nwbfile.processing['Face Rhythm'].data_interfaces:

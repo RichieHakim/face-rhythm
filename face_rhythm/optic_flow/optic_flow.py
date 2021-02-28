@@ -167,8 +167,8 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
     vidNums_toUse = optic['vidNums_toUse']
     showVideo_pref = optic['showVideo_pref']
-    fps_counterPeriod = optic['fps_counterPeriod']
-    printFPS_pref = optic['printFPS_pref']
+    fps_counterPeriod = video['fps_counterPeriod']
+    printFPS_pref = video['printFPS_pref']
 
     remote = config['General']['remote']
     Fs = video['Fs']
@@ -297,8 +297,8 @@ def displacements_monothread_trials(config, pointInds_toUse, pointInds_tracked, 
 
     vidNums_toUse = optic['vidNums_toUse']
     showVideo_pref = optic['showVideo_pref']
-    fps_counterPeriod = optic['fps_counterPeriod']
-    printFPS_pref = optic['printFPS_pref']
+    fps_counterPeriod = video['fps_counterPeriod']
+    printFPS_pref = video['printFPS_pref']
 
     remote = config['General']['remote']
     Fs = video['Fs']
@@ -750,7 +750,7 @@ def displacements_trial_separated(config, pointInds_toUse, displacements, pts_sp
 
     displacements = np.stack(displacements_trials)
     displacements = displacements[..., ~np.isnan(displacements[0, 0, 0, :])]
-    numFrames_total = displacements.shape[2]
+    numFrames_total = displacements.shape[-1]
 
     return displacements, numFrames_total
 
