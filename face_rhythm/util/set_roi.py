@@ -198,18 +198,19 @@ class BBoxSelect:
 
 
 def get_roi(config_filepath):
-    roi = helpers.load_namespace(config_filepath,'ROI')
-    paths = helpers.load_namespace(config_filepath, 'Paths')
-    general = helpers.load_namespace(config_filepath, 'General')
+    config = helpers.load_config(config_filepath)
+    roi = config['ROI']
+    paths = config['Paths']
+    general = config['General']
 
-    if roi.load_from_file:
-        with h5py.File(Path(paths.data) / 'pts_all.h5', 'r') as pt:
+    if roi['load_from_file']:
+        with h5py.File(Path(paths['data']) / 'pts_all.h5', 'r') as pt:
             pts_all = helpers.h5_to_dict(pt)
         helpers.save_h5(config_filepath, 'pts_all', pts_all)
         return None, None
 
-    video_list = general.sessions[roi.session_to_set]['videos']
-    frame = load_video(roi.vid_to_set, roi.frame_to_set, video_list)
+    video_list = general['sessions'][roi['session_to_set']]['videos']
+    frame = load_video(roi['vid_to_set'], roi['frame_to_set'], video_list)
     return frame, BBoxSelect(frame)
 
 

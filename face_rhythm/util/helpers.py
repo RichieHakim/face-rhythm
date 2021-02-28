@@ -149,70 +149,30 @@ def import_videos(config_filepath):
 
     """
 
-    paths = load_namespace(config_filepath, 'Paths')
-    video = load_namespace(config_filepath, 'Video')
-    general = load_namespace(config_filepath, 'General')
+    config = load_config(config_filepath)
+    paths = config['Paths']
+    video = config['Video']
+    general = config['General']
+    general['sessions'] = []
 
-    general.sessions = {}
-    for path in Path(paths.video).iterdir():
-        if path.is_dir() and video.session_prefix in str(path):
-            general.sessions[path.stem] = {'videos':[]}
+    for path in Path(paths['video']).iterdir():
+        if path.is_dir() and video['session_prefix'] in str(path):
+            session = {'name': path.stem, 'videos': []}
             for vid in path.iterdir():
                 if vid.suffix in ['.avi', '.mp4']:
-                    general.sessions[path.stem]['videos'].append(str(vid))
-                elif vid.suffix in ['.npy'] and general.trials:
-                    general.sessions[path.stem]['trial_inds'] = str(vid)
-
-    save_namespace(config_filepath, 'General', general)
-
-
-def load_namespace(config_filepath, ns_key):
-    config = load_config(config_filepath)
-    return types.SimpleNamespace(**config[ns_key])
-
-
-def save_namespace(config_filepath, ns_key, ns):
-    config = load_config(config_filepath)
-    ns_dict = vars(ns)
-    config[ns_key] = {**config[ns_key], **ns_dict}
-    save_config(config, config_filepath)
-
-
-def import_videos_old(config_filepath):
-    """
-    Define the directory of videos
-    Import the videos as read objects
-    
-    Prints those versions
-    
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file 
-    
-    Returns
-    -------
-    
-    """
-
-    config = load_config(config_filepath)
-    dir_vid = Path(config['dir_vid'])
-    fileName_vid_prefix = config['fileName_vid_prefix']
-
-    path_vid_allFiles = []
-    for path in dir_vid.iterdir():
-        if path.is_file() and fileName_vid_prefix in str(path):
-            path_vid_allFiles.append(str(path))
-    numVids = len(path_vid_allFiles)
-    path_vid_allFiles = sorted(path_vid_allFiles)
-
-    config['numVids'] = numVids
-    config['path_vid_allFiles'] = path_vid_allFiles
+                    session['videos'].append(str(vid))
+                elif vid.suffix in ['.npy'] and general['trials']:
+                    session['trial_inds'] = str(vid)
+                    trial_inds = np.load(session['trial_inds'])
+                    session['num_trials'] = trial_inds.shape[0]
+                    session['trial_len'] = trial_inds.shape[1]
+            general['sessions'].append(session)
 
     save_config(config, config_filepath)
 
 
-def print_session_report(session_name, session):
-    print(f'Current Session: {session_name}')
+def print_session_report(session):
+    print(f'Current Session: {session["name"]}')
     print(f'number of videos: {session["num_vids"]}')
     print(f'number of frames per video (roughly): {session["frames_per_video"]}')
     print(f'number of frames in ALL videos (roughly): {session["frames_total"]}')
@@ -230,10 +190,11 @@ def get_video_data(config_filepath):
     -------
 
     """
-    general = load_namespace(config_filepath,'General')
-    video   = load_namespace(config_filepath, 'Video')
+    config = load_config(config_filepath)
+    general = config['General']
+    video = config['Video']
 
-    for session_name, session in general.sessions.items():
+    for session in general['sessions']:
         session['num_vids'] = len(session['videos'])
         vid_lens = np.ones(session['num_vids'])
         for i, vid_path in enumerate(session['videos']):
@@ -242,70 +203,18 @@ def get_video_data(config_filepath):
         session['vid_lens'] = vid_lens.tolist()
         session['frames_total'] = int(sum(session['vid_lens']))
         session['frames_per_video'] = int(session['frames_total']/session['num_vids'])
-        print_session_report(session_name, session)
+        print_session_report(session)
 
-        if video.print_filenames:
+        if video['print_filenames']:
             print(f'\n {np.array(session["videos"]).transpose()}')
 
-    video.Fs = vid_reader.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
-    print(f'Sampling rate pulled from video file metadata:   {round(video.Fs, 3)} frames per second')
+    video['Fs'] = vid_reader.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
+    print(f'Sampling rate pulled from video file metadata:   {round(video["Fs"], 3)} frames per second')
 
     vid_reader.set(1, 1)
     ok, frame = vid_reader.read()
-    video.height = frame.shape[0]
-    video.width = frame.shape[1]
-
-    save_namespace(config_filepath, 'General', general)
-    save_namespace(config_filepath, 'Video', video)
-
-
-def get_video_data_old(config_filepath):
-    """
-    get info on the imported video(s): num of frames, video height and width, framerate
-    
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file 
-    
-    Returns
-    -------
-    
-    """
-
-    config = load_config(config_filepath)
-    path_vid_allFiles = config['path_vid_allFiles']
-    numVids  = config['numVids']
-    print_fileNames_pref = config['print_fileNames_pref']
-
-    video = cv2.VideoCapture(path_vid_allFiles[0])
-    numFrames_firstVid = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    numFrames_allFiles = np.ones(numVids) * np.nan  # preallocation
-    for ii in range(numVids):
-        video = cv2.VideoCapture(path_vid_allFiles[ii])
-        numFrames_allFiles[ii] = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-    numFrames_total_rough = np.uint64(sum(numFrames_allFiles))
-    numFrames_allFiles = numFrames_allFiles.tolist()
-    print(f'number of videos: {numVids}')
-    print(f'number of frames in FIRST video (roughly):  {numFrames_firstVid}')
-    print(f'number of frames in ALL videos (roughly):   {numFrames_total_rough}')
-
-    Fs = video.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
-    print(f'Sampling rate pulled from video file metadata:   {round(Fs, 3)} frames per second')
-
-    if print_fileNames_pref:
-        print(f'\n {np.array(path_vid_allFiles).transpose()}')
-
-    video.set(1, 1)
-    ok, frame = video.read()
-    vid_height = frame.shape[0]
-    vid_width = frame.shape[1]
-
-    config['numFrames_total_rough'] = int(numFrames_total_rough)
-    config['vid_Fs'] = Fs
-    config['numFrames_allFiles'] = numFrames_allFiles
-    config['vid_height'] = vid_height
-    config['vid_width'] = vid_width
+    video['height'] = frame.shape[0]
+    video['width'] = frame.shape[1]
 
     save_config(config, config_filepath)
 
@@ -323,14 +232,15 @@ def create_nwbs(config_filepath):
 
     """
 
-    general = load_namespace(config_filepath, 'General')
-    paths   = load_namespace(config_filepath, 'Paths')
+    config = load_config(config_filepath)
+    general = config['General']
+    paths = config['Paths']
 
-    for session_name, session in general.sessions.items():
-        session['nwb'] = str(Path(paths.data) / (session_name + '.nwb'))
+    for session in general['sessions']:
+        session['nwb'] = str(Path(paths['data']) / (session['name']+ '.nwb'))
 
         nwbfile = NWBFile(session_description=f'face rhythm data',
-                          identifier=f'{session_name}',
+                          identifier=f'{session["name"]}',
                           session_start_time=datetime.now(tzlocal()),
                           file_create_date=datetime.now(tzlocal()))
 
@@ -340,7 +250,7 @@ def create_nwbs(config_filepath):
         with NWBHDF5IO(session['nwb'], 'w') as io:
             io.write(nwbfile)
 
-    save_namespace(config_filepath,'General',general)
+    save_config(config, config_filepath)
 
 
 def create_nwb(config_filepath):
@@ -375,7 +285,7 @@ def create_nwb(config_filepath):
     save_config(config, config_filepath)
 
 
-def create_nwb_group(config_filepath, group_name):
+def create_nwb_group(nwb_path, group_name):
     """
     Create an NWB BehavioralTimeSeries for grouping data
 
@@ -388,8 +298,6 @@ def create_nwb_group(config_filepath, group_name):
     -------
 
     """
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
     with NWBHDF5IO(nwb_path,'a') as io:
         nwbfile = io.read()
         if group_name in nwbfile.processing['Face Rhythm'].data_interfaces.keys():
@@ -399,7 +307,7 @@ def create_nwb_group(config_filepath, group_name):
         io.write(nwbfile)
 
 
-def create_nwb_ts(config_filepath, group_name, ts_name, data):
+def create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
     """
     Create a new TimeSeries for data to write
 
@@ -414,9 +322,6 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
     -------
 
     """
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
-    Fs = config['vid_Fs']
     print(f'Saving {ts_name} in Group {group_name}')
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
@@ -432,7 +337,7 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
         io.write(nwbfile)
 
 
-def load_nwb_ts(config_filepath, group_name, ts_name):
+def load_nwb_ts(nwb_path, group_name, ts_name):
     """
     Create a new TimeSeries for data to write
 
@@ -446,9 +351,6 @@ def load_nwb_ts(config_filepath, group_name, ts_name):
     -------
 
     """
-
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
         return np.moveaxis(nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()],0,-1)
@@ -467,12 +369,11 @@ def save_data(config_filepath, save_name, data_to_save):
     -------
 
     """
-
     config = load_config(config_filepath)
-    save_dir = Path(config['path_data'])
+    save_dir = Path(config['Paths']['data'])
     save_path = save_dir / f'{save_name}.npy'
     np.save(save_path, data_to_save, allow_pickle=True)
-    config[f'path_{save_name}'] = str(save_path)
+    config['Paths'][save_name] = str(save_path)
     save_config(config, config_filepath)
 
 
@@ -490,14 +391,15 @@ def save_h5(config_filepath, save_name, data_dict):
     -------
 
     """
-    paths = load_namespace(config_filepath, 'Paths')
-    save_dir = Path(paths.data)
+    config = load_config(config_filepath)
+    paths = config['Paths']
+    save_dir = Path(paths['data'])
     save_path = save_dir / f'{save_name}.h5'
     to_write = h5py.File(save_path, 'w')
     dict_to_h5(data_dict, to_write)
     to_write.close()
-    vars(paths)[save_name] = str(save_path)
-    save_namespace(config_filepath,'Paths',paths)
+    paths[save_name] = str(save_path)
+    save_config(config, config_filepath)
 
 
 def load_h5(config_filepath, data_key):
@@ -516,7 +418,7 @@ def load_h5(config_filepath, data_key):
 
     """
     config = load_config(config_filepath)
-    return types.SimpleNamespace(**h5_to_dict(config[data_key]))
+    return h5_to_dict(config['Paths'][data_key])
 
 
 def load_data(config_filepath, data_key):
@@ -535,7 +437,7 @@ def load_data(config_filepath, data_key):
     """
 
     config = load_config(config_filepath)
-    return np.load(config[data_key], allow_pickle=True)
+    return np.load(config['Paths'][data_key], allow_pickle=True)
 
 
 def print_time(action, time):
