@@ -359,18 +359,10 @@ def conv_dim_reduce_workflow(config_filepath):
     helpers.print_time('Points spaced out', time.time() - tic)
 
     for session in general['sessions']:
+        tic_session = time.time()
         points_show(config_filepath, session, pts_all, pts_spaced_convDR)
         positions_new_sansOutliers = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'positions')
-        if general['trials']:
-            positions_convDR_meanSub = np.zeros_like(positions_new_sansOutliers)
-            positions_convDR_absolute = np.zeros_like(positions_new_sansOutliers)
-            for i, trial in enumerate(positions_new_sansOutliers):
-                new_positions = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
-                                                                 cosKernel, cosKernel_mean, trial)
-                positions_convDR_meanSub[i, ...] = new_positions[0]
-                positions_convDR_absolute[i, ...] = new_positions[1]
-        else:
-            positions_convDR_meanSub, positions_convDR_absolute = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
+        positions_convDR_meanSub, positions_convDR_absolute = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean, positions_new_sansOutliers)
 
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub, video['Fs'])
@@ -378,6 +370,8 @@ def conv_dim_reduce_workflow(config_filepath):
 
         if config['CDR']['display_displacements']:
             display_displacements(config_filepath, session, positions_convDR_meanSub, pts_spaced_convDR)
+
+        helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
     helpers.print_time('total elapsed time', time.time() - tic_all)

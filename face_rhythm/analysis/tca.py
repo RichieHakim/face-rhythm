@@ -584,6 +584,31 @@ def load_factors(nwb_path, stem):
         return [tca_data[ts].data[()] for ts in tca_data.time_series if stem in ts]
 
 
+def trial_reshape_positional(positions, trial_inds):
+    reshaped = np.zeros((trial_inds.shape[0], *positions.shape[:-1], trial_inds.shape[1]))
+    for i, trial_ind in enumerate(trial_inds):
+        reshaped[i, ...] = positions[..., trial_ind]
+    return reshaped
+
+
+def downsample_trial_inds(trial_inds, len_original, len_cqt):
+    idx_cqt_originalSamples = np.round(np.linspace(0, len_original, len_cqt))
+    trial_idx_cqt = np.ones((trial_inds.shape[0], 1000)) * np.nan
+    for ii in range(trial_inds.shape[0]):
+        retained = np.where((idx_cqt_originalSamples > trial_inds[ii, 0]) * (idx_cqt_originalSamples < trial_inds[ii, -1]))[0]
+        trial_idx_cqt[ii, :retained.shape[0]] = retained
+    to_keep = ~np.any(np.isnan(trial_idx_cqt),axis=0)
+    return trial_idx_cqt[:,to_keep]
+
+
+def trial_reshape_frequential(positions, spectrum, trial_inds):
+    trial_inds = downsample_trial_inds(trial_inds,positions.shape[-1], spectrum.shape[-2])
+    reshaped = np.zeros((trial_inds.shape[0], *spectrum.shape[:-2], trial_inds.shape[1], spectrum.shape[-1]))
+    for i, trial_ind in enumerate(trial_inds):
+        reshaped[i, ...] = spectrum[..., trial_ind,:]
+    return reshaped
+
+
 def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     """
     sequences the steps for tca of the positions of the optic flow data
@@ -603,8 +628,13 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     general = config['General']
 
     for session in general['sessions']:
+        tic_session = time.time()
+
         positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', key_meansub)
         positions_convDR_absolute = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', key_absolute)
+        if general['trials']:
+            trial_inds = np.load(session['trial_inds'])
+            positions_convDR_meanSub = trial_reshape_positional(positions_convDR_meanSub, trial_inds)
 
         factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
@@ -617,8 +647,10 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
         helpers.create_nwb_group(session['nwb'], 'TCA')
         save_factors(session['nwb'], factors_np_positional, 'positional')
 
-        helpers.print_time('total elapsed time', time.time() - tic_all)
-        print(f'== End Positional TCA ==')
+        helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
+
+    helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'== End Positional TCA ==')
 
 def interpolate_temporal_factor(y_input , numFrames):
     """
@@ -671,7 +703,10 @@ def full_tca_workflow(config_filepath, data_key):
         positions_convDR_absolute = helpers.load_nwb_ts(session['nwb'],'Optic Flow', data_key)
         Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_norm')
         Sxx_allPixels_normFactor = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_normFactor')
-
+        if general['trials']:
+            trial_inds = np.load(session['trial_inds'])
+            positions_convDR_absolute = trial_reshape_positional(positions_convDR_absolute, Sxx_allPixels_norm, trial_inds)
+         
         tic = time.time()
         factors_np = tca(config_filepath, Sxx_allPixels_norm)
         helpers.print_time('Decomposition completed', time.time() - tic)

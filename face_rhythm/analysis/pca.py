@@ -53,11 +53,8 @@ def pca_workflow(config_filepath, data_key):
     video = config['Video']
 
     for session in general['sessions']:
-
+        tic_session = time.time()
         positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', data_key)
-        if general['trials']:
-            old_shape = positions_convDR_meanSub.shape
-            positions_convDR_meanSub = positions_convDR_meanSub.reshape(-1,2,old_shape[0]*old_shape[-1])
 
         # input_dimRed = np.squeeze(positions_new_sansOutliers[:,1,:])
         tmp_x = np.squeeze(positions_convDR_meanSub[:,0,:])
@@ -82,6 +79,8 @@ def pca_workflow(config_filepath, data_key):
         helpers.create_nwb_group(session['nwb'], 'PCA')
         helpers.create_nwb_ts(session['nwb'], 'PCA','scores_points',scores_points, video['Fs'])
         helpers.save_data(config_filepath, 'input_dimRed_meanSub', input_dimRed_meanSub)
+
+        helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End pca ==')
