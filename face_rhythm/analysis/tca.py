@@ -37,14 +37,15 @@ def tca(config_filepath, positions):
     """
     
     config = helpers.load_config(config_filepath)
-    pref_useGPU = config['tca_pref_useGPU']
-    device = config['tca_device']
-    rank = config['tca_rank']
-    init = config['tca_init']
-    verbosity = config['tca_verbosity']
-    n_iters = config['tca_n_iters']
+    tca = config['TCA']
+    pref_useGPU = tca['pref_useGPU']
+    device = tca['device']
+    rank = tca['rank']
+    init = tca['init']
+    verbosity = tca['verbosity']
+    n_iters = tca['n_iters']
 
-    input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
+    input_dimRed_meanSub = helpers.load_data(config_filepath,'input_dimRed_meanSub')
     
     tl.set_backend('pytorch')
     
@@ -97,7 +98,7 @@ def plot_factors(config_filepath, factors_np):
 #     if 'Fs' not in globals():
 #         Fs = 120
     config = helpers.load_config(config_filepath)
-    Fs = config['vid_Fs']
+    Fs = config['Video']['Fs']
 
     plt.figure()
     # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
@@ -164,9 +165,11 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
     """
 
     config = helpers.load_config(config_filepath)
-    Fs = config['vid_Fs']
-    vid_width = config['vid_width']
-    vid_height = config['vid_height']
+    video = config['Video']
+
+    Fs = video['Fs']
+    vid_width = video['width']
+    vid_height = video['height']
     numFrames_allFiles = config['numFrames_allFiles']
     path_vid_allFiles = config['path_vid_allFiles']
     numFrames = config['tca_display_frames']
@@ -300,7 +303,7 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     """
 
     config = helpers.load_config(config_filepath)
-    Fs = config['vid_Fs']
+    Fs = config['Video']['Fs']
 
     factors_toUse = factors_np
     modelRank = factors_toUse[0].shape[1]
@@ -567,16 +570,15 @@ def factor_tsne(factors):
     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
-def save_factors(config_filepath, factors_all, factors_temporal_interp, ftype):
+def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None):
     for i, factor in enumerate(factors_all):
-        helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_dim{i}', factor)
-    helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_temporal_interp', factors_temporal_interp)
+        helpers.create_nwb_ts(nwb_path, 'TCA', f'factors_{ftype}_dim{i}', factor, 1.0)
+    if factors_temporal_interp is not None:
+        helpers.create_nwb_ts(nwb_path, 'TCA', f'factors_{ftype}_temporal_interp', factors_temporal_interp, 1.0)
 
 
-def load_factors(config_filepath, stem):
-    config = helpers.load_config(config_filepath)
-    path_nwb = config['path_nwb']
-    with NWBHDF5IO(path_nwb, 'r') as io:
+def load_factors(nwb_path, stem):
+    with NWBHDF5IO(nwb_path, 'r') as io:
         nwbfile = io.read()
         tca_data = nwbfile.processing['Face Rhythm']['TCA']
         return [tca_data[ts].data[()] for ts in tca_data.time_series if stem in ts]
@@ -598,24 +600,25 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
     config = helpers.load_config(config_filepath)
+    general = config['General']
 
-    positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_meansub)
-    positions_convDR_absolute = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_absolute)
+    for session in general['sessions']:
+        positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', key_meansub)
+        positions_convDR_absolute = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', key_absolute)
 
-    factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
+        factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
+        plot_factors(config_filepath, factors_np_positional)
+        if general['trials']:
+            plot_trial_factor(factors_np_positional[0])
+        if config['TCA']['vid_display']:
+            factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
 
-    plot_factors(config_filepath, factors_np_positional)
-    if config['trial_inds']:
-        plot_trial_factor(factors_np_positional[0])
-    if config['tca_vid_display']:
-        factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
+        helpers.create_nwb_group(session['nwb'], 'TCA')
+        save_factors(session['nwb'], factors_np_positional, 'positional')
 
-    helpers.create_nwb_group(config_filepath, 'TCA')
-    save_factors(config_filepath, factors_np_positional, 'positional')
-
-    helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'== End Positional TCA ==')
+        helpers.print_time('total elapsed time', time.time() - tic_all)
+        print(f'== End Positional TCA ==')
 
 def interpolate_temporal_factor(y_input , numFrames):
     """
@@ -661,32 +664,29 @@ def full_tca_workflow(config_filepath, data_key):
     print(f'== Beginning Full TCA Workflow ==')
     tic_all = time.time()
     config = helpers.load_config(config_filepath)
+    general = config['General']
 
-    positions_convDR_absolute = helpers.load_nwb_ts(config_filepath,'Optic Flow', data_key)
-    Sxx_allPixels_norm = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_norm')
-    Sxx_allPixels_normFactor = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_normFactor')
-    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+    freqs_Sxx = helpers.load_data(config_filepath, 'freqs_Sxx')
+    for session in general['sessions']:
+        positions_convDR_absolute = helpers.load_nwb_ts(session['nwb'],'Optic Flow', data_key)
+        Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_norm')
+        Sxx_allPixels_normFactor = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_normFactor')
 
-    tic = time.time()
-    factors_np = tca(config_filepath, Sxx_allPixels_norm)
-    helpers.print_time('Decomposition completed', time.time() - tic)
+        tic = time.time()
+        factors_np = tca(config_filepath, Sxx_allPixels_norm)
+        helpers.print_time('Decomposition completed', time.time() - tic)
 
-    factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
-    #factors_xcorr = correlations(config_filepath, factors_np)
+        factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+        #factors_xcorr = correlations(config_filepath, factors_np)
+        if general['trials']:
+            plot_trial_factor(factors_np[0])
+        if config['TCA']['vid_display']:
+            more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
-    if config['tca_vid_display']:
-        more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
+        factors_temporal_interp = interpolate_temporal_factor(factors_np[-2], session['numFrames_total'])
+        helpers.create_nwb_group(session['nwb'], 'TCA')
+        save_factors(session['nwb'], factors_np, 'frequential', factors_temporal_interp)
 
-    #factor_tsne(factors_temporal)
 
-    factors_temporal_interp = interpolate_temporal_factor(factors_np[2] , config['numFrames_total'])
-
-    helpers.create_nwb_group(config_filepath, 'TCA')
-    save_factors(config_filepath, factors_np, factors_temporal_interp, 'frequential')
-    # helpers.save_data(config_filepath, 'factors_np', factors_np)
-    # helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
-    # helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
-
-    
-    helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'== End Full TCA ==')
+        helpers.print_time('total elapsed time', time.time() - tic_all)
+        print(f'== End Full TCA ==')

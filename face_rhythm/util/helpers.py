@@ -1,11 +1,10 @@
 import yaml
 import cv2
 import torch
-import sys
 import numpy as np
-import os
-import os.path
+
 import h5py
+import types
 
 from pathlib import Path
 
@@ -16,7 +15,7 @@ import pynwb
 from pynwb.behavior import BehavioralTimeSeries
 
 
-def setup_project(project_path, video_path, session_name, overwrite_config, remote):
+def setup_project(project_path, video_path, run_name, overwrite_config, remote, trials):
     """
     Creates the project folder and data folder (if they don't exist)
     Creates the config file (if it doesn't exist or overwrite requested)
@@ -35,9 +34,9 @@ def setup_project(project_path, video_path, session_name, overwrite_config, remo
     (project_path / 'data').mkdir(parents=True, exist_ok=True)
     (project_path / 'viz').mkdir(parents=True, exist_ok=True)
     video_path.mkdir(parents=True, exist_ok=True)
-    config_filepath = project_path / 'configs' / f'config_{session_name}.yaml'
+    config_filepath = project_path / 'configs' / f'config_{run_name}.yaml'
     if not config_filepath.exists() or overwrite_config:
-        generate_config(config_filepath, project_path, video_path, remote)
+        generate_config(config_filepath, project_path, video_path, remote, trials)
 
     version_check(config_filepath)
     return config_filepath
@@ -102,7 +101,7 @@ def save_config(config, config_filepath):
         yaml.safe_dump(config, f)
 
 
-def generate_config(config_filepath, project_path, video_path, remote):
+def generate_config(config_filepath, project_path, video_path, remote, trials):
     """
     Generates bare config file with just basic info
     
@@ -115,13 +114,23 @@ def generate_config(config_filepath, project_path, video_path, remote):
     
     """
 
-    basic_config = {'path_project': str(project_path),
-                    'path_video': str(video_path),
-                    'dir_vid': str(video_path),
-                    'path_data': str(project_path / 'data'),
-                    'path_viz': str(project_path / 'viz'),
-                    'path_config': str(config_filepath),
-                    'remote': remote}
+    basic_config = {'General':{},
+                    'Video':{},
+                    'Paths':{},
+                    'ROI':{},
+                    'Optic':{},
+                    'Clean':{},
+                    'CDR':{},
+                    'PCA':{},
+                    'CQT':{},
+                    'TCA':{}}
+    basic_config['Paths']['project'] = str(project_path)
+    basic_config['Paths']['video'] = str(video_path)
+    basic_config['Paths']['data'] = str(project_path / 'data')
+    basic_config['Paths']['viz'] = str(project_path / 'viz')
+    basic_config['Paths']['config'] = str(config_filepath)
+    basic_config['General']['remote'] = remote
+    basic_config['General']['trials'] = trials
 
     with open(str(config_filepath), 'w') as f:
         yaml.safe_dump(basic_config, f)
@@ -129,84 +138,117 @@ def generate_config(config_filepath, project_path, video_path, remote):
 
 def import_videos(config_filepath):
     """
-    Define the directory of videos
-    Import the videos as read objects
-    
-    Prints those versions
-    
+    Find all videos
+
     Parameters
     ----------
-    config_filepath (Path): path to the config file 
-    
+    config_filepath (Path): path to the config file
+
     Returns
     -------
-    
+
     """
 
     config = load_config(config_filepath)
-    dir_vid = Path(config['dir_vid'])
-    fileName_vid_prefix = config['fileName_vid_prefix']
+    paths = config['Paths']
+    video = config['Video']
+    general = config['General']
+    general['sessions'] = []
 
-    path_vid_allFiles = []
-    for path in dir_vid.iterdir():
-        if path.is_file() and fileName_vid_prefix in str(path):
-            path_vid_allFiles.append(str(path))
-    numVids = len(path_vid_allFiles)
-    path_vid_allFiles = sorted(path_vid_allFiles)
-
-    config['numVids'] = numVids
-    config['path_vid_allFiles'] = path_vid_allFiles
+    for path in Path(paths['video']).iterdir():
+        if path.is_dir() and video['session_prefix'] in str(path):
+            session = {'name': path.stem, 'videos': []}
+            for vid in path.iterdir():
+                if vid.suffix in ['.avi', '.mp4']:
+                    session['videos'].append(str(vid))
+                elif vid.suffix in ['.npy'] and general['trials']:
+                    session['trial_inds'] = str(vid)
+                    trial_inds = np.load(session['trial_inds'])
+                    session['num_trials'] = trial_inds.shape[0]
+                    session['trial_len'] = trial_inds.shape[1]
+            general['sessions'].append(session)
 
     save_config(config, config_filepath)
+
+
+def print_session_report(session):
+    print(f'Current Session: {session["name"]}')
+    print(f'number of videos: {session["num_vids"]}')
+    print(f'number of frames per video (roughly): {session["frames_per_video"]}')
+    print(f'number of frames in ALL videos (roughly): {session["frames_total"]}')
 
 
 def get_video_data(config_filepath):
     """
     get info on the imported video(s): num of frames, video height and width, framerate
-    
+
     Parameters
     ----------
-    config_filepath (Path): path to the config file 
-    
+    config_filepath (Path): path to the config file
+
     Returns
     -------
-    
+
+    """
+    config = load_config(config_filepath)
+    general = config['General']
+    video = config['Video']
+
+    for session in general['sessions']:
+        session['num_vids'] = len(session['videos'])
+        vid_lens = np.ones(session['num_vids'])
+        for i, vid_path in enumerate(session['videos']):
+            vid_reader = cv2.VideoCapture(vid_path)
+            vid_lens[i] = int(vid_reader.get(cv2.CAP_PROP_FRAME_COUNT))
+        session['vid_lens'] = vid_lens.tolist()
+        session['frames_total'] = int(sum(session['vid_lens']))
+        session['frames_per_video'] = int(session['frames_total']/session['num_vids'])
+        print_session_report(session)
+
+        if video['print_filenames']:
+            print(f'\n {np.array(session["videos"]).transpose()}')
+
+    video['Fs'] = vid_reader.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
+    print(f'Sampling rate pulled from video file metadata:   {round(video["Fs"], 3)} frames per second')
+
+    vid_reader.set(1, 1)
+    ok, frame = vid_reader.read()
+    video['height'] = frame.shape[0]
+    video['width'] = frame.shape[1]
+
+    save_config(config, config_filepath)
+
+
+def create_nwbs(config_filepath):
+    """
+    Create one nwb per session. This file will be used for all future data storage
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
     """
 
     config = load_config(config_filepath)
-    path_vid_allFiles = config['path_vid_allFiles']
-    numVids  = config['numVids']
-    print_fileNames_pref = config['print_fileNames_pref']
+    general = config['General']
+    paths = config['Paths']
 
-    video = cv2.VideoCapture(path_vid_allFiles[0])
-    numFrames_firstVid = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+    for session in general['sessions']:
+        session['nwb'] = str(Path(paths['data']) / (session['name']+ '.nwb'))
 
-    numFrames_allFiles = np.ones(numVids) * np.nan  # preallocation
-    for ii in range(numVids):
-        video = cv2.VideoCapture(path_vid_allFiles[ii])
-        numFrames_allFiles[ii] = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-    numFrames_total_rough = np.uint64(sum(numFrames_allFiles))
-    numFrames_allFiles = numFrames_allFiles.tolist()
-    print(f'number of videos: {numVids}')
-    print(f'number of frames in FIRST video (roughly):  {numFrames_firstVid}')
-    print(f'number of frames in ALL videos (roughly):   {numFrames_total_rough}')
+        nwbfile = NWBFile(session_description=f'face rhythm data',
+                          identifier=f'{session["name"]}',
+                          session_start_time=datetime.now(tzlocal()),
+                          file_create_date=datetime.now(tzlocal()))
 
-    Fs = video.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
-    print(f'Sampling rate pulled from video file metadata:   {round(Fs, 3)} frames per second')
+        nwbfile.create_processing_module(name='Face Rhythm',
+                                         description='all face rhythm related data')
 
-    if print_fileNames_pref:
-        print(f'\n {np.array(path_vid_allFiles).transpose()}')
-
-    video.set(1, 1)
-    ok, frame = video.read()
-    vid_height = frame.shape[0]
-    vid_width = frame.shape[1]
-
-    config['numFrames_total_rough'] = int(numFrames_total_rough)
-    config['vid_Fs'] = Fs
-    config['numFrames_allFiles'] = numFrames_allFiles
-    config['vid_height'] = vid_height
-    config['vid_width'] = vid_width
+        with NWBHDF5IO(session['nwb'], 'w') as io:
+            io.write(nwbfile)
 
     save_config(config, config_filepath)
 
@@ -243,7 +285,7 @@ def create_nwb(config_filepath):
     save_config(config, config_filepath)
 
 
-def create_nwb_group(config_filepath, group_name):
+def create_nwb_group(nwb_path, group_name):
     """
     Create an NWB BehavioralTimeSeries for grouping data
 
@@ -256,8 +298,6 @@ def create_nwb_group(config_filepath, group_name):
     -------
 
     """
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
     with NWBHDF5IO(nwb_path,'a') as io:
         nwbfile = io.read()
         if group_name in nwbfile.processing['Face Rhythm'].data_interfaces.keys():
@@ -267,7 +307,7 @@ def create_nwb_group(config_filepath, group_name):
         io.write(nwbfile)
 
 
-def create_nwb_ts(config_filepath, group_name, ts_name, data):
+def create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
     """
     Create a new TimeSeries for data to write
 
@@ -282,9 +322,6 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
     -------
 
     """
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
-    Fs = config['vid_Fs']
     print(f'Saving {ts_name} in Group {group_name}')
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
@@ -296,11 +333,17 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
             nwbfile.processing['Face Rhythm'][group_name].add_timeseries(new_ts)
         else:
             ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
-            ts = new_ts
+            try:
+                ts.data[()] = new_ts.data
+            except:
+                print('Shape mismatch between old shape and new shape, not NWB supported')
+                print(f"Old Shape: {ts.data.shape}")
+                print(f"New Shape: {new_ts.data.shape}")
+                print('Not Saving')
         io.write(nwbfile)
 
 
-def load_nwb_ts(config_filepath, group_name, ts_name):
+def load_nwb_ts(nwb_path, group_name, ts_name):
     """
     Create a new TimeSeries for data to write
 
@@ -314,9 +357,6 @@ def load_nwb_ts(config_filepath, group_name, ts_name):
     -------
 
     """
-
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
         return np.moveaxis(nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()],0,-1)
@@ -335,12 +375,11 @@ def save_data(config_filepath, save_name, data_to_save):
     -------
 
     """
-
     config = load_config(config_filepath)
-    save_dir = Path(config['path_data'])
+    save_dir = Path(config['Paths']['data'])
     save_path = save_dir / f'{save_name}.npy'
     np.save(save_path, data_to_save, allow_pickle=True)
-    config[f'path_{save_name}'] = str(save_path)
+    config['Paths'][save_name] = str(save_path)
     save_config(config, config_filepath)
 
 
@@ -359,12 +398,13 @@ def save_h5(config_filepath, save_name, data_dict):
 
     """
     config = load_config(config_filepath)
-    save_dir = Path(config['path_data'])
+    paths = config['Paths']
+    save_dir = Path(paths['data'])
     save_path = save_dir / f'{save_name}.h5'
     to_write = h5py.File(save_path, 'w')
     dict_to_h5(data_dict, to_write)
     to_write.close()
-    config[f'path_{save_name}'] = str(save_path)
+    paths[save_name] = str(save_path)
     save_config(config, config_filepath)
 
 
@@ -384,7 +424,7 @@ def load_h5(config_filepath, data_key):
 
     """
     config = load_config(config_filepath)
-    return h5_to_dict(config[data_key])
+    return h5_to_dict(config['Paths'][data_key])
 
 
 def load_data(config_filepath, data_key):
@@ -403,7 +443,7 @@ def load_data(config_filepath, data_key):
     """
 
     config = load_config(config_filepath)
-    return np.load(config[data_key], allow_pickle=True)
+    return np.load(config['Paths'][data_key], allow_pickle=True)
 
 
 def print_time(action, time):
@@ -484,9 +524,7 @@ def dict_to_h5(data_dict, h5):
         else:
             h5.create_dataset(key, data=item)
 
-def dump_nwb(config_filepath):
-    config = load_config(config_filepath)
-    nwb_path = config['path_nwb']
+def dump_nwb(nwb_path):
     io = pynwb.NWBHDF5IO(nwb_path, 'r')
     nwbfile = io.read()
     for interface in nwbfile.processing['Face Rhythm'].data_interfaces:

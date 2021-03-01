@@ -23,7 +23,7 @@ colors = (WHITE, RED, GREEN, BLUE, CYAN, MAGENTA, YELLOW)
 pts = []
 
 
-def load_video(vidToSet, frameToSet, path_vid_allFiles):
+def load_video(vid_to_set, frame_to_set, videos):
     """
     loads the chosen video and returns chosen frame
     Parameters
@@ -35,11 +35,11 @@ def load_video(vidToSet, frameToSet, path_vid_allFiles):
     -------
     frame (cv2.image): frame read using cv2
     """
-    path_vid = path_vid_allFiles[vidToSet - 1]
-    video = cv2.VideoCapture(path_vid)
+    path_vid = videos[vid_to_set - 1]
+    vid_reader = cv2.VideoCapture(path_vid)
 
-    video.set(1, frameToSet)
-    ok, frame = video.read()
+    vid_reader.set(1, frame_to_set)
+    ok, frame = vid_reader.read()
     return frame
 
 
@@ -199,14 +199,18 @@ class BBoxSelect:
 
 def get_roi(config_filepath):
     config = helpers.load_config(config_filepath)
-    if config['load_from_file']:
-        with h5py.File(Path(config['path_data']) / 'pts_all.h5', 'r') as pt:
+    roi = config['ROI']
+    paths = config['Paths']
+    general = config['General']
+
+    if roi['load_from_file']:
+        with h5py.File(Path(paths['data']) / 'pts_all.h5', 'r') as pt:
             pts_all = helpers.h5_to_dict(pt)
         helpers.save_h5(config_filepath, 'pts_all', pts_all)
-        return
+        return None, None
 
-    config = helpers.load_config(config_filepath)
-    frame = load_video(config['vidToSet'], config['frameToSet'], config['path_vid_allFiles'])
+    video_list = general['sessions'][roi['session_to_set']]['videos']
+    frame = load_video(roi['vid_to_set'], roi['frame_to_set'], video_list)
     return frame, BBoxSelect(frame)
 
 
