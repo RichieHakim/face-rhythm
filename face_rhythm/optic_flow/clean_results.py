@@ -54,7 +54,7 @@ def clean_displacements(config_filepath, displacements):
             tmp = positions_new_sansOutliers[:, :, ii - 1] + displacements_sansOutliers[:, :, ii]
         positions_new_sansOutliers[:, :, ii] = tmp - (tmp) * relaxation_factor
 
-    positions_new_absolute_sansOutliers = positions_new_sansOutliers + np.squeeze(pointInds_toUse)[None, :, :, None]
+    positions_new_absolute_sansOutliers = positions_new_sansOutliers + np.squeeze(pointInds_toUse)[:, :, None]
 
     return positions_new_sansOutliers, positions_new_absolute_sansOutliers
 

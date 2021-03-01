@@ -70,15 +70,9 @@ def setup(config, session, pts_all):
     ## Preallocate output variables
 
     # I add a bunch of NaNs to the end because the openCV estimate is usually less than the actual number of frames
-    if general['trials']:
-        displacements = np.ones((
-            session['num_trials'],
-            pts_spaced.shape[0], 2,
-            np.uint64(session['trial_len'] + session['trial_len'] * 0.1))) * np.nan
-    else:
-        displacements = np.ones((
-            pts_spaced.shape[0], 2,
-            np.uint64(numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
+    displacements = np.ones((
+        pts_spaced.shape[0], 2,
+        np.uint64(numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
 
     ## Preset point tracking variables
     pointInds_toUse = copy.deepcopy(pts_spaced)
@@ -498,14 +492,13 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     cv2.destroyAllWindows()
 
     for ii in range(len(displacements_list)):
-        #     displacements[:,:,ii] = test_disp[ii]
         if ii == 0:
             displacements = displacements_list[ii]
         else:
             displacements = np.concatenate((displacements, displacements_list[ii]), axis=2)
 
     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
-    numFrames_total = displacements.shape[2]
+    numFrames_total = displacements.shape[-1]
 
     return displacements, numFrames_total
 

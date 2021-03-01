@@ -107,7 +107,7 @@ def cqt_workflow(config_filepath, data_key):
         #Sxx_allPixels_norm.shape
 
         plt.figure()
-        plt.imshow(Sxx_allPixels_norm[500, :, :, 0], aspect='auto', cmap='hot', origin='lower')
+        plt.imshow(Sxx_allPixels_norm[cqt['pixelNum_toUse'], :, :, 0], aspect='auto', cmap='hot', origin='lower')
 
         plt.figure()
         plt.plot(Sxx_allPixels_normFactor)

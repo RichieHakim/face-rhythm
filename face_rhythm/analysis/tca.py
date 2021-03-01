@@ -598,7 +598,7 @@ def downsample_trial_inds(trial_inds, len_original, len_cqt):
         retained = np.where((idx_cqt_originalSamples > trial_inds[ii, 0]) * (idx_cqt_originalSamples < trial_inds[ii, -1]))[0]
         trial_idx_cqt[ii, :retained.shape[0]] = retained
     to_keep = ~np.any(np.isnan(trial_idx_cqt),axis=0)
-    return trial_idx_cqt[:,to_keep]
+    return trial_idx_cqt[:,to_keep].astype(int)
 
 
 def trial_reshape_frequential(positions, spectrum, trial_inds):
@@ -705,8 +705,8 @@ def full_tca_workflow(config_filepath, data_key):
         Sxx_allPixels_normFactor = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_normFactor')
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])
-            positions_convDR_absolute = trial_reshape_positional(positions_convDR_absolute, Sxx_allPixels_norm, trial_inds)
-         
+            Sxx_allPixels_norm = trial_reshape_frequential(positions_convDR_absolute, Sxx_allPixels_norm, trial_inds)
+
         tic = time.time()
         factors_np = tca(config_filepath, Sxx_allPixels_norm)
         helpers.print_time('Decomposition completed', time.time() - tic)
