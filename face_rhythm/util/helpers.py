@@ -300,6 +300,7 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
             ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
             ts.data.resize(new_ts.data.shape)
             ts.data[()] = new_ts.data
+        io.write(nwbfile)
 
 
 def load_nwb_ts(config_filepath, group_name, ts_name):
