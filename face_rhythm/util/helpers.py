@@ -12,6 +12,7 @@ from pathlib import Path
 from datetime import datetime
 from dateutil.tz import tzlocal
 from pynwb import NWBFile, NWBHDF5IO
+from hdmf.backends.hdf5.h5_utils import H5DataIO
 import pynwb
 from pynwb.behavior import BehavioralTimeSeries
 
@@ -288,15 +289,17 @@ def create_nwb_ts(config_filepath, group_name, ts_name, data):
     print(f'Saving {ts_name} in Group {group_name}')
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
+        maxshape = tuple(None for dim in data.shape)
         new_ts = pynwb.TimeSeries(name=ts_name,
-                                  data=np.moveaxis(data,-1,0),
+                                  data=H5DataIO(np.moveaxis(data,-1,0), maxshape=maxshape),
                                   unit='mm',
                                   rate=Fs)
         if ts_name not in nwbfile.processing['Face Rhythm'][group_name].time_series:
             nwbfile.processing['Face Rhythm'][group_name].add_timeseries(new_ts)
         else:
             ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
-            ts = new_ts
+            ts.data.resize(new_ts.data.shape)
+            ts.data[()] = new_ts.data
         io.write(nwbfile)
 
 
