@@ -129,9 +129,11 @@ def points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
     vidNum_toUse = cdr['vidNum']
     frameNum_toUse = cdr['frameNum']
     dot_size = cdr['dot_size']
+    kernel_pixel = cdr['kernel_pixel']
     path_vid_allFiles = session['videos']
 
-    kernel_example = np.repeat(cosKernel[...,10,np.newaxis],3,axis=2)
+    kernel_example = np.zeros_like(cosKernel[...,:3])
+    kernel_example[...,2] = cosKernel[...,kernel_pixel]
     alpha = cdr['kernel_alpha']
 
     color_tuples = helpers.load_data(config_filepath, 'color_tuples')
