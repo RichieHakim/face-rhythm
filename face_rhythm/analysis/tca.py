@@ -20,6 +20,9 @@ from pynwb import NWBHDF5IO
 
 from face_rhythm.util import helpers
 
+FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
+                'frequential': ['points','frequential','temporal','cartesian']}
+
 
 def tca(config_filepath, positions):
     """
@@ -147,143 +150,7 @@ def plot_trial_factor(trial_factor):
     plt.legend(np.arange(modelRank) + 1)
     plt.xlabel('trial number')
     plt.ylabel('a.u.')
-    
-    
-def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
-    """
-    creates videos of the points colored by their positional factor values
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    factors_np ():
-    positions_convDR_absolute ():
-
-    Returns
-    -------
-
-    """
-
-    config = helpers.load_config(config_filepath)
-    video = config['Video']
-
-    Fs = video['Fs']
-    vid_width = video['width']
-    vid_height = video['height']
-    numFrames_allFiles = config['numFrames_allFiles']
-    path_vid_allFiles = config['path_vid_allFiles']
-    numFrames = config['tca_display_frames']
-    remote = config['remote']
-
-    # Display video of factors
-
-    factors_toShow = np.arange(factors_np[-3].shape[1])  # zero-indexed
-    # factors_toShow = [3]  # zero-indexed
-
-    for factor_iter in factors_toShow:
-
-        # vidNums_toUse = range(numVids) ## note zero indexing!
-        vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
-
-        if type(vidNums_toUse) == int:
-            vidNums_toUse = np.array([vidNums_toUse])
-
-        dot_size = 2
-
-        printFPS_pref = 0
-        fps_counterPeriod = 10 ## number of frames to do a tic toc over
-
-    #     modelRank_toUse = 5
-        factor_toShow = factor_iter+1
-        save_pref = config['tca_vid_save']
-
-        # save_dir = "F:\\RH_Local\\Rich data\\camera data"
-        save_dir = config['tca_vid_dir']
-        save_fileName = f'factor {factor_toShow}'
-        # save_pathFull = f'{save_dir}\\{save_fileName}.avi'
-        save_pathFull = f'{save_dir}/{save_fileName}.avi'
-        config[f'path_{save_fileName}'] = save_pathFull
-        helpers.save_config(config, config_filepath)
-
-        # ensemble_toUse = ensemble
-        ensemble_toUse = factors_np
-        positions_toUse = positions_convDR_absolute
-
-        factor_toShow = factor_toShow-1
-        # input_scores = ensemble_toUse.factors(modelRank_toUse)[0][0]
-        input_scores = np.single(ensemble_toUse[-3])
-
-        range_toUse = np.ceil(np.max(input_scores[:,factor_toShow]) - np.min(input_scores[:,factor_toShow])) + 1
-        offset_toUse = np.min(input_scores[:,factor_toShow])
-        scores_norm = input_scores[:,factor_toShow] - offset_toUse
-        scores_norm = (scores_norm / np.max(scores_norm)) *1000
-        cmap = matplotlib.cm.get_cmap('hot', 1000)
-        # cmap_viridis(np.arange(range_toUse))
-
-        colormap_tuples =  list(np.arange(positions_toUse.shape[0]))
-        for ii in range(positions_toUse.shape[0]):
-            colormap_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) *255)[:3]))
-
-        # Define the codec and create VideoWriter object
-        if save_pref:
-            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            print(f'saving to file {save_pathFull}')
-            out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
-
-
-        ## Main loop to pull out displacements in each video   
-        ind_concat = int(np.hstack([0 , np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
-
-        fps = 0
-        tic_fps = time.time()
-        for iter_vid , vidNum_iter in enumerate(vidNums_toUse):
-            path_vid = path_vid_allFiles[vidNum_iter]
-            vid = imageio.get_reader(path_vid,  'ffmpeg')
-
-    #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    #         frameToSet = 0
-    #         video.set(1,frameToSet)
-
-            for iter_frame , new_frame in enumerate(vid):
-                    
-    #             ind_currentVid = np.int64(video.get(cv2.CAP_PROP_POS_FRAMES))
-                if iter_frame >= numFrames:
-                    break
-    #             ok, new_frame = video.read()
-
-                for ii in range(positions_toUse.shape[0]):
-                    pointInds_tracked_tuple = tuple(np.int64(np.squeeze(positions_toUse[ii,:,ind_concat])))
-                    cv2.circle(new_frame,pointInds_tracked_tuple, dot_size, colormap_tuples[ii], -1)
-                if save_pref:
-                    out.write(new_frame)
-
-
-                cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames}', org=(10,20), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                if not remote:
-                    cv2.imshow('test',new_frame)
-
-
-                k = cv2.waitKey(1) & 0xff
-                if k == 27 : break
-
-                ind_concat = ind_concat+1
-
-
-                if ind_concat%fps_counterPeriod==0:
-                    elapsed = time.time() - tic_fps
-                    fps = fps_counterPeriod/elapsed
-                    if printFPS_pref:
-                        print(fps)
-                    tic_fps = time.time()
-
-
-    out.release()
-    #video.release()
-    cv2.destroyAllWindows()
     
     
 def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor):
@@ -570,9 +437,11 @@ def factor_tsne(factors):
     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
-def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None):
+def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, trials = False):
+    factor_names = FACTOR_NAMES[ftype]
+    factor_names = (['trials'] + factor_names) if trials else factor_names
     for i, factor in enumerate(factors_all):
-        helpers.create_nwb_ts(nwb_path, 'TCA', f'factors_{ftype}_dim{i}', factor, 1.0)
+        helpers.create_nwb_ts(nwb_path, 'TCA', f'factors_{ftype}_{factor_names[i]}', factor, 1.0)
     if factors_temporal_interp is not None:
         helpers.create_nwb_ts(nwb_path, 'TCA', f'factors_{ftype}_temporal_interp', factors_temporal_interp, 1.0)
 
@@ -609,7 +478,7 @@ def trial_reshape_frequential(positions, spectrum, trial_inds):
     return reshaped
 
 
-def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
+def positional_tca_workflow(config_filepath, data_key):
     """
     sequences the steps for tca of the positions of the optic flow data
 
@@ -630,8 +499,8 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     for session in general['sessions']:
         tic_session = time.time()
 
-        positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', key_meansub)
-        positions_convDR_absolute = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', key_absolute)
+        positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', data_key)
+
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])
             positions_convDR_meanSub = trial_reshape_positional(positions_convDR_meanSub, trial_inds)
@@ -641,11 +510,9 @@ def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
         plot_factors(config_filepath, factors_np_positional)
         if general['trials']:
             plot_trial_factor(factors_np_positional[0])
-        if config['TCA']['vid_display']:
-            factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
 
         helpers.create_nwb_group(session['nwb'], 'TCA')
-        save_factors(session['nwb'], factors_np_positional, 'positional')
+        save_factors(session['nwb'], factors_np_positional, 'positional', trials=general['trials'])
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
@@ -715,12 +582,11 @@ def full_tca_workflow(config_filepath, data_key):
         #factors_xcorr = correlations(config_filepath, factors_np)
         if general['trials']:
             plot_trial_factor(factors_np[0])
-        if config['TCA']['vid_display']:
-            more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
-        factors_temporal_interp = interpolate_temporal_factor(factors_np[-2], session['numFrames_total'])
+        interp_dim = session['trial_len'] if general['trials'] else session['numFrames_total']
+        factors_temporal_interp = interpolate_temporal_factor(factors_np[-2], interp_dim)
         helpers.create_nwb_group(session['nwb'], 'TCA')
-        save_factors(session['nwb'], factors_np, 'frequential', factors_temporal_interp)
+        save_factors(session['nwb'], factors_np, 'frequential', factors_temporal_interp, trials=general['trials'])
 
 
         helpers.print_time('total elapsed time', time.time() - tic_all)

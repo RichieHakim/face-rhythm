@@ -183,7 +183,7 @@ class BBoxSelect:
         pts = np.array(pts, np.int32)
         pts = pts.reshape((-1, 1, 2))
         cv2.polylines(img, [pts], True,
-                      (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255)), 2)
+                      (40, 240, 240, 2),2)
         return img
 
     def onclick(self, event):
