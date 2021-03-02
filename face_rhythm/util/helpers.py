@@ -133,6 +133,16 @@ def generate_config(config_filepath, project_path, video_path, remote, trials):
     basic_config['General']['remote'] = remote
     basic_config['General']['trials'] = trials
 
+    demo_path = project_path / 'viz' / 'demos'
+    demo_path.mkdir(parents=True, exist_ok=True)
+    basic_config['Video']['demos'] = demo_path
+    positional_path = project_path / 'viz' / 'positional'
+    positional_path.mkdir(parents=True, exist_ok=True)
+    basic_config['TCA']['dir_positional'] = positional_path
+    frequential_path = project_path / 'viz' / 'frequential'
+    frequential_path.mkdir(parents=True, exist_ok=True)
+    basic_config['TCA']['dir_positional'] = frequential_path
+
     with open(str(config_filepath), 'w') as f:
         yaml.safe_dump(basic_config, f)
 
@@ -328,7 +338,7 @@ def create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
         nwbfile = io.read()
         maxshape = tuple(None for dim in data.shape)
         new_ts = pynwb.TimeSeries(name=ts_name,
-                                  data=H5DataIO(np.moveaxis(data,-1,0), maxshape=maxshape),
+                                  data=H5DataIO(data, maxshape=maxshape),
                                   unit='mm',
                                   rate=Fs)
         if ts_name not in nwbfile.processing['Face Rhythm'][group_name].time_series:
@@ -356,7 +366,7 @@ def load_nwb_ts(nwb_path, group_name, ts_name):
     """
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
-        return np.moveaxis(nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()],0,-1)
+        return nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()]
 
 
 def save_data(config_filepath, save_name, data_to_save):

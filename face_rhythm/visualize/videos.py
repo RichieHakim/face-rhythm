@@ -1,12 +1,14 @@
 import numpy as np
-import copy
-from face_rhythm.util import helpers
 
 import cv2
 import imageio
 
 from pathlib import Path
-from tqdm.notebook import tqdm, trange
+from tqdm.notebook import trange
+
+import matplotlib
+
+from face_rhythm.util import helpers
 
 
 def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters):
@@ -27,7 +29,7 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
     -------
     frame (cv2.image): labeled and processed image with points
     """
-    dot_size = config['Optic']['dot_size']
+    dot_size = config['Video']['dot_size']
     vidNums_toUse = config['Optic']['vidNums_toUse']
     numFrames_total_rough = session['frames_total']
     iter_frame, vidNum_iter, ind_concat, fps = counters
@@ -51,12 +53,11 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
         
 
 def visualize_progress(config, session, frame, point_inds_tracked_list, color_tuples, counters, out):
-    remote = config['General']['remote']
     frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters)
 
-    if remote:
+    if config['General']['remote'] or (config['Video']['save_demo'] and counters[0] < config['Video']['demo_len']):
         out.write(frame_labeled)
-    else:
+    if not config['General']['remote']:
         cv2.imshow('test', frame_labeled)
 
 
@@ -66,7 +67,6 @@ def visualize_points(config_filepath):
     video = config['Video']
     optic = config['Optic']
 
-    save_pathFull = str(Path(config['Paths']['viz']) / f'{video["data_to_display"]}_demo.avi')
     color_tuples = helpers.load_data(config_filepath, 'color_tuples')
 
     demo_len = video['demo_len']
@@ -74,14 +74,16 @@ def visualize_points(config_filepath):
     vid_height = video['height']
     Fs = video['Fs']
 
-    if general['remote'] or video['save_demo']:
-        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-        print(f'saving to file {save_pathFull}')
-        out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
-    else:
-        out = None
-
     for session in general['sessions']:
+        save_pathFull = str(Path(config['Paths']['viz']) / f'{session["name"]}_{video["data_to_display"]}_demo.avi')
+
+        if general['remote'] or video['save_demo']:
+            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+            print(f'saving to file {save_pathFull}')
+            out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
+        else:
+            out = None
+
         positions = helpers.load_nwb_ts(session['nwb'],'Optic Flow',video['data_to_display'])
         position_tuples = list(np.arange(positions.shape[0]))
         ind_concat = 0
@@ -95,4 +97,85 @@ def visualize_points(config_filepath):
 
                 k = cv2.waitKey(1) & 0xff
                 if k == 27 : break
-            ind_concat += 1
+
+                ind_concat += 1
+
+        if general['remote'] or video['save_demo']:
+            out.release()
+
+
+def visualize_factor(config_filepath):
+    """
+    creates videos of the points colored by their positional factor values
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    factors_np ():
+    positions_convDR_absolute ():
+
+    Returns
+    -------
+
+    """
+
+    config = helpers.load_config(config_filepath)
+    general = config['General']
+    video = config['Video']
+    optic = config['Optic']
+
+    demo_len = video['demo_len']
+    vid_width = video['width']
+    vid_height = video['height']
+    Fs = video['Fs']
+
+    factor_name = video['factor_to_display']
+    points_name = video['points_to_display']
+    ftype = factor_name.split('_')[1]
+
+
+    for session in general['sessions']:
+        factor = helpers.load_nwb_ts(session['nwb'],'TCA',factor_name)
+        points = helpers.load_nwb_ts(session['nwb'],'Optic Flow', points_name)
+        points_tuples = list(np.arange(points.shape[0]))
+        rank = factor.shape[1]
+
+        for factor_iter in range(rank):
+            save_path = str(Path(config['TCA'][f'dir_{ftype}']) / f'factor_{factor_iter}.avi')
+
+            if general['remote'] or video['save_demo']:
+                fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+                print(f'saving to file {save_path}')
+                out = cv2.VideoWriter(save_path, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
+            else:
+                out = None
+
+            factor_toShow = factor_iter
+
+            offset_toUse = np.min(factor[:, factor_toShow])
+            scores_norm = factor[:, factor_toShow] - offset_toUse
+            scores_norm = (scores_norm / np.max(scores_norm)) * 1000
+            cmap = matplotlib.cm.get_cmap('hot', 1000)
+
+            color_tuples = list(np.arange(points.shape[0]))
+            for ii in range(points.shape[0]):
+                color_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) * 255)[:3]))
+
+            ind_concat = 0
+            for vid_num in optic['vidNums_toUse']:
+                vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
+                for iter_frame in trange(demo_len):
+                    new_frame = vid.get_data(iter_frame)
+                    points_tracked = [points[:, np.newaxis, :, iter_frame], points_tuples]
+                    counters = [iter_frame, vid_num, ind_concat, Fs]
+                    visualize_progress(config, session, new_frame, points_tracked, color_tuples, counters, out)
+
+                    k = cv2.waitKey(1) & 0xff
+                    if k == 27: break
+
+                    ind_concat += 1
+
+            if general['remote'] or video['save_demo']:
+                out.release()
+
+    cv2.destroyAllWindows()

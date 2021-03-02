@@ -164,12 +164,13 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     showVideo_pref = optic['showVideo_pref']
     fps_counterPeriod = video['fps_counterPeriod']
     printFPS_pref = video['printFPS_pref']
-
     remote = config['General']['remote']
+    save_vid = video['save_demo']
+
     Fs = video['Fs']
     vid_width = video['width']
     vid_height = video['height']
-    test_len = optic['test_len']
+    test_len = video['demo_len']
     save_pathFull = str(Path(config['Paths']['viz']) / 'optic_test.avi')
 
     numVids = session['num_vids']
@@ -179,7 +180,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                  for k in lk_names}
 
     # Define the codec and create VideoWriter object
-    if showVideo_pref and remote:
+    if showVideo_pref and (save_vid or remote):
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         print(f'saving to file {save_pathFull}')
         out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
@@ -229,7 +230,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                 if (remote and iter_frame < test_len) or not remote:
                     videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
 
-                if config['General']['remote'] and iter_frame == test_len:
+                if (save_vid or remote) and iter_frame == test_len:
                     out.release()
 
                 k = cv2.waitKey(1) & 0xff
@@ -296,8 +297,9 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     showVideo_pref = optic['showVideo_pref']
     fps_counterPeriod = video['fps_counterPeriod']
     printFPS_pref = video['printFPS_pref']
-
     remote = config['General']['remote']
+    save_vid = video['save_demo']
+
     Fs = video['Fs']
     vid_width = video['width']
     vid_height = video['height']
@@ -368,7 +370,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
                 if (remote and iter_frame < test_len) or not remote:
                     videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
 
-                if config['General']['remote'] and iter_frame == test_len:
+                if (save_vid or remote) and iter_frame == test_len:
                     out.release()
 
                 k = cv2.waitKey(1) & 0xff
