@@ -135,13 +135,13 @@ def generate_config(config_filepath, project_path, video_path, remote, trials):
 
     demo_path = project_path / 'viz' / 'demos'
     demo_path.mkdir(parents=True, exist_ok=True)
-    basic_config['Video']['demos'] = demo_path
+    basic_config['Video']['demos'] = str(demo_path)
     positional_path = project_path / 'viz' / 'positional'
     positional_path.mkdir(parents=True, exist_ok=True)
-    basic_config['TCA']['dir_positional'] = positional_path
+    basic_config['TCA']['dir_positional'] = str(positional_path)
     frequential_path = project_path / 'viz' / 'frequential'
     frequential_path.mkdir(parents=True, exist_ok=True)
-    basic_config['TCA']['dir_positional'] = frequential_path
+    basic_config['TCA']['dir_frequential'] = str(frequential_path)
 
     with open(str(config_filepath), 'w') as f:
         yaml.safe_dump(basic_config, f)
