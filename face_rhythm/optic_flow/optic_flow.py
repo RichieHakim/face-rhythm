@@ -2,6 +2,7 @@ import time
 import numpy as np
 import copy
 from face_rhythm.util import helpers
+from face_rhythm.visualize import videos
 
 import cv2
 import imageio
@@ -82,48 +83,48 @@ def setup(config, session, pts_all):
     return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples
 
 
-def visualize_progress(config, session, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters,
-                       numFrames_rough, out, test_len):
-    """
-    plots a checkup
-
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    new_frame ():
-    pointInds_tracked ():
-    pointInds_tracked_tuple ():
-    color_tuples ():
-    counters ():
-
-    Returns
-    -------
-
-    """
-    dot_size = config['Optic']['dot_size']
-    vidNums_toUse = config['Optic']['vidNums_toUse']
-    numFrames_total_rough = session['frames_total']
-    remote = config['General']['remote']
-
-    iter_frame, vidNum_iter, ind_concat, fps = counters
-
-    for ii in range(pointInds_tracked.shape[0]):
-        pointInds_tracked_tuple[ii] = tuple(np.int64(np.squeeze(pointInds_tracked[ii, 0, :])))
-        cv2.circle(new_frame, pointInds_tracked_tuple[ii], dot_size, color_tuples[ii], -1)
-
-    cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames_rough}-ish', org=(10, 20), fontFace=1, fontScale=1,
-                color=(255, 255, 255), thickness=1)
-    cv2.putText(new_frame, f'vid #: {vidNum_iter + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
-                color=(255, 255, 255), thickness=1)
-    cv2.putText(new_frame, f'total frame #: {ind_concat + 1}/{numFrames_total_rough}-ish', org=(10, 60), fontFace=1,
-                fontScale=1, color=(255, 255, 255), thickness=1)
-    cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1, color=(255, 255, 255),
-                thickness=1)
-
-    if remote and iter_frame < test_len:
-        out.write(new_frame)
-    else:
-        cv2.imshow('test', new_frame)
+# def visualize_progress(config, session, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters,
+#                        numFrames_rough, out, test_len):
+#     """
+#     plots a checkup
+#
+#     Parameters
+#     ----------
+#     config (dict): dictionary of config parameters
+#     new_frame ():
+#     pointInds_tracked ():
+#     pointInds_tracked_tuple ():
+#     color_tuples ():
+#     counters ():
+#
+#     Returns
+#     -------
+#
+#     """
+#     dot_size = config['Optic']['dot_size']
+#     vidNums_toUse = config['Optic']['vidNums_toUse']
+#     numFrames_total_rough = session['frames_total']
+#     remote = config['General']['remote']
+#
+#     iter_frame, vidNum_iter, ind_concat, fps = counters
+#
+#     for ii in range(pointInds_tracked.shape[0]):
+#         pointInds_tracked_tuple[ii] = tuple(np.int64(np.squeeze(pointInds_tracked[ii, 0, :])))
+#         cv2.circle(new_frame, pointInds_tracked_tuple[ii], dot_size, color_tuples[ii], -1)
+#
+#     cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames_rough}-ish', org=(10, 20), fontFace=1, fontScale=1,
+#                 color=(255, 255, 255), thickness=1)
+#     cv2.putText(new_frame, f'vid #: {vidNum_iter + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
+#                 color=(255, 255, 255), thickness=1)
+#     cv2.putText(new_frame, f'total frame #: {ind_concat + 1}/{numFrames_total_rough}-ish', org=(10, 60), fontFace=1,
+#                 fontScale=1, color=(255, 255, 255), thickness=1)
+#     cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1, color=(255, 255, 255),
+#                 thickness=1)
+#
+#     if remote and iter_frame < test_len:
+#         out.write(new_frame)
+#     else:
+#         cv2.imshow('test', new_frame)
 
 
 def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
@@ -169,7 +170,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     vid_width = video['width']
     vid_height = video['height']
     test_len = optic['test_len']
-    save_pathFull = str(Path(config['Paths']['project']) / 'optic_test.avi')
+    save_pathFull = str(Path(config['Paths']['viz']) / 'optic_test.avi')
 
     numVids = session['num_vids']
     path_vid_allFiles = session['videos']
@@ -223,10 +224,12 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                         pointInds_new - pointInds_toUse)  # calculate integrated position
                 pointInds_tracked = pointInds_tracked - (
                         pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term. this is just for display purposes. Relaxation term chosen during cleanup will be real
+                pointInds = [pointInds_tracked, pointInds_tracked_tuple]
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, session, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples,
-                                   counters, numFrames_rough, out, test_len)
-                if remote and iter_frame == test_len:
+                if (remote and iter_frame < test_len) or not remote:
+                    videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
+
+                if config['General']['remote'] and iter_frame == test_len:
                     out.release()
 
                 k = cv2.waitKey(1) & 0xff
@@ -359,10 +362,13 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
             ## below is just for visualization. Nothing calculated is maintained
             if showVideo_pref:
+
+                pointInds = [pointInds_tracked, pointInds_tracked_tuple]
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, session, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples,
-                                   counters, numFrames_rough, out, test_len)
-                if remote and iter_frame == test_len:
+                if (remote and iter_frame < test_len) or not remote:
+                    videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
+
+                if config['General']['remote'] and iter_frame == test_len:
                     out.release()
 
                 k = cv2.waitKey(1) & 0xff

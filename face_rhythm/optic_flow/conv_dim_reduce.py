@@ -368,8 +368,8 @@ def conv_dim_reduce_workflow(config_filepath):
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub, video['Fs'])
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute, video['Fs'])
 
-        if config['CDR']['display_displacements']:
-            display_displacements(config_filepath, session, positions_convDR_meanSub, pts_spaced_convDR)
+        # if config['CDR']['display_displacements']:
+        #     display_displacements(config_filepath, session, positions_convDR_meanSub, pts_spaced_convDR)
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 

@@ -337,6 +337,7 @@ def create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
             ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
             ts.data.resize(new_ts.data.shape)
             ts.data[()] = new_ts.data
+        io.write(nwbfile)
 
 
 def load_nwb_ts(nwb_path, group_name, ts_name):
@@ -356,6 +357,7 @@ def load_nwb_ts(nwb_path, group_name, ts_name):
     with NWBHDF5IO(nwb_path, 'a') as io:
         nwbfile = io.read()
         return np.moveaxis(nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()],0,-1)
+
 
 def save_data(config_filepath, save_name, data_to_save):
     """
