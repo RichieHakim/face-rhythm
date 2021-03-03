@@ -4,7 +4,6 @@ import torch
 import numpy as np
 
 import h5py
-import types
 
 from pathlib import Path
 
