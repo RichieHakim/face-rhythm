@@ -300,6 +300,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     remote = config['General']['remote']
     save_vid = video['save_demo']
 
+
     Fs = video['Fs']
     vid_width = video['width']
     vid_height = video['height']
