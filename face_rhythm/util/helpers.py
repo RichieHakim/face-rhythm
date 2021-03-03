@@ -11,7 +11,6 @@ import pynwb
 from pynwb.behavior import BehavioralTimeSeries
 
 
-
 def load_config(config_filepath):
     """
     Loads config file into memory
@@ -142,6 +141,25 @@ def save_data(config_filepath, save_name, data_to_save):
     save_config(config, config_filepath)
 
 
+def load_data(config_filepath, data_key):
+    """
+    load an npy file with data
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    data_key (str): config key for the target data
+
+    Returns
+    -------
+    data (np.ndarray): (usually) an np array with data
+
+    """
+
+    config = load_config(config_filepath)
+    return np.load(config['Paths'][data_key], allow_pickle=True)
+
+
 def save_h5(config_filepath, save_name, data_dict):
     """
     save an h5 file from a data dictionary
@@ -184,25 +202,6 @@ def load_h5(config_filepath, data_key):
     """
     config = load_config(config_filepath)
     return h5_to_dict(config['Paths'][data_key])
-
-
-def load_data(config_filepath, data_key):
-    """
-    load an npy file with data
-
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    data_key (str): config key for the target data
-
-    Returns
-    -------
-    data (np.ndarray): (usually) an np array with data
-
-    """
-
-    config = load_config(config_filepath)
-    return np.load(config['Paths'][data_key], allow_pickle=True)
 
 
 def print_time(action, time):
@@ -282,6 +281,7 @@ def dict_to_h5(data_dict, h5):
             dict_to_h5(item, group)
         else:
             h5.create_dataset(key, data=item)
+
 
 def dump_nwb(nwb_path):
     io = pynwb.NWBHDF5IO(nwb_path, 'r')
