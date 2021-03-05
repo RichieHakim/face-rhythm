@@ -54,6 +54,10 @@ conda activate face-rhythm
 cd face-rhythm
 pip install -e . 
 ```
+Unix users may encounter some problems with using librosa during the spectrogram generation step. If so, try running: 
+```
+conda install -c conda-forge librosa
+```
 4. Install the correct version of cuda toolkit (if you plan on using a gpu). [This link](https://anaconda.org/anaconda/cudatoolkit) and [this link](https://pytorch.org/get-started/locally/) are useful for figuring that out
 ```
 conda install cudatoolkit=10.2
