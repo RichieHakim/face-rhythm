@@ -62,7 +62,8 @@ conda install cudatoolkit=10.2
 ```
 cd ..
 mkdir face_rhythm_runs
-cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/
+mkdir face_rhythm_runs/run_00
+cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/run_00/
 ```
 
 6. Get started! The plots display better using Jupyter Notebook
