@@ -3,6 +3,6 @@ data
 notebooks/config*
 docs/_build
 *__pycache__*
-**.ipynb_checkpoints**
+**.ipynb_checkpoint**
 *.egg-info/*
-
+**-checkpoint.ipynb
