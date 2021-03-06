@@ -209,6 +209,10 @@ def create_nwbs(config_filepath):
 
     for session in general['sessions']:
         session['nwb'] = str(Path(paths['data']) / (session['name']+ '.nwb'))
+        if not general['overwrite_nwbs'] and Path(session['nwb']).exists():
+            print(f'nwb for {session["name"]} already exists, not overwriting')
+            print('set config["General"]["overwrite_nwbs"]=True for otherwise')
+            continue
 
         nwbfile = NWBFile(session_description=f'face rhythm data',
                           identifier=f'{session["name"]}',
