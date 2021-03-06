@@ -75,7 +75,7 @@ def visualize_points(config_filepath):
     Fs = video['Fs']
 
     for session in general['sessions']:
-        save_pathFull = str(Path(config['Paths']['viz']) / f'{session["name"]}_{video["data_to_display"]}_demo.avi')
+        save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_demo.avi')
 
         if general['remote'] or video['save_demo']:
             fourcc = cv2.VideoWriter_fourcc(*'MJPG')
