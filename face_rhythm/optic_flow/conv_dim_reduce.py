@@ -8,8 +8,7 @@ from multiprocessing import Pool, RLock, freeze_support
 import copy
 import time
 from functools import partial
-from tqdm.notebook import tqdm
-from tqdm import trange
+from tqdm.notebook import tqdm, trange
 
 from matplotlib import pyplot as plt
 
@@ -52,10 +51,13 @@ def create_kernel(config_filepath, point_idxs):
     """
 
     config = helpers.load_config(config_filepath)
-    width_cos_kernel = config['cdr_width_cosKernel']
-    num_dots = config['cdr_num_dots']
-    vid_height = config['vid_height']
-    vid_width = config['vid_width']
+    cdr = config['CDR']
+    video = config['Video']
+
+    width_cos_kernel = cdr['width_cosKernel']
+    num_dots = cdr['num_dots']
+    vid_height = video['height']
+    vid_width = video['width']
     cos_kernel = np.zeros((vid_height, vid_width, num_dots))
     cos_kernel_mean = np.zeros(num_dots)
     for ii in tqdm(range(num_dots),desc="creating kernel"):
@@ -84,7 +86,9 @@ def space_points(config_filepath, pts_all):
     """
 
     config = helpers.load_config(config_filepath)
-    spacing = config['cdr_spacing']
+    cdr = config['CDR']
+
+    spacing = cdr['spacing']
 
     bbox_subframe_displacement = pts_all['bbox_subframe_displacement']
     pts_x_displacement = pts_all['pts_x_displacement']
@@ -105,7 +109,7 @@ def space_points(config_filepath, pts_all):
     return pts_spaced_convDR
 
 
-def points_show(config_filepath, pts_all, pts_spaced_convDR):
+def points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel):
     """
     shows the points
 
@@ -121,12 +125,18 @@ def points_show(config_filepath, pts_all, pts_spaced_convDR):
     """
 
     config = helpers.load_config(config_filepath)
-    vidNum_toUse = config['cdr_vidNum']
-    frameNum_toUse = config['cdr_frameNum']
-    dot_size = config['cdr_dot_size']
-    path_vid_allFiles = config['path_vid_allFiles']
+    cdr = config['CDR']
+    vidNum_toUse = cdr['vidNum']
+    frameNum_toUse = cdr['frameNum']
+    dot_size = cdr['dot_size']
+    kernel_pixel = cdr['kernel_pixel']
+    path_vid_allFiles = session['videos']
 
-    color_tuples = helpers.load_data(config_filepath, 'path_color_tuples')
+    kernel_example = np.zeros_like(cosKernel[...,:3])
+    kernel_example[...,2] = cosKernel[...,kernel_pixel]
+    alpha = cdr['kernel_alpha']
+
+    color_tuples = helpers.load_data(config_filepath, 'color_tuples')
 
     vid = imageio.get_reader(path_vid_allFiles[vidNum_toUse], 'ffmpeg')
     frame = vid.get_data(
@@ -135,8 +145,7 @@ def points_show(config_filepath, pts_all, pts_spaced_convDR):
     for ii in range(pts_spaced_convDR.shape[0]):
         pointInds_tuple[ii] = tuple(np.squeeze(pts_spaced_convDR[ii, 0, :]))
         cv2.circle(frame, pointInds_tuple[ii], dot_size, color_tuples[ii], -1)
-
-    plt.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    plt.imshow(cv2.cvtColor(np.float32((frame*(1-alpha)+255*kernel_example*alpha)/255), cv2.COLOR_BGR2RGB))
     plt.show()
 
 
@@ -207,7 +216,7 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     """
 
     config = helpers.load_config(config_filepath)
-    num_components = config['cdr_num_components']
+    num_components = config['CDR']['num_components']
     
     input_traces = np.float32(positions_new_sansOutliers)
     # num_components = 3
@@ -241,112 +250,21 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
         output_PCA_scores[ii][1,:,:] = np.dot( displacements_preConvDR_y  ,  output_PCA_loadings[ii,1,:,:] )
         positions_convDR_meanSub[ii,0,:] = np.mean(np.dot( output_PCA_loadings[ii,0,:,:rank_reduced] , output_PCA_scores[ii][0,:,:rank_reduced].T ) , axis=1) / cosKernel_mean[ii]
         positions_convDR_meanSub[ii,1,:] = np.mean(np.dot( output_PCA_loadings[ii,1,:,:rank_reduced] , output_PCA_scores[ii][1,:,:rank_reduced].T ) , axis=1) / cosKernel_mean[ii]
-    return positions_convDR_meanSub
+
+    positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
+    return positions_convDR_meanSub, positions_convDR_absolute
 
 
-# def display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR):
-#     """
-#     displays newly computed displacements after convolutional dr
-
-#     Parameters
-#     ----------
-#     config_filepath  ():
-#     positions_convDR_meanSub ():
-#     pts_spaced_convDR ():
-
-#     Returns
-#     -------
-#     positions_convDR_meanSub ():
-
-#     """
-
-#     config = helpers.load_config(config_filepath)
-
-#     # positions_toUse = positions_new_absolute_sansOutliers
-#     positions_toUse = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
-
-#     # vidNums_toUse = range(numVids) ## note zero indexing!
-#     vidNums_toUse = range(3)  ## note zero indexing!
-
-#     if type(vidNums_toUse) == int:
-#         vidNums_toUse = np.array([vidNums_toUse])
-
-#     dot_size = config['cdr_dot_size']
-#     printFPS_pref = config['printFPS_pref']
-#     fps_counterPeriod = config['fps_counterPeriod']  ## number of frames to do a tic toc over
-#     path_vid_allFiles = config['path_vid_allFiles']
-#     numFrames_allFiles = config['numFrames_allFiles']
-#     numFrames_total_rough = config['numFrames_total_rough']
-
-#     ## Define random colors for points in cloud
-#     color_tuples = list(np.arange(positions_toUse.shape[0]))
-#     for ii in range(positions_toUse.shape[0]):
-#         color_tuples[ii] = (np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255, np.random.rand(1)[0] * 255)
-#     #     color_tuples[ii] = (0,255,255)
-
-#     ## Main loop to pull out displacements in each video   
-#     ind_concat = int(np.hstack([0, np.cumsum(numFrames_allFiles)])[vidNums_toUse[0]])
-
-#     fps = 0
-#     tic_fps = time.time()
-#     for iter_vid, vidNum_iter in enumerate(vidNums_toUse):
-#         path_vid = path_vid_allFiles[vidNum_iter]
-#         vid = imageio.get_reader(path_vid, 'ffmpeg')
-
-#         video = cv2.VideoCapture(path_vid)
-#         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-
-#         for iter_frame, new_frame in enumerate(vid):
-#             for ii in range(positions_toUse.shape[0]):
-#                 pointInds_tracked_tuple = tuple(np.int64(np.squeeze(positions_toUse[ii, :, ind_concat])))
-#                 cv2.circle(new_frame, pointInds_tracked_tuple, dot_size, color_tuples[ii], -1)
-
-#             cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames}-ish', org=(10, 20), fontFace=1, fontScale=1,
-#                         color=(255, 255, 255), thickness=1)
-#             cv2.putText(new_frame, f'vid #: {iter_vid + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
-#                         color=(255, 255, 255), thickness=1)
-#             cv2.putText(new_frame, f'total frame #: {ind_concat + 1}/{numFrames_total_rough}-ish', org=(10, 60),
-#                         fontFace=1, fontScale=1, color=(255, 255, 255), thickness=1)
-#             cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1,
-#                         color=(255, 255, 255), thickness=1)
-#             cv2.imshow('post outlier removal', new_frame)
-
-#             k = cv2.waitKey(1) & 0xff
-#             if k == 27: break
-
-#             ind_concat = ind_concat + 1
-
-#             if ind_concat % fps_counterPeriod == 0:
-#                 elapsed = time.time() - tic_fps
-#                 fps = fps_counterPeriod / elapsed
-#                 if printFPS_pref:
-#                     print(fps)
-#                 tic_fps = time.time()
-
-#     cv2.destroyAllWindows()
-
-    
 def conv_dim_reduce_workflow(config_filepath):
-    """
-    sequences the steps of the convolutional dimensionality reduction
-
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-
-    Returns
-    -------
-
-    """
-
     print(f'== Beginning convolutional dimensionality reduction ==')
     tic_all = time.time()
-    
-    config = helpers.load_config(config_filepath)
-    pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
 
-    pts_all = helpers.load_h5(config_filepath, 'path_pts_all')
-    positions_new_sansOutliers = helpers.load_nwb_ts(config_filepath, 'Optic Flow', 'positions')
+    config = helpers.load_config(config_filepath)
+    general = config['General']
+    video = config['Video']
+
+    pointInds_toUse = helpers.load_data(config_filepath, 'pointInds_toUse')
+    pts_all = helpers.load_h5(config_filepath, 'pts_all')
 
     # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
     tic = time.time()
@@ -358,26 +276,19 @@ def conv_dim_reduce_workflow(config_filepath):
     pts_spaced_convDR = space_points(config_filepath, pts_all)
     print(f'number of points: {pts_spaced_convDR.shape[0]}')
     helpers.print_time('Points spaced out', time.time() - tic)
-    
-    points_show(config_filepath, pts_all, pts_spaced_convDR)
 
-    ## now let's find coefficients of influence from each original dot onto each new dot
-    # CAUTION: Huge memory requirement (Lower number of CPUs in the pool to decrease memory usage. For my runs (1 hr at 120hz, downsampling to ~400 dots, I use 18 cores and it
-    # uses around 150GB of memory. Use single thread version otherwise)
-    tic = time.time()
-    positions_convDR_meanSub = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
+    for session in general['sessions']:
+        tic_session = time.time()
+        points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
+        positions_new_sansOutliers = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'positions')
+        positions_convDR_meanSub, positions_convDR_absolute = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean, positions_new_sansOutliers)
-    helpers.print_time('Influence computed', time.time() - tic)
-    
-    positions_convDR_absolute = (positions_convDR_meanSub + np.squeeze(pts_spaced_convDR)[:, :, None])
 
-    # if config['display_displacements']:
-    #     display_displacements(config_filepath, positions_convDR_meanSub, pts_spaced_convDR)
+
+        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub, video['Fs'])
+        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute, video['Fs'])
+        helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
-    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub)
-    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute)
-
-    
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End convolutional dimensionality reduction ==')

@@ -2,6 +2,7 @@ import time
 import numpy as np
 import copy
 from face_rhythm.util import helpers
+from face_rhythm.visualize import videos
 
 import cv2
 import imageio
@@ -15,7 +16,7 @@ from tqdm.notebook import tqdm
 from pathlib import Path
 
 
-def setup(config, pts_all):
+def setup(config, session, pts_all):
     """
     initializes the arrays for optic flow analysis
 
@@ -33,9 +34,12 @@ def setup(config, pts_all):
     pts_spaced
     color_tuples
     """
-    numFrames_total_rough = config['numFrames_total_rough']
-    numVids = config['numVids']
-    spacing = config['spacing']
+    optic = config['Optic']
+    general = config['General']
+
+    numFrames_total_rough = session['frames_total']
+    numVids = session['num_vids']
+    spacing = optic['spacing']
 
     bbox_subframe_displacement = pts_all['bbox_subframe_displacement']
     pts_displacement = pts_all['pts_displacement']
@@ -80,51 +84,9 @@ def setup(config, pts_all):
     return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples , positions_recursive
 
 
-def visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len):
-    """
-    plots a checkup
-
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    new_frame ():
-    pointInds_tracked ():
-    pointInds_tracked_tuple ():
-    color_tuples ():
-    counters ():
-
-    Returns
-    -------
-
-    """
-    dot_size = config['dot_size']
-    vidNums_toUse = config['vidNums_toUse']
-    numFrames_total_rough = config['numFrames_total_rough']
-    remote = config['remote']
-
-    iter_frame, vidNum_iter, ind_concat, fps = counters
-
-    for ii in range(pointInds_tracked.shape[0]):
-        pointInds_tracked_tuple[ii] = tuple(np.int64(np.squeeze(pointInds_tracked[ii,0,:])))
-        cv2.circle(new_frame, pointInds_tracked_tuple[ii], dot_size, color_tuples[ii], -1)
-
-    cv2.putText(new_frame, f'frame #: {iter_frame}/{numFrames_rough}-ish', org=(10, 20), fontFace=1, fontScale=1,
-                color=(255, 255, 255), thickness=1)
-    cv2.putText(new_frame, f'vid #: {vidNum_iter + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
-                color=(255, 255, 255), thickness=1)
-    cv2.putText(new_frame, f'total frame #: {ind_concat + 1}/{numFrames_total_rough}-ish', org=(10, 60), fontFace=1,
-                fontScale=1, color=(255, 255, 255), thickness=1)
-    cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1, color=(255, 255, 255),
-                thickness=1)
-
-    if remote and iter_frame < test_len:
-        out.write(new_frame)
-    else:
-        cv2.imshow('test', new_frame)
-
 
 def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
-                             pts_spaced, color_tuples):
+                             pts_spaced, color_tuples, session):
     """
     the workhorse of the optic flow
     Opens each video in the list of videos
@@ -153,26 +115,30 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     tic_fps = time.time()
     tic_all = time.time()
 
-    vidNums_toUse = config['vidNums_toUse']
-    path_vid_allFiles = config['path_vid_allFiles']
-    numVids = config['numVids']
-    showVideo_pref = config['showVideo_pref']
-    fps_counterPeriod = config['fps_counterPeriod']
-    printFPS_pref = config['printFPS_pref']
+    optic = config['Optic']
+    video = config['Video']
 
-    remote = config['remote']
-    Fs = config['vid_Fs']
-    vid_width = config['vid_width']
-    vid_height = config['vid_height']
-    test_len = config['test_len']
-    save_pathFull = str(Path(config['path_project']) / 'optic_test.avi')
+    vidNums_toUse = optic['vidNums_toUse']
+    showVideo_pref = optic['showVideo_pref']
+    fps_counterPeriod = video['fps_counterPeriod']
+    printFPS_pref = video['printFPS_pref']
+    remote = config['General']['remote']
+    save_vid = video['save_demo']
 
-    lk_names = [key for key in config.keys() if 'lk_' in key]
-    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+    Fs = video['Fs']
+    vid_width = video['width']
+    vid_height = video['height']
+    test_len = video['demo_len']
+    save_pathFull = str(Path(config['Paths']['viz']) / 'optic_test.avi')
+
+    numVids = session['num_vids']
+    path_vid_allFiles = session['videos']
+    lk_names = [key for key in optic.keys() if 'lk_' in key]
+    lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
                  for k in lk_names}
 
     # Define the codec and create VideoWriter object
-    if showVideo_pref and remote:
+    if showVideo_pref and (save_vid or remote):
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         print(f'saving to file {save_pathFull}')
         out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
@@ -200,14 +166,14 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
             ##calculate optical flow
             pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
-                **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+                                                                    **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
             ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
             if iter_frame == 0:
                 displacements[:, :, ind_concat] = np.zeros((pts_spaced.shape[0], 2))
             else:
                 displacements[:, :, ind_concat] = np.single(np.squeeze((
-                    pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+                        pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
             old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
@@ -217,11 +183,14 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                         pointInds_new - pointInds_toUse)  # calculate integrated position
                 pointInds_tracked = pointInds_tracked - (
                         pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term. this is just for display purposes. Relaxation term chosen during cleanup will be real
+                pointInds = [pointInds_tracked, pointInds_tracked_tuple]
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len)
-                if remote and iter_frame == test_len:
+                if (remote and iter_frame < test_len) or not remote:
+                    videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
+
+                if (save_vid or remote) and iter_frame == test_len:
                     out.release()
-                
+
                 k = cv2.waitKey(1) & 0xff
                 if k == 27: break
 
@@ -248,9 +217,10 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
     return displacements, numFrames_total
 
+
+
 def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, positions_recursive,
-                             pts_spaced, color_tuples, relaxation_factor):
-    
+                            pts_spaced, color_tuples, relaxation_factor, session):
     """
     the workhorse of the optic flow
     Opens each video in the list of videos
@@ -279,22 +249,27 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     tic_fps = time.time()
     tic_all = time.time()
 
-    vidNums_toUse = config['vidNums_toUse']
-    path_vid_allFiles = config['path_vid_allFiles']
-    numVids = config['numVids']
-    showVideo_pref = config['showVideo_pref']
-    fps_counterPeriod = config['fps_counterPeriod']
-    printFPS_pref = config['printFPS_pref']
+    optic = config['Optic']
+    video = config['Video']
 
-    remote = config['remote']
-    Fs = config['vid_Fs']
-    vid_width = config['vid_width']
-    vid_height = config['vid_height']
-    test_len = config['test_len']
-    save_pathFull = str(Path(config['path_project']) / 'optic_test.avi')
+    vidNums_toUse = optic['vidNums_toUse']
+    showVideo_pref = optic['showVideo_pref']
+    fps_counterPeriod = video['fps_counterPeriod']
+    printFPS_pref = video['printFPS_pref']
+    remote = config['General']['remote']
+    save_vid = video['save_demo']
 
-    lk_names = [key for key in config.keys() if 'lk_' in key]
-    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+
+    Fs = video['Fs']
+    vid_width = video['width']
+    vid_height = video['height']
+    test_len = optic['test_len']
+    save_pathFull = str(Path(config['Paths']['project']) / 'optic_test.avi')
+
+    numVids = session['num_vids']
+    path_vid_allFiles = session['videos']
+    lk_names = [key for key in optic.keys() if 'lk_' in key]
+    lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
                  for k in lk_names}
 
     # Define the codec and create VideoWriter object
@@ -307,28 +282,29 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
     pointInds_old = pointInds_toUse
     for vidNum_iter in vidNums_toUse:
-        vid = imageio.get_reader(path_vid_allFiles[vidNum_iter],  'ffmpeg')
-    #     metadata = vid.get_meta_data()
-            
+        vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
+        #     metadata = vid.get_meta_data()
+
         path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
         video = cv2.VideoCapture(path_vid)  # open the video object with openCV
-        numFrames_rough = int(video.get(cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
+        numFrames_rough = int(video.get(
+            cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
 
         frameToSet = 0
-        frame = vid.get_data(0) # Get a single frame to use as the first 'previous frame' in calculating optic flow
-        new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  
+        frame = vid.get_data(0)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+        new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         old_frame = new_frame_gray
-        
-        
-        
+
         print(f'\n Calculating displacement field: video # {vidNum_iter+1}/{numVids}')
         for iter_frame , new_frame in enumerate(vid):
+
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
             ##calculate optical flow
-    #         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
-            pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, np.single(pointInds_old), None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
-
+            #         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+            pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, np.single(pointInds_old),
+                                                                    None,
+                                                                    **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
             # diff =  np.squeeze((pointInds_new - pointInds_old))  # this is the important variable. Simply the difference in the estimate
             
@@ -349,16 +325,19 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
             ## below is just for visualization. Nothing calculated is maintained
             if showVideo_pref:
+
+                pointInds = [pointInds_tracked, pointInds_tracked_tuple]
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                visualize_progress(config, new_frame, pointInds_tracked, pointInds_tracked_tuple, color_tuples, counters, numFrames_rough, out, test_len)
-                if remote and iter_frame == test_len:
+                if (remote and iter_frame < test_len) or not remote:
+                    videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
+
+                if (save_vid or remote) and iter_frame == test_len:
                     out.release()
-                
+
                 k = cv2.waitKey(1) & 0xff
                 if k == 27: break
 
             ind_concat = ind_concat + 1
-            
 
             if ind_concat % fps_counterPeriod == 0:
                 elapsed = time.time() - tic_fps
@@ -383,7 +362,8 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
     return displacements, numFrames_total , positions_recursive
 
-def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function needed for multiprocessing
+
+def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced, session):  # function needed for multiprocessing
     """
     computes optic flow for a single video within the multithread command
     similar to displacements monothread
@@ -401,11 +381,12 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
     -------
     displacements (): array of displacements
     """
+    optic = config['Optic']
 
-    numVids = config['numVids']
-    path_vid_allFiles = config['path_vid_allFiles']
-    lk_names = [key for key in config.keys() if 'lk_' in key]
-    lk_params = {k.split('lk_')[1]: (tuple(config[k]) if type(config[k]) is list else config[k]) \
+    numVids = session['num_vids']
+    path_vid_allFiles = session['videos']
+    lk_names = [key for key in optic.keys() if 'lk_' in key]
+    lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
                  for k in lk_names}
 
     vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
@@ -417,7 +398,8 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
         cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
 
     frameToSet = 0
-    frame = vid.get_data(frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+    frame = vid.get_data(
+        frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
     new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     old_frame = new_frame_gray
 
@@ -438,14 +420,15 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced):  # function
         if iter_frame == 0:
             displacements_tmp[:, :, iter_frame] = np.zeros((pts_spaced.shape[0], 2))
         else:
-            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((
+                    pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
         old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
     return displacements_tmp
 
 
-def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced):
+def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session):
     """
     wrapper for multithreaded optic flow computation
     operates on multiple videos at once
@@ -463,13 +446,13 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     numFrames_total (int): number of frames
     """
 
-    numVids = config['numVids']
+    numVids = session['num_vids']
     cv2.setNumThreads(0)
     freeze_support()
     tqdm.set_lock(RLock())
-    p = Pool(multiprocessing.cpu_count(),initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
+    p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
     displacements_list = p.map(
-        partial(analyze_video, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced),
+        partial(analyze_video, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced, session=session),
         list(np.arange(numVids)))
 
     ## all of the below called for safety.
@@ -480,16 +463,16 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     cv2.destroyAllWindows()
 
     for ii in range(len(displacements_list)):
-        #     displacements[:,:,ii] = test_disp[ii]
         if ii == 0:
             displacements = displacements_list[ii]
         else:
             displacements = np.concatenate((displacements, displacements_list[ii]), axis=2)
 
     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
-    numFrames_total = displacements.shape[2]
+    numFrames_total = displacements.shape[-1]
 
     return displacements, numFrames_total
+
 
 
 def optic_workflow(config_filepath):
@@ -509,36 +492,49 @@ def optic_workflow(config_filepath):
     tic_all = time.time()
 
     config = helpers.load_config(config_filepath)
-    pts_all = helpers.load_h5(config_filepath, 'path_pts_all')
+    optic = config['Optic']
+    general = config['General']
+    video = config['Video']
 
-    tic = time.time()
-    pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples , positions_recursive = setup(config,
-                                                                                                                 pts_all)
-    helpers.print_time('Optic Flow Set Up', time.time() - tic)
+    pts_all = helpers.load_h5(config_filepath, 'pts_all')
+    if optic['recursive'] and optic['multithread']:
+        raise NameError("Incompatible option combination:  If optic_recursive==True, optic_multithread MUST ==False \n\
+    The recursive calculation is done serially, so it is not possible to parallelize it.")
 
-    tic = time.time()
-    if config['optic_multithread']:
-        displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced)
-    elif config['optic_recursive']:
-        displacements, numFrames_total , positions_recursive = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
-                                                            pointInds_tracked_tuple, positions_recursive, pts_spaced, color_tuples, config['optic_recursive_relaxation_factor'])
-    else:
-        displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
-                                                                  pointInds_tracked_tuple, displacements, pts_spaced, color_tuples)
-    helpers.print_time('Displacements computed', time.time() - tic)
+    for session in general['sessions']:
+        tic_session = time.time()
+        tic = tic_session
+        pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples,positions_recursive = setup(config, session, pts_all)
+        helpers.print_time('Optic Flow Set Up', time.time() - tic)
 
-    tic = time.time()
-    config['numFrames_total'] = numFrames_total
-    helpers.save_config(config, config_filepath)
+        tic = time.time()
 
-    helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
-    helpers.create_nwb_group(config_filepath, 'Optic Flow')
-    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'displacements', displacements)
-    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_recursive', positions_recursive)
+        if optic['multithread']:
+            displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
+        elif optic['recursive']:
+            displacements, numFrames_total , positions_recursive = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
+                                                                     pointInds_tracked_tuple, positions_recursive, pts_spaced,
+                                                                     color_tuples,
+                                                                     optic['recursive_relaxation_factor'], session)
+        else:
+            displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
+                                                                      pointInds_tracked_tuple, displacements, pts_spaced,
+                                                                      color_tuples, session)
+
+
+        helpers.print_time('Displacements computed', time.time() - tic)
+        session['numFrames_total'] = numFrames_total
+        helpers.save_config(config, config_filepath)
+
+        helpers.create_nwb_group(session['nwb'], 'Optic Flow')
+        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'displacements', displacements,video['Fs'])
+        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_recursive', positions_recursive,video['Fs'])
+
+        helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
+        print(f'Total number of frames: {numFrames_total} frames')
+        print(f'Average frames per second: {round(numFrames_total / (time.time() - tic_session), 2)} fps')
+
     helpers.save_data(config_filepath, 'color_tuples', color_tuples)
-    helpers.print_time('Data Saved', time.time() - tic)
-
+    helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
     helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'Total number of frames: {numFrames_total} frames')
-    print(f'Average frames per second: {round(numFrames_total / (time.time() - tic_all), 2)} fps')
     print(f'== End Optic Flow Computation ==')
