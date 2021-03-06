@@ -41,10 +41,11 @@ def tca(config_filepath, positions):
     device = config['tca_device']
     rank = config['tca_rank']
     init = config['tca_init']
+    tol = config['tca_tolerance']
     verbosity = config['tca_verbosity']
     n_iters = config['tca_n_iters']
 
-    input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
+    # input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
     
     tl.set_backend('pytorch')
     
@@ -53,11 +54,11 @@ def tca(config_filepath, positions):
 
     print(f'Size of input (spectrogram): {input_tensor.shape}')
 
-    print(f'{round(sys.getsizeof(input_dimRed_meanSub)/1000000000,3)} GB')
+    # print(f'{round(sys.getsizeof(input_dimRed_meanSub)/1000000000,3)} GB')
     
     ### Fit TCA model
     ## If the input is small, set init='svd'
-    weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=1e-05, n_iter_max=n_iters, rank=rank, verbose=verbosity)
+    weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=tol, n_iter_max=n_iters, rank=rank, verbose=verbosity)
 
     ## make numpy version of tensorly output
 
@@ -395,7 +396,7 @@ def correlations(config_filepath, factors_np):
         
     return factors_xcorr
 
-def more_factors_videos(config_filepath, factors_toUse, positions_convDR_absolute, numFrames):
+def more_factors_videos(config_filepath, factors_toUse, positions_convDR_absolute, numFrames, dot_size):
     """
     creates videos of points colored by a variety of factors
 
@@ -424,13 +425,16 @@ def more_factors_videos(config_filepath, factors_toUse, positions_convDR_absolut
 
     for factor_iter in factors_toShow:
 
+        print(f'showing video: {factor_iter+1}')
+
         # vidNums_toUse = range(numVids) ## note zero indexing!
-        vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
+        # vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
+        vidNums_toUse = 0
 
         if type(vidNums_toUse) == int:
             vidNums_toUse = np.array([vidNums_toUse])
 
-        dot_size = 2
+        # dot_size = 2
 
         printFPS_pref = 0
         fps_counterPeriod = 10 ## number of frames to do a tic toc over
@@ -452,7 +456,7 @@ def more_factors_videos(config_filepath, factors_toUse, positions_convDR_absolut
         ensemble_toUse = factors_toUse
         positions_toUse = positions_convDR_absolute
 
-        factor_toShow = factor_toShow-1
+        factor_toShow = factor_iter
         # input_scores = ensemble_toUse.factors(modelRank_toUse)[0][0]
         input_scores = np.single(ensemble_toUse)
 
@@ -482,6 +486,8 @@ def more_factors_videos(config_filepath, factors_toUse, positions_convDR_absolut
         for iter_vid , vidNum_iter in enumerate(vidNums_toUse):
             path_vid = path_vid_allFiles[vidNum_iter]
             vid = imageio.get_reader(path_vid,  'ffmpeg')
+
+            print(f'showing vid#: {iter_vid}')
 
     #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
             # numFrames = 6000
@@ -634,7 +640,7 @@ def interpolate_temporal_factor(y_input , numFrames):
     return y_new
 
 
-def full_tca_workflow(config_filepath, data_key):
+def full_tca_workflow(config_filepath):
     """
     sequences the steps for tca of the spectral decomposition of the optic flow data
 
@@ -651,10 +657,13 @@ def full_tca_workflow(config_filepath, data_key):
     tic_all = time.time()
     config = helpers.load_config(config_filepath)
 
-    positions_convDR_absolute = helpers.load_nwb_ts(config_filepath,'Optic Flow', data_key)
+    # positions_convDR_absolute = helpers.load_nwb_ts(config_filepath,'Optic Flow', data_key)
     Sxx_allPixels_norm = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_norm')
-    Sxx_allPixels_normFactor = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_normFactor')
-    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+    # Sxx_allPixels_normFactor = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_normFactor')
+    # freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+
+    # print(f'{round(sys.getsizeof(Sxx_allPixels_norm)/1000000000,3)} GB')
+
 
     tic = time.time()
     factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])

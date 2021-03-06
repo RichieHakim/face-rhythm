@@ -305,6 +305,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     else:
         out = None
 
+    pointInds_old = pointInds_toUse
     for vidNum_iter in vidNums_toUse:
         vid = imageio.get_reader(path_vid_allFiles[vidNum_iter],  'ffmpeg')
     #     metadata = vid.get_meta_data()
@@ -321,7 +322,6 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
         
         
         print(f'\n Calculating displacement field: video # {vidNum_iter+1}/{numVids}')
-        pointInds_old = pointInds_toUse
         for iter_frame , new_frame in enumerate(vid):
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
@@ -339,7 +339,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
             pointInds_tracked = pointInds_new - (pointInds_new -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
 
             ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
-            if iter_frame ==0:
+            if ind_concat ==0:
                 positions_recursive[:,:,ind_concat] = np.zeros((pts_spaced.shape[0] ,2))
             else:
     #             displacements[:,:,ind_concat] =  np.single(np.squeeze((pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
@@ -539,5 +539,6 @@ def optic_workflow(config_filepath):
     helpers.print_time('Data Saved', time.time() - tic)
 
     helpers.print_time('total elapsed time', time.time() - tic_all)
+    print(f'Total number of frames: {numFrames_total} frames')
     print(f'Average frames per second: {round(numFrames_total / (time.time() - tic_all), 2)} fps')
     print(f'== End Optic Flow Computation ==')
