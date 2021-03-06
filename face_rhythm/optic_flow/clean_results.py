@@ -28,14 +28,12 @@ def clean_workflow(config_filepath):
     framesHalted_beforeOutlier = config['framesHalted_beforeOutlier']
     framesHalted_afterOutlier = config['framesHalted_afterOutlier']
     relaxation_factor = config['relaxation_factor']
-    pixelNum_toUse = config['pixelNum_toUse']
+    pixelNum_toPlot = config['pixelNum_toPlot']
     
-    displacements = helpers.load_data(config_filepath, 'path_displacements')
+    displacements = helpers.load_nwb_ts(config_filepath, 'Optic Flow', 'displacements')
     pointInds_toUse = helpers.load_data(config_filepath, 'path_pointInds_toUse')
 
     
-    # This is the speed at which the integrated position exponentially relaxes back to its anchored position
-
     ## Remove flagrant outliers from displacements
     tic = time.time()
     displacements_simpleOutliersRemoved = displacements * (np.abs(displacements) < outlier_threshold_displacements)
@@ -88,12 +86,14 @@ def clean_workflow(config_filepath):
     helpers.print_time('Final absolute position trace', time.time() - tic)
 
     plt.figure()
-    plt.plot(positions_new_sansOutliers[pixelNum_toUse, 0, :])
+    plt.plot(positions_new_sansOutliers[pixelNum_toPlot, 0, :])
     plt.show()
 
     tic = time.time()
-    helpers.save_data(config_filepath, 'positions', positions_new_sansOutliers)
-    helpers.save_data(config_filepath, 'positions_absolute', positions_new_absolute_sansOutliers)
+    #helpers.save_data(config_filepath, 'positions', positions_new_sansOutliers)
+    #helpers.save_data(config_filepath, 'positions_absolute', positions_new_absolute_sansOutliers)
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions', positions_new_sansOutliers)
+    helpers.create_nwb_ts(config_filepath, 'Optic Flow', 'positions_absolute', positions_new_absolute_sansOutliers)
 
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End outlier removal ==')

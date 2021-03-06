@@ -5,11 +5,19 @@ import sys
 import numpy as np
 import os
 import os.path
+import h5py
 
 from pathlib import Path
 
+from datetime import datetime
+from dateutil.tz import tzlocal
+from pynwb import NWBFile, NWBHDF5IO
+from hdmf.backends.hdf5.h5_utils import H5DataIO
+import pynwb
+from pynwb.behavior import BehavioralTimeSeries
 
-def setup_project(project_path, video_path, session_name, overwrite_config):
+
+def setup_project(project_path, video_path, session_name, overwrite_config, remote):
     """
     Creates the project folder and data folder (if they don't exist)
     Creates the config file (if it doesn't exist or overwrite requested)
@@ -30,7 +38,7 @@ def setup_project(project_path, video_path, session_name, overwrite_config):
     video_path.mkdir(parents=True, exist_ok=True)
     config_filepath = project_path / 'configs' / f'config_{session_name}.yaml'
     if not config_filepath.exists() or overwrite_config:
-        generate_config(config_filepath, project_path, video_path)
+        generate_config(config_filepath, project_path, video_path, remote)
 
     version_check(config_filepath)
     return config_filepath
@@ -40,7 +48,6 @@ def version_check(config_filepath):
     """
     Checks the versions of various important softwares.
     Prints those versions
-    OS versioning check obsolete, to remove
     
     Parameters
     ----------
@@ -59,24 +66,6 @@ def version_check(config_filepath):
     ### find version of pytorch
     print(f'Pytorch version: {torch.__version__}')
 
-    ## prep stuff
-    ## find slash type of operating system
-
-    if sys.platform == 'linux':
-        slash_type = '/'
-        print('Autodetected operating system: Linux. Using "/" for directory slashes')
-    elif sys.platform == 'win32':
-        slash_type = '\\'
-        print(f'Autodetected operating system: Windows. Using "{slash_type}{slash_type}" for directory slashes')
-    elif sys.platform == 'darwin':
-        slash_type = '/'
-        print(
-            "What computer are you running this on? I haven't tested it on OSX or anything except windows and ubuntu.")
-        print('Autodetected operating system: OSX. Using "/" for directory slashes')
-
-    config = load_config(config_filepath)
-    config['slash_type'] = slash_type
-    save_config(config, config_filepath)
 
 
 def load_config(config_filepath):
@@ -114,7 +103,7 @@ def save_config(config, config_filepath):
         yaml.safe_dump(config, f)
 
 
-def generate_config(config_filepath, project_path, video_path):
+def generate_config(config_filepath, project_path, video_path, remote):
     """
     Generates bare config file with just basic info
     
@@ -132,7 +121,8 @@ def generate_config(config_filepath, project_path, video_path):
                     'dir_vid': str(video_path),
                     'path_data': str(project_path / 'data'),
                     'path_viz': str(project_path / 'viz'),
-                    'path_config': str(config_filepath)}
+                    'path_config': str(config_filepath),
+                    'remote': remote}
 
     with open(str(config_filepath), 'w') as f:
         yaml.safe_dump(basic_config, f)
@@ -155,34 +145,17 @@ def import_videos(config_filepath):
     """
 
     config = load_config(config_filepath)
-    multiple_files_pref = config['multiple_files_pref']
-    dir_vid = config['dir_vid']
+    dir_vid = Path(config['dir_vid'])
     fileName_vid_prefix = config['fileName_vid_prefix']
-    fileName_vid = config['fileName_vid']
-    slash_type = config['slash_type']
 
-    if multiple_files_pref:
-        ## first find all the files in the directory with the file name prefix
-        fileNames_allInPathWithPrefix = []
-        for ii in os.listdir(dir_vid):
-            if os.path.isfile(os.path.join(dir_vid, ii)) and fileName_vid_prefix in ii:
-                fileNames_allInPathWithPrefix.append(ii)
-        numVids = len(fileNames_allInPathWithPrefix)
-
-        ## make a variable containing all of the file paths
-        path_vid_allFiles = list()
-        for ii in range(numVids):
-            path_vid_allFiles.append(f'{dir_vid}{slash_type}{fileNames_allInPathWithPrefix[ii]}')
-
-    else:  ## Single file import
-        path_vid = f'{dir_vid}{slash_type}{fileName_vid}'
-        path_vid_allFiles = list()
-        path_vid_allFiles.append(path_vid)
-        numVids = 1
-
-    config['numVids'] = numVids
+    path_vid_allFiles = []
+    for path in dir_vid.iterdir():
+        if path.is_file() and fileName_vid_prefix in str(path):
+            path_vid_allFiles.append(str(path))
+    numVids = len(path_vid_allFiles)
     path_vid_allFiles = sorted(path_vid_allFiles)
 
+    config['numVids'] = numVids
     config['path_vid_allFiles'] = path_vid_allFiles
 
     save_config(config, config_filepath)
@@ -202,31 +175,22 @@ def get_video_data(config_filepath):
     """
 
     config = load_config(config_filepath)
-    multiple_files_pref = config['multiple_files_pref']
     path_vid_allFiles = config['path_vid_allFiles']
     numVids  = config['numVids']
     print_fileNames_pref = config['print_fileNames_pref']
 
-    if multiple_files_pref:
-        path_vid = path_vid_allFiles[0]
-        video = cv2.VideoCapture(path_vid_allFiles[0])
-        numFrames_firstVid = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+    video = cv2.VideoCapture(path_vid_allFiles[0])
+    numFrames_firstVid = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        numFrames_allFiles = np.ones(numVids) * np.nan  # preallocation
-        for ii in range(numVids):
-            video = cv2.VideoCapture(path_vid_allFiles[ii])
-            numFrames_allFiles[ii] = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-        numFrames_total_rough = np.uint64(sum(numFrames_allFiles))
-        numFrames_allFiles = numFrames_allFiles.tolist()
-        print(f'number of videos: {numVids}')
-        print(f'number of frames in FIRST video (roughly):  {numFrames_firstVid}')
-        print(f'number of frames in ALL videos (roughly):   {numFrames_total_rough}')
-    else:
-        video = cv2.VideoCapture(path_vid_allFiles[0])
-        numFrames_onlyVid = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-        numFrames_total_rough = numFrames_onlyVid
-        numFrames_allFiles = numFrames_total_rough
-        print(f'number of frames in ONLY video:   {numFrames_onlyVid}')
+    numFrames_allFiles = np.ones(numVids) * np.nan  # preallocation
+    for ii in range(numVids):
+        video = cv2.VideoCapture(path_vid_allFiles[ii])
+        numFrames_allFiles[ii] = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+    numFrames_total_rough = np.uint64(sum(numFrames_allFiles))
+    numFrames_allFiles = numFrames_allFiles.tolist()
+    print(f'number of videos: {numVids}')
+    print(f'number of frames in FIRST video (roughly):  {numFrames_firstVid}')
+    print(f'number of frames in ALL videos (roughly):   {numFrames_total_rough}')
 
     Fs = video.get(cv2.CAP_PROP_FPS)  ## Sampling rate (FPS). Manually change here if necessary
     print(f'Sampling rate pulled from video file metadata:   {round(Fs, 3)} frames per second')
@@ -247,6 +211,118 @@ def get_video_data(config_filepath):
 
     save_config(config, config_filepath)
 
+
+def create_nwb(config_filepath):
+    """
+    Create the nwb for one video. This file will be used for all future data storage
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+
+    Returns
+    -------
+
+    """
+    config = load_config(config_filepath)
+    session_name = config['fileName_vid_prefix']
+    data_dir = Path(config['path_data'])
+    out_file = data_dir / (session_name + '.nwb')
+
+    nwbfile = NWBFile(session_description=f'face rhythm data',
+                      identifier=f'{session_name}',
+                      session_start_time=datetime.now(tzlocal()),
+                      file_create_date=datetime.now(tzlocal()))
+
+    nwbfile.create_processing_module(name='Face Rhythm',
+                                     description='all face rhythm related data')
+
+    with NWBHDF5IO(str(out_file), 'w') as io:
+        io.write(nwbfile)
+
+    config['path_nwb'] = str(out_file)
+    save_config(config, config_filepath)
+
+
+def create_nwb_group(config_filepath, group_name):
+    """
+    Create an NWB BehavioralTimeSeries for grouping data
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    group_name (str): name of group to be created
+
+    Returns
+    -------
+
+    """
+    config = load_config(config_filepath)
+    nwb_path = config['path_nwb']
+    with NWBHDF5IO(nwb_path,'a') as io:
+        nwbfile = io.read()
+        if group_name in nwbfile.processing['Face Rhythm'].data_interfaces.keys():
+            return
+        new_group = BehavioralTimeSeries(name=group_name)
+        nwbfile.processing['Face Rhythm'].add(new_group)
+        io.write(nwbfile)
+
+
+def create_nwb_ts(config_filepath, group_name, ts_name, data):
+    """
+    Create a new TimeSeries for data to write
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    group_name (str): name of group to write to
+    ts_name (str): name of new ts
+    data (np.array): data to be written
+
+    Returns
+    -------
+
+    """
+    config = load_config(config_filepath)
+    nwb_path = config['path_nwb']
+    Fs = config['vid_Fs']
+    print(f'Saving {ts_name} in Group {group_name}')
+    with NWBHDF5IO(nwb_path, 'a') as io:
+        nwbfile = io.read()
+        maxshape = tuple(None for dim in data.shape)
+        new_ts = pynwb.TimeSeries(name=ts_name,
+                                  data=H5DataIO(np.moveaxis(data,-1,0), maxshape=maxshape),
+                                  unit='mm',
+                                  rate=Fs)
+        if ts_name not in nwbfile.processing['Face Rhythm'][group_name].time_series:
+            nwbfile.processing['Face Rhythm'][group_name].add_timeseries(new_ts)
+        else:
+            ts = nwbfile.processing['Face Rhythm'][group_name].get_timeseries(ts_name)
+            ts.data.resize(new_ts.data.shape)
+            ts.data[()] = new_ts.data
+        io.write(nwbfile)
+
+
+def load_nwb_ts(config_filepath, group_name, ts_name):
+    """
+    Create a new TimeSeries for data to write
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    group_name (str): name of group to write to
+    ts_name (str): name of ts
+
+    Returns
+    -------
+
+    """
+
+    config = load_config(config_filepath)
+    nwb_path = config['path_nwb']
+    with NWBHDF5IO(nwb_path, 'a') as io:
+        nwbfile = io.read()
+        return np.moveaxis(nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()],0,-1)
 
 def save_data(config_filepath, save_name, data_to_save):
     """
@@ -269,6 +345,49 @@ def save_data(config_filepath, save_name, data_to_save):
     np.save(save_path, data_to_save, allow_pickle=True)
     config[f'path_{save_name}'] = str(save_path)
     save_config(config, config_filepath)
+
+
+def save_h5(config_filepath, save_name, data_dict):
+    """
+    save an h5 file from a data dictionary
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    save_name (str): name of the object to be saved
+    data_dict (dict): dict of numpy arrays
+
+    Returns
+    -------
+
+    """
+    config = load_config(config_filepath)
+    save_dir = Path(config['path_data'])
+    save_path = save_dir / f'{save_name}.h5'
+    to_write = h5py.File(save_path, 'w')
+    dict_to_h5(data_dict, to_write)
+    to_write.close()
+    config[f'path_{save_name}'] = str(save_path)
+    save_config(config, config_filepath)
+
+
+def load_h5(config_filepath, data_key):
+    """
+    load an h5 file into a data dictionary
+    proceed with caution given that this loads the entire h5 file into mem
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    save_name (str): name of the object to be saved
+    data_dict (dict): dict of numpy arrays
+
+    Returns
+    -------
+
+    """
+    config = load_config(config_filepath)
+    return h5_to_dict(config[data_key])
 
 
 def load_data(config_filepath, data_key):
@@ -317,3 +436,65 @@ def print_time(action, time):
         unit = 'seconds'
     reported_time = round(reported_time, 2)
     print(f'{action}. Elapsed time: {reported_time} {unit}')
+
+
+def h5_to_dict(h5file, path='/'):
+    '''
+    Reads all contents from h5 and returns them in a nested dict object.
+
+    Parameters
+    ----------
+    h5file (str): path to h5 file
+    path (str): path to group within h5 file
+
+    Returns
+    -------
+    ans (dict): dictionary of all h5 group contents
+    '''
+
+    ans = {}
+
+    if type(h5file) is str:
+        with h5py.File(h5file, 'r') as f:
+            ans = h5_to_dict(f, path)
+            return ans
+
+    for key, item in h5file[path].items():
+        if isinstance(item, h5py._hl.dataset.Dataset):
+            ans[key] = item[()]
+        elif isinstance(item, h5py._hl.group.Group):
+            ans[key] = h5_to_dict(h5file, path + key + '/')
+    return ans
+
+
+def dict_to_h5(data_dict, h5):
+    '''
+    Quick and dirty dict dumper to h5
+
+    Parameters
+    ----------
+    data_dict (dict): dictionary (potentially nested) of data!
+    h5 (h5py.File): h5 File (or Group) to populate
+
+    Returns
+    -------
+    '''
+
+    for key, item in data_dict.items():
+        if isinstance(item, dict):
+            group = h5.create_group(key)
+            dict_to_h5(item, group)
+        else:
+            h5.create_dataset(key, data=item)
+
+def dump_nwb(config_filepath):
+    config = load_config(config_filepath)
+    nwb_path = config['path_nwb']
+    io = pynwb.NWBHDF5IO(nwb_path, 'r')
+    nwbfile = io.read()
+    for interface in nwbfile.processing['Face Rhythm'].data_interfaces:
+        print(interface)
+        time_series_list = list(nwbfile.processing['Face Rhythm'][interface].time_series.keys())
+        for ii, time_series in enumerate(time_series_list):
+            print(f"     {time_series}:    {nwbfile.processing['Face Rhythm'][interface][time_series].data.shape}   ,  {nwbfile.processing['Face Rhythm'][interface][time_series].data.dtype}")
+

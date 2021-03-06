@@ -9,12 +9,14 @@ import numpy as np
 
 import scipy
 import scipy.signal
+import scipy.interpolate
 import tensorly as tl
 import tensorly.decomposition
 import sklearn.decomposition
 import sklearn.manifold
 
 from tqdm.notebook import tqdm
+from pynwb import NWBHDF5IO
 
 from face_rhythm.util import helpers
 
@@ -39,10 +41,11 @@ def tca(config_filepath, positions):
     device = config['tca_device']
     rank = config['tca_rank']
     init = config['tca_init']
+    tol = config['tca_tolerance']
     verbosity = config['tca_verbosity']
     n_iters = config['tca_n_iters']
 
-    input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
+    # input_dimRed_meanSub = helpers.load_data(config_filepath,'path_input_dimRed_meanSub')
     
     tl.set_backend('pytorch')
     
@@ -51,11 +54,11 @@ def tca(config_filepath, positions):
 
     print(f'Size of input (spectrogram): {input_tensor.shape}')
 
-    print(f'{round(sys.getsizeof(input_dimRed_meanSub)/1000000000,3)} GB')
+    # print(f'{round(sys.getsizeof(input_dimRed_meanSub)/1000000000,3)} GB')
     
     ### Fit TCA model
     ## If the input is small, set init='svd'
-    weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=1e-05, n_iter_max=n_iters, rank=rank, verbose=verbosity)
+    weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=tol, n_iter_max=n_iters, rank=rank, verbose=verbosity)
 
     ## make numpy version of tensorly output
 
@@ -160,6 +163,7 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
     numFrames_allFiles = config['numFrames_allFiles']
     path_vid_allFiles = config['path_vid_allFiles']
     numFrames = config['tca_display_frames']
+    remote = config['remote']
 
     # Display video of factors
 
@@ -211,8 +215,8 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
             colormap_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) *255)[:3]))
 
         # Define the codec and create VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         if save_pref:
+            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
             print(f'saving to file {save_pathFull}')
             out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
 
@@ -249,7 +253,8 @@ def factor_videos(config_filepath, factors_np, positions_convDR_absolute):
                 cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.imshow('test',new_frame)
+                if not remote:
+                    cv2.imshow('test',new_frame)
 
 
                 k = cv2.waitKey(1) & 0xff
@@ -391,7 +396,7 @@ def correlations(config_filepath, factors_np):
         
     return factors_xcorr
 
-def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
+def more_factors_videos(config_filepath, factors_toUse, positions_convDR_absolute, numFrames, dot_size):
     """
     creates videos of points colored by a variety of factors
 
@@ -412,20 +417,24 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     vid_height = config['vid_height']
     numFrames_allFiles = config['numFrames_allFiles']
     path_vid_allFiles = config['path_vid_allFiles']
+    remote = config['remote']
 
     # Display video of factors
-    factors_toShow = np.arange(factors_np[0].shape[1])  # zero-indexed
+    factors_toShow = np.arange(factors_toUse.shape[1])  # zero-indexed
     # factors_toShow = [3]  # zero-indexed
 
     for factor_iter in factors_toShow:
 
+        print(f'showing video: {factor_iter+1}')
+
         # vidNums_toUse = range(numVids) ## note zero indexing!
-        vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
+        # vidNums_toUse = config['vidNums_toUse'] ## note zero indexing!
+        vidNums_toUse = 0
 
         if type(vidNums_toUse) == int:
             vidNums_toUse = np.array([vidNums_toUse])
 
-        dot_size = 2
+        # dot_size = 2
 
         printFPS_pref = 0
         fps_counterPeriod = 10 ## number of frames to do a tic toc over
@@ -444,12 +453,12 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
         helpers.save_config(config, config_filepath)
 
         # ensemble_toUse = ensemble
-        ensemble_toUse = factors_np
+        ensemble_toUse = factors_toUse
         positions_toUse = positions_convDR_absolute
 
-        factor_toShow = factor_toShow-1
+        factor_toShow = factor_iter
         # input_scores = ensemble_toUse.factors(modelRank_toUse)[0][0]
-        input_scores = np.single(ensemble_toUse[0])
+        input_scores = np.single(ensemble_toUse)
 
         range_toUse = np.ceil(np.max(input_scores[:,factor_toShow]) - np.min(input_scores[:,factor_toShow])) + 1
         offset_toUse = np.min(input_scores[:,factor_toShow])
@@ -478,8 +487,10 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
             path_vid = path_vid_allFiles[vidNum_iter]
             vid = imageio.get_reader(path_vid,  'ffmpeg')
 
+            print(f'showing vid#: {iter_vid}')
+
     #         numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-            numFrames = 600
+            # numFrames = 6000
 
     #         frameToSet = 0
     #         video.set(1,frameToSet)
@@ -504,7 +515,8 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
                 cv2.putText(new_frame, f'total frame #: {ind_concat+1}/{positions_toUse.shape[2]}', org=(10,60), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'fps: {np.uint32(fps)}', org=(10,80), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
                 cv2.putText(new_frame, f'factor num: {factor_iter+1} / {np.max(factors_toShow)+1}', org=(10,100), fontFace=1, fontScale=1, color=(255,255,255), thickness=1)
-                cv2.imshow('test',new_frame)
+                if not remote:
+                    cv2.imshow('test',new_frame)
 
 
                 k = cv2.waitKey(1) & 0xff
@@ -526,34 +538,49 @@ def more_factors_videos(config_filepath, factors_np, positions_convDR_absolute):
     cv2.destroyAllWindows()
 
 
-def factor_tsne(factors):
-    """
-    creates and plots tsne of the factors
+# def factor_tsne(factors):
+#     """
+#     creates and plots tsne of the factors
 
-    Parameters
-    ----------
-    factors ():
+#     Parameters
+#     ----------
+#     factors ():
 
-    Returns
-    -------
+#     Returns
+#     -------
 
-    """
+#     """
 
-    print("Computing t-SNE embedding")
-    tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
-                         random_state=0, perplexity=200)
-    X_tsne = tsne.fit_transform(factors)
-    print("Finished computing t-SNE embedding")
+#     print("Computing t-SNE embedding")
+#     tsne = sklearn.manifold.TSNE(n_components=2, init='pca',
+#                          random_state=0, perplexity=200)
+#     X_tsne = tsne.fit_transform(factors)
+#     print("Finished computing t-SNE embedding")
 
-    factor_toCMap = 8  # 1 indexed
+#     factor_toCMap = 8  # 1 indexed
 
-    plt.figure(figsize=(5, 5))
-    # plt.plot(X_tsne[:,0] , X_tsne[:,1] , linewidth=0.05)
-    # plt.scatter(X_tsne[:,0] , X_tsne[:,1], 'r.' , markersize=0.6)
-    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
+#     plt.figure(figsize=(5, 5))
+#     # plt.plot(X_tsne[:,0] , X_tsne[:,1] , linewidth=0.05)
+#     # plt.scatter(X_tsne[:,0] , X_tsne[:,1], 'r.' , markersize=0.6)
+#     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], s=1.5, c=factors[:, factor_toCMap - 1], cmap='jet')
 
 
-def positional_tca_workflow(config_filepath):
+def save_factors(config_filepath, factors_all, factors_temporal_interp, ftype):
+    for i, factor in enumerate(factors_all):
+        helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_dim{i}', factor)
+    helpers.create_nwb_ts(config_filepath, 'TCA', f'factors_{ftype}_temporal_interp', factors_temporal_interp)
+
+
+def load_factors(config_filepath, stem):
+    config = helpers.load_config(config_filepath)
+    path_nwb = config['path_nwb']
+    with NWBHDF5IO(path_nwb, 'r') as io:
+        nwbfile = io.read()
+        tca_data = nwbfile.processing['Face Rhythm']['TCA']
+        return [tca_data[ts].data[()] for ts in tca_data.time_series if stem in ts]
+
+
+def positional_tca_workflow(config_filepath, key_meansub, key_absolute):
     """
     sequences the steps for tca of the positions of the optic flow data
 
@@ -569,9 +596,9 @@ def positional_tca_workflow(config_filepath):
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
     config = helpers.load_config(config_filepath)
-    
-    positions_convDR_meanSub = helpers.load_data(config_filepath, 'path_positions_convDR_meanSub')
-    positions_convDR_absolute = helpers.load_data(config_filepath, 'path_positions_convDR_absolute')
+
+    positions_convDR_meanSub = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_meansub)
+    positions_convDR_absolute = helpers.load_nwb_ts(config_filepath, 'Optic Flow', key_absolute)
     
     factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
 
@@ -579,13 +606,41 @@ def positional_tca_workflow(config_filepath):
     if config['tca_vid_display']:
         factor_videos(config_filepath, factors_np_positional, positions_convDR_absolute)
 
-    helpers.save_data(config_filepath, 'factors_np_positional', factors_np_positional)
+    helpers.create_nwb_group(config_filepath, 'TCA')
+    save_factors(config_filepath, factors_np_positional, 'positional')
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
 
+def interpolate_temporal_factor(y_input , numFrames):
+    """
+    Interpolates the temporal component from the frequential TCA step from CQT time steps into
+    camera time steps. This allows for a 1 to 1 sync of the temporal component with the camera frames.
+    This step assumes non-negativity and rectifies the output to be >0.
 
-def full_tca_workflow(config_filepath, data_key):
+    Parameters
+    ----------
+    y_input: This should be the temporal factor matrix [N,M] where N: factors, M: time steps
+    numFrames: This should be the number of frames from the original camera time series
+    ----------
+
+    Returns
+    ----------
+    y_new: This will be the interpolated y_input
+    ----------
+    """
+
+    x_old = np.linspace(0 , y_input.shape[0] , num=y_input.shape[0] , endpoint=True)
+    x_new = np.linspace(0 , y_input.shape[0] , num=numFrames, endpoint=True)
+
+    f_interp = scipy.interpolate.interp1d(x_old, y_input, kind='cubic',axis=0)
+    y_new = f_interp(x_new)
+    y_new[y_new <=0] = 0 # assumes non-negativity
+
+    return y_new
+
+
+def full_tca_workflow(config_filepath):
     """
     sequences the steps for tca of the spectral decomposition of the optic flow data
 
@@ -601,27 +656,35 @@ def full_tca_workflow(config_filepath, data_key):
     print(f'== Beginning Full TCA Workflow ==')
     tic_all = time.time()
     config = helpers.load_config(config_filepath)
-    
-    Sxx_allPixels_norm = helpers.load_data(config_filepath, 'path_Sxx_allPixels_norm')
-    positions_convDR_absolute = helpers.load_data(config_filepath, data_key)
-    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
-    Sxx_allPixels_normFactor = helpers.load_data(config_filepath, 'path_Sxx_allPixels_normFactor')
+
+    # positions_convDR_absolute = helpers.load_nwb_ts(config_filepath,'Optic Flow', data_key)
+    Sxx_allPixels_norm = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_norm')
+    # Sxx_allPixels_normFactor = helpers.load_nwb_ts(config_filepath, 'CQT','Sxx_allPixels_normFactor')
+    # freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
+
+    # print(f'{round(sys.getsizeof(Sxx_allPixels_norm)/1000000000,3)} GB')
+
 
     tic = time.time()
     factors_np = tca(config_filepath, Sxx_allPixels_norm[:,:,:,:])
     helpers.print_time('Decomposition completed', time.time() - tic)
 
-    factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
-    factors_xcorr = correlations(config_filepath, factors_np)
+    # factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+    # factors_xcorr = correlations(config_filepath, factors_np)
 
-    if config['tca_vid_display']:
-        more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
+    # if config['tca_vid_display']:
+    #     more_factors_videos(config_filepath, factors_np, positions_convDR_absolute)
 
-    factor_tsne(factors_temporal)
+    # factor_tsne(factors_temporal)
 
-    helpers.save_data(config_filepath, 'factors_np', factors_np)
-    helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
-    helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
+    factors_temporal_interp = interpolate_temporal_factor(factors_np[2] , config['numFrames_total'])
+
+    helpers.create_nwb_group(config_filepath, 'TCA')
+    save_factors(config_filepath, factors_np, factors_temporal_interp, 'frequential')
+    # helpers.save_data(config_filepath, 'factors_np', factors_np)
+    # helpers.save_data(config_filepath, 'factors_xcorr', factors_xcorr)
+    # helpers.save_data(config_filepath, 'factors_temporal', factors_temporal)
+
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Full TCA ==')

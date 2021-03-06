@@ -12,7 +12,9 @@ Project Organization
     │
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
     │
-    ├── notebooks          <- Jupyter notebooks. 
+    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
+    │                         the creator's initials, and a short `-` delimited description, e.g.
+    │                         `1.0-jqp-initial-data-exploration`.
     │
     │
     ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
@@ -52,10 +54,6 @@ conda activate face-rhythm
 cd face-rhythm
 pip install -e . 
 ```
-Unix users may encounter some problems with using librosa during the spectrogram generation step. If so, try running: 
-```
-conda install -c conda-forge librosa
-```
 4. Install the correct version of cuda toolkit (if you plan on using a gpu). [This link](https://anaconda.org/anaconda/cudatoolkit) and [this link](https://pytorch.org/get-started/locally/) are useful for figuring that out
 ```
 conda install cudatoolkit=10.2
@@ -64,8 +62,7 @@ conda install cudatoolkit=10.2
 ```
 cd ..
 mkdir face_rhythm_runs
-mkdir face_rhythm_runs/run_00
-cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/run_00/
+cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/
 ```
 
 6. Get started! The plots display better using Jupyter Notebook
