@@ -6,3 +6,4 @@ docs/_build
 **.ipynb_checkpoint**
 *.egg-info/*
 **-checkpoint.ipynb
+.vscode
