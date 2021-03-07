@@ -24,14 +24,14 @@ FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
                 'frequential': ['points','frequential','temporal','cartesian']}
 
 
-def tca(config_filepath, positions):
+def tca(config_filepath, input_array):
     """
     computes the tca of the provided dataframe
 
     Parameters
     ----------
     config_filepath (Path): path to the config file
-    positions ():
+    input_array ():
 
     Returns
     -------
@@ -48,17 +48,21 @@ def tca(config_filepath, positions):
     tol = tca['tolerance']
     verbosity = tca['verbosity']
     n_iters = tca['n_iters']
-
-    input_dimRed_meanSub = helpers.load_data(config_filepath,'input_dimRed_meanSub')
+    pref_concat_cartesian_dim = tca['pref_concat_cartesian_dim']
     
     tl.set_backend('pytorch')
     
     ## Prepare the input tensor
-    input_tensor = tl.tensor(positions, dtype=tl.float32, device=device, requires_grad=False)
+    if pref_concat_cartesian_dim:
+        if config['General']['trials']:
+            input_tensor = tl.tensor(np.concatenate((input_array[...,0] , input_array[...,1]) , axis=1), dtype=tl.float32, device=device, requires_grad=False)
+        else:
+            input_tensor = tl.tensor(np.concatenate((input_array[...,0] , input_array[...,1]) , axis=0), dtype=tl.float32, device=device, requires_grad=False)
+    else:
+        input_tensor = tl.tensor(input_array, dtype=tl.float32, device=device, requires_grad=False)
 
     print(f'Size of input (spectrogram): {input_tensor.shape}')
 
-    # print(f'{round(sys.getsizeof(input_dimRed_meanSub)/1000000000,3)} GB')
     
     ### Fit TCA model
     ## If the input is small, set init='svd'
@@ -172,6 +176,11 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
 
     config = helpers.load_config(config_filepath)
     Fs = config['Video']['Fs']
+    # This bit is just to offset the indexing due to the loss of the last dimension in the case of concatenating the cartesian dimension
+    if config['TCA']['pref_concat_cartesian_dim']:
+        ind_offset = 1
+    else:
+        ind_offset = 0
 
     factors_toUse = factors_np
     modelRank = factors_toUse[0].shape[1]
@@ -179,7 +188,7 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     plt.figure()
     # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
     # factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
-    factors_temporal = factors_toUse[-2][:,:]
+    factors_temporal = factors_toUse[-2+ind_offset][:,:]
     # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
     # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
     plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,])
@@ -188,20 +197,8 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     plt.xlabel('time (s)')
     plt.ylabel('a.u.')
 
-    # plt.figure()
-    # # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
-    # # factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
-    # factors_temporal = factors_toUse[-2][:,:] * (np.mean(Sxx_allPixels_normFactor , axis=1)[:,None] **(2/5))
-    # # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
-    # # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
-    # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
-    # # plt.plot(factors_temporal[:,:])
-    # plt.legend(np.arange(modelRank)+1)
-    # plt.xlabel('time (s)')
-    # plt.ylabel('a.u.')
-
     plt.figure()
-    plt.plot(freqs_Sxx , (factors_toUse[-3][:,:]))
+    plt.plot(freqs_Sxx , (factors_toUse[-3+ind_offset][:,:]))
     # plt.plot(freqXaxis , (factors_toUse[1][:,:]))
     # plt.plot(f , (factors_toUse[1][:,:]))
     # plt.plot((factors_toUse[1][:,:]))
@@ -212,67 +209,19 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
     # plt.xscale('log')
 
     plt.figure()
-    plt.plot(factors_toUse[-1][:,:])
+    plt.plot(factors_toUse[-1+ind_offset][:,:])
     plt.legend(np.arange(modelRank)+1)
     plt.xlabel('x vs. y')
     plt.ylabel('a.u.')
 
     plt.figure()
-    plt.plot(factors_toUse[-4][:,:])
+    plt.plot(factors_toUse[-4+ind_offset][:,:])
     plt.legend(np.arange(modelRank)+1)
     plt.xlabel('pixel number')
     plt.ylabel('a.u.')
 
-
-    #plt.figure()
-    #plt.imshow(np.single(np.corrcoef(factors_toUse[2][:,:].T)))
-
-    # input_dimRed = factors_toUse[2][:,:]
-    # # input_dimRed_meanSub =
-    # pca = sklearn.decomposition.PCA(n_components=modelRank-2)
-    # # pca = sk.decomposition.FactorAnalysis(n_components=3)
-    # pca.fit(np.single(input_dimRed).transpose())
-    # output_PCA = pca.components_.transpose()
-    # # scores_points = np.dot(ensemble.factors(4)[0][2] , output_PCA)
-    #
-    # plt.figure()
-    # plt.plot(output_PCA[:,5])
-
     config['modelRank'] = modelRank
     helpers.save_config(config, config_filepath)
-
-    return factors_temporal
-    
-    
-def correlations(config_filepath, factors_np):
-    """
-    finds correlations between the factors
-
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    factors_np ():
-
-    Returns
-    -------
-
-    """
-
-    config = helpers.load_config(config_filepath)
-    modelRank = config['modelRank']
-
-    input_factors = factors_np
-    factors_xcorr = np.zeros((input_factors[2].shape[0] , input_factors[2].shape[1] , input_factors[2].shape[1]))
-    for ii in tqdm(range(input_factors[2].shape[1]),desc="correlations"):
-        for jj in range(input_factors[2].shape[1]):
-            factors_xcorr[:,ii,jj] = scipy.signal.correlate(input_factors[2][:,ii] , input_factors[2][:,jj] , mode='same')
-        
-    for ii in range(factors_xcorr.shape[1]): 
-        plt.figure()
-        plt.plot(np.squeeze(factors_xcorr[:,ii,:]))
-        plt.legend(np.arange(modelRank)+1)  
-        
-    return factors_xcorr
 
 
 def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, trials = False):
@@ -385,7 +334,7 @@ def interpolate_temporal_factor(y_input , numFrames):
     return y_new
 
 
-def full_tca_workflow(config_filepath):
+def full_tca_workflow(config_filepath, data_key):
     """
     sequences the steps for tca of the spectral decomposition of the optic flow data
 
@@ -405,24 +354,27 @@ def full_tca_workflow(config_filepath):
 
     freqs_Sxx = helpers.load_data(config_filepath, 'freqs_Sxx')
     for session in general['sessions']:
-        positions_convDR_absolute = helpers.load_nwb_ts(session['nwb'],'Optic Flow', data_key)
+        positions_toUse = helpers.load_nwb_ts(session['nwb'],'Optic Flow', data_key)
         Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_norm')
         Sxx_allPixels_normFactor = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_normFactor')
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])
-            Sxx_allPixels_norm = trial_reshape_frequential(positions_convDR_absolute, Sxx_allPixels_norm, trial_inds)
+            Sxx_allPixels_norm = trial_reshape_frequential(positions_toUse, Sxx_allPixels_norm, trial_inds)
 
         tic = time.time()
         factors_np = tca(config_filepath, Sxx_allPixels_norm)
         helpers.print_time('Decomposition completed', time.time() - tic)
 
-        factors_temporal = plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+        plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
 
         if general['trials']:
             plot_trial_factor(factors_np[0])
 
         interp_dim = session['trial_len'] if general['trials'] else session['numFrames_total']
-        factors_temporal_interp = interpolate_temporal_factor(factors_np[-2], interp_dim)
+        if config['TCA']['pref_concat_cartesian_dim']:
+            factors_temporal_interp = interpolate_temporal_factor(factors_np[-1], interp_dim)
+        else:
+            factors_temporal_interp = interpolate_temporal_factor(factors_np[-2], interp_dim)
         helpers.create_nwb_group(session['nwb'], 'TCA')
         save_factors(session['nwb'], factors_np, 'frequential', factors_temporal_interp, trials=general['trials'])
 

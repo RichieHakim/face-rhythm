@@ -4,6 +4,7 @@ import cv2
 import imageio
 
 from pathlib import Path
+import tqdm
 from tqdm.notebook import trange
 
 import matplotlib
@@ -55,7 +56,7 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
 def visualize_progress(config, session, frame, point_inds_tracked_list, color_tuples, counters, out):
     frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters)
 
-    if config['General']['remote'] or (config['Video']['save_demo'] and counters[0] < config['Video']['demo_len']):
+    if config['General']['remote'] or (config['Video']['save_demo'] and counters[2] < config['Video']['demo_len']):
         out.write(frame_labeled)
     if not config['General']['remote']:
         cv2.imshow('test', frame_labeled)
@@ -164,9 +165,10 @@ def visualize_factor(config_filepath):
             ind_concat = 0
             for vid_num in optic['vidNums_toUse']:
                 vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
-                for iter_frame in trange(demo_len):
-                    new_frame = vid.get_data(iter_frame)
-                    points_tracked = [points[:, np.newaxis, :, iter_frame], points_tuples]
+                # for iter_frame in trange(demo_len):
+                for iter_frame, new_frame in enumerate(vid):
+                    # new_frame = vid.get_data(iter_frame)
+                    points_tracked = [points[:, np.newaxis, :, ind_concat], points_tuples]
                     counters = [iter_frame, vid_num, ind_concat, Fs]
                     visualize_progress(config, session, new_frame, points_tracked, color_tuples, counters, out)
 
@@ -174,6 +176,11 @@ def visualize_factor(config_filepath):
                     if k == 27: break
 
                     ind_concat += 1
+
+                    if ind_concat >= demo_len:
+                        break
+                if ind_concat >= demo_len:
+                    break
 
             if general['remote'] or video['save_demo']:
                 out.release()

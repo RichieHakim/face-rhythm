@@ -263,7 +263,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     Fs = video['Fs']
     vid_width = video['width']
     vid_height = video['height']
-    test_len = optic['test_len']
+    test_len = video['demo_len']
     save_pathFull = str(Path(config['Paths']['project']) / 'optic_test.avi')
 
     numVids = session['num_vids']
