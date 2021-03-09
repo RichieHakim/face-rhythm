@@ -255,7 +255,6 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     return positions_convDR_meanSub, positions_convDR_absolute
 
 
-
 def conv_dim_reduce_workflow(config_filepath):
     print(f'== Beginning convolutional dimensionality reduction ==')
     tic_all = time.time()
@@ -285,9 +284,9 @@ def conv_dim_reduce_workflow(config_filepath):
         positions_convDR_meanSub, positions_convDR_absolute = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean, positions_new_sansOutliers)
 
+
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub, video['Fs'])
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute, video['Fs'])
-
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)

@@ -127,7 +127,7 @@ def import_videos(config_filepath):
     general['sessions'] = []
 
     for path in Path(paths['video']).iterdir():
-        if path.is_dir() and video['session_prefix'] in str(path):
+        if path.is_dir() and video['session_prefix'] in str(path.name):
             session = {'name': path.stem, 'videos': []}
             for vid in path.iterdir():
                 if vid.suffix in ['.avi', '.mp4']:
