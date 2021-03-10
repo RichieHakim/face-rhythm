@@ -421,7 +421,7 @@ def full_tca_workflow(config_filepath, data_key):
         factors_np = tca(config_filepath, Sxx_allPixels_norm)
         helpers.print_time('Decomposition completed', time.time() - tic)
 
-        plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+        plot_factors_full(config_filepath, factors_np, freqs_Sxx)
 
         if general['trials']:
             plot_trial_factor(factors_np[0])
