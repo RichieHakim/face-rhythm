@@ -60,7 +60,7 @@ def visualize_progress(config, session, frame, point_inds_tracked_list, color_tu
     if config['General']['remote'] or (config['Video']['save_demo'] and counters[2] < config['Video']['demo_len']):
         out.write(frame_labeled)
     if not config['General']['remote']:
-        cv2.imshow('test', frame_labeled)
+        cv2.imshow('Display Factors', frame_labeled)
 
 
 def visualize_points(config_filepath):
@@ -106,6 +106,90 @@ def visualize_points(config_filepath):
             out.release()
 
 
+# def visualize_factor(config_filepath):
+#     """
+#     creates videos of the points colored by their positional factor values
+
+#     Parameters
+#     ----------
+#     config_filepath (Path): path to the config file
+#     factors_np ():
+#     positions_convDR_absolute ():
+
+#     Returns
+#     -------
+
+#     """
+
+#     config = helpers.load_config(config_filepath)
+#     general = config['General']
+#     video = config['Video']
+#     optic = config['Optic']
+
+#     demo_len = video['demo_len']
+#     vid_width = video['width']
+#     vid_height = video['height']
+#     Fs = video['Fs']
+
+#     factor_category_name = video['factor_category_to_display']
+#     factor_name = video['factor_to_display']
+#     points_name = video['points_to_display']
+#     ftype = factor_name.split('_')[1]
+
+
+#     for session in general['sessions']:
+#         factor = helpers.load_nwb_ts(session['nwb'], factor_category_name, factor_name)
+#         points = helpers.load_nwb_ts(session['nwb'],'Optic Flow', points_name)
+#         points_tuples = list(np.arange(points.shape[0]))
+#         rank = factor.shape[1]
+
+#         for factor_iter in range(rank):
+#             save_path = str(Path(config['Paths']['viz']) / (config['Video']['factor_category_to_display'] + '__' + config['Video']['factor_to_display'] + f'factor_{factor_iter+1}.avi'))
+
+#             if general['remote'] or video['save_demo']:
+#                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+#                 print(f'saving to file {save_path}')
+#                 out = cv2.VideoWriter(save_path, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
+#             else:
+#                 out = None
+
+#             factor_toShow = factor_iter
+
+#             offset_toUse = np.min(factor[:, factor_toShow])
+#             scores_norm = factor[:, factor_toShow] - offset_toUse
+#             scores_norm = (scores_norm / np.max(scores_norm)) * 1000
+#             cmap = matplotlib.cm.get_cmap('hot', 1000)
+
+#             color_tuples = list(np.arange(points.shape[0]))
+#             for ii in range(points.shape[0]):
+#                 color_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) * 255)[:3]))
+
+#             ind_concat = 0
+#             for vid_num in optic['vidNums_toUse']:
+#                 vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
+#                 # for iter_frame in trange(demo_len):
+#                 for iter_frame, new_frame in enumerate(vid):
+#                     # new_frame = vid.get_data(iter_frame)
+#                     points_tracked = [points[:, np.newaxis, :, ind_concat], points_tuples]
+#                     counters = [iter_frame, vid_num, ind_concat, Fs]
+#                     visualize_progress(config, session, new_frame, points_tracked, color_tuples, counters, out)
+
+#                     k = cv2.waitKey(1) & 0xff
+#                     if k == 27: break
+
+#                     ind_concat += 1
+
+#                     if ind_concat >= demo_len:
+#                         break
+#                 if ind_concat >= demo_len:
+#                     break
+
+#             if general['remote'] or video['save_demo']:
+#                 out.release()
+
+#     cv2.destroyAllWindows()
+
+
 def visualize_factor(config_filepath):
     """
     creates videos of the points colored by their positional factor values
@@ -131,96 +215,14 @@ def visualize_factor(config_filepath):
     vid_height = video['height']
     Fs = video['Fs']
 
+    factor_category_name = video['factor_category_to_display']
     factor_name = video['factor_to_display']
     points_name = video['points_to_display']
     ftype = factor_name.split('_')[1]
 
 
     for session in general['sessions']:
-        factor = helpers.load_nwb_ts(session['nwb'],'TCA',factor_name)
-        points = helpers.load_nwb_ts(session['nwb'],'Optic Flow', points_name)
-        points_tuples = list(np.arange(points.shape[0]))
-        rank = factor.shape[1]
-
-        for factor_iter in range(rank):
-            save_path = str(Path(config['TCA'][f'dir_{ftype}']) / f'factor_{factor_iter+1}.avi')
-
-            if general['remote'] or video['save_demo']:
-                fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-                print(f'saving to file {save_path}')
-                out = cv2.VideoWriter(save_path, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
-            else:
-                out = None
-
-            factor_toShow = factor_iter
-
-            offset_toUse = np.min(factor[:, factor_toShow])
-            scores_norm = factor[:, factor_toShow] - offset_toUse
-            scores_norm = (scores_norm / np.max(scores_norm)) * 1000
-            cmap = matplotlib.cm.get_cmap('hot', 1000)
-
-            color_tuples = list(np.arange(points.shape[0]))
-            for ii in range(points.shape[0]):
-                color_tuples[ii] = list(np.flip((np.array(cmap(np.int64(scores_norm[ii]))) * 255)[:3]))
-
-            ind_concat = 0
-            for vid_num in optic['vidNums_toUse']:
-                vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
-                # for iter_frame in trange(demo_len):
-                for iter_frame, new_frame in enumerate(vid):
-                    # new_frame = vid.get_data(iter_frame)
-                    points_tracked = [points[:, np.newaxis, :, ind_concat], points_tuples]
-                    counters = [iter_frame, vid_num, ind_concat, Fs]
-                    visualize_progress(config, session, new_frame, points_tracked, color_tuples, counters, out)
-
-                    k = cv2.waitKey(1) & 0xff
-                    if k == 27: break
-
-                    ind_concat += 1
-
-                    if ind_concat >= demo_len:
-                        break
-                if ind_concat >= demo_len:
-                    break
-
-            if general['remote'] or video['save_demo']:
-                out.release()
-
-    cv2.destroyAllWindows()
-
-
-def visualize_factor_cartCat(config_filepath):
-    """
-    creates videos of the points colored by their positional factor values
-
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    factors_np ():
-    positions_convDR_absolute ():
-
-    Returns
-    -------
-
-    """
-
-    config = helpers.load_config(config_filepath)
-    general = config['General']
-    video = config['Video']
-    optic = config['Optic']
-
-    demo_len = video['demo_len']
-    vid_width = video['width']
-    vid_height = video['height']
-    Fs = video['Fs']
-
-    factor_name = video['factor_to_display']
-    points_name = video['points_to_display']
-    ftype = factor_name.split('_')[1]
-
-
-    for session in general['sessions']:
-        factor = helpers.load_nwb_ts(session['nwb'],'TCA',factor_name)
+        factor = helpers.load_nwb_ts(session['nwb'], factor_category_name, factor_name)
         factor_x, factor_y = np.array_split(factor, 2, axis=0)
 
         points = helpers.load_nwb_ts(session['nwb'],'Optic Flow', points_name)
@@ -228,7 +230,8 @@ def visualize_factor_cartCat(config_filepath):
         rank = factor.shape[1]
 
         for factor_iter in range(rank):
-            save_path = str(Path(config['TCA'][f'dir_{ftype}']) / f'factor_{factor_iter+1}.avi')
+            save_path = str(Path(config['Paths']['viz']) / (factor_category_name + '__' 
+            + factor_name + '__' + points_name + '__' + f'factor_{factor_iter+1}.avi'))
 
             if general['remote'] or video['save_demo']:
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
