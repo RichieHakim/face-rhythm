@@ -21,7 +21,7 @@ from pynwb import NWBHDF5IO
 from face_rhythm.util import helpers
 
 FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
-                'spectrall': ['points','frequential','temporal','cartesian']}
+                'spectral': ['points','frequential','temporal','cartesian']}
 
 
 def tca(config_filepath, input_array):
