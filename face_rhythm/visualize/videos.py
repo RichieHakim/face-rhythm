@@ -21,16 +21,17 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
     Parameters
     ----------
     config (dict): dictionary of config parameters
-    session (): 
-    frame ():
-    points ():
-    color_tuples ():
-    counters ():
+    session (dict): dictionary of session level data
+    frame (cv2.image): current frame to display
+    points_inds_tracked_list (list): list of two containers of points to display
+    color_tuples (list): list of color tuples
+    counters (list): list of counters that track various stats about the video
 
     Returns
     -------
     frame (cv2.image): labeled and processed image with points
     """
+
     dot_size = config['Video']['dot_size']
     vidNums_toUse = config['Optic']['vidNums_toUse']
     numFrames_total_rough = session['frames_total']
@@ -55,6 +56,24 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
         
 
 def visualize_progress(config, session, frame, point_inds_tracked_list, color_tuples, counters, out):
+    """
+    gets frame and then saves ior displays it
+
+    Parameters
+    ----------
+    config (dict): dictionary of config parameters
+    session (dict): dictionary of session level data
+    frame (cv2.image): current frame to display
+    points_inds_tracked_list (list): list of two containers of points to display
+    color_tuples (list): list of color tuples
+    counters (list): list of counters that track various stats about the video
+    out (cv2.fileinterface): where to write the frames
+
+    Returns
+    -------
+
+    """
+
     frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters)
 
     if config['General']['remote'] or (config['Video']['save_demo'] and counters[2] < config['Video']['demo_len']):
@@ -64,6 +83,18 @@ def visualize_progress(config, session, frame, point_inds_tracked_list, color_tu
 
 
 def visualize_points(config_filepath):
+    """
+    loops over all sessions and creates a short demo video from each session
+
+    Parameters
+    ----------
+    config_filepath (Path): path to current config file
+
+    Returns
+    -------
+
+    """
+
     config = helpers.load_config(config_filepath)
     general = config['General']
     video = config['Video']
@@ -113,8 +144,6 @@ def visualize_factor(config_filepath):
     Parameters
     ----------
     config_filepath (Path): path to the config file
-    factors_np ():
-    positions_convDR_absolute ():
 
     Returns
     -------
@@ -196,8 +225,6 @@ def visualize_factor_cartCat(config_filepath):
     Parameters
     ----------
     config_filepath (Path): path to the config file
-    factors_np ():
-    positions_convDR_absolute ():
 
     Returns
     -------

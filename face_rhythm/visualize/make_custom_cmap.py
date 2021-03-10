@@ -1,5 +1,15 @@
 import numpy as np
 def make_custom_cmap():
+    """
+    creates custom color map
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    cmap (np.ndarray): custom colormap
+    """
     cmap = np.array([[255., 133.,  61.],
                     [255., 132.,  62.],
                     [255., 130.,  62.],
