@@ -1,7 +1,7 @@
-face\_rhythm.optic\_flow package
+face\_rhythm.optic\_flow module
 ================================
 
-Optic Flow - Optic Flow
+Optic Flow
 -------------------------------
 
 .. automodule:: face_rhythm.optic_flow.optic_flow
@@ -9,7 +9,7 @@ Optic Flow - Optic Flow
    :undoc-members:
    :show-inheritance:
 
-Optic Flow - Clean Results
+Clean Results
 ------------------------------
 
 .. automodule:: face_rhythm.optic_flow.clean_results
@@ -17,7 +17,7 @@ Optic Flow - Clean Results
    :undoc-members:
    :show-inheritance:
 
-Optic Flow - Convolutional Dimensionality Reduction
+Convolutional Dimensionality Reduction
 ---------------------------------------------------
 
 .. automodule:: face_rhythm.optic_flow.conv_dim_reduce

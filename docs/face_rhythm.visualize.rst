@@ -1,8 +1,8 @@
-face\_rhythm.visualize package
+face\_rhythm.visualize module
 =============================
 
 
-Visualize - Videos
+Videos
 -------------------------------
 
 .. automodule:: face_rhythm.visualize.videos
@@ -10,7 +10,7 @@ Visualize - Videos
    :undoc-members:
    :show-inheritance:
 
-Visualize - Make Custom Cmap
+Make Custom Cmap
 -------------------------------
 
 .. automodule:: face_rhythm.visualize.make_custom_cmap

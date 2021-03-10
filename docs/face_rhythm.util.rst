@@ -1,7 +1,7 @@
-face\_rhythm.util package
+face\_rhythm.util module
 =========================
 
-Util - Helpers
+Helpers
 -------------------------------
 
 .. automodule:: face_rhythm.util.helpers
@@ -9,7 +9,7 @@ Util - Helpers
    :undoc-members:
    :show-inheritance:
 
-Util - Set ROI
+Set ROI
 ------------------------------
 
 .. automodule:: face_rhythm.util.set_roi
@@ -17,3 +17,10 @@ Util - Set ROI
    :undoc-members:
    :show-inheritance:
 
+Setup
+------------------------------
+
+.. automodule:: face_rhythm.util.setup
+   :members:
+   :undoc-members:
+   :show-inheritance:
