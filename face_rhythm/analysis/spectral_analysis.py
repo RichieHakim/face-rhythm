@@ -3,7 +3,7 @@ import sys
 
 import numpy as np
 import scipy.stats
-from librosa import cqt
+import librosa
 from matplotlib import pyplot as plt
 from tqdm.notebook import tqdm
 
@@ -50,7 +50,7 @@ def cqt_workflow(config_filepath, data_key):
         input_sgram = np.single(np.squeeze(positions_convDR_meanSub))[:,:,:]
 
         ## make a single spectrogram to get some size parameters for preallocation
-        Sxx = cqt(np.squeeze(input_sgram[0,0,:]),
+        Sxx = librosa.cqt(np.squeeze(input_sgram[0,0,:]),
                           sr=sr,
                           hop_length=hop_length,
                           fmin=fmin,
@@ -73,7 +73,7 @@ def cqt_workflow(config_filepath, data_key):
                 tmp_input_sgram = np.squeeze(input_sgram[ii,jj,:])
 
 
-                tmp = cqt(np.squeeze(input_sgram[ii,jj,:]),
+                tmp = librosa.cqt(np.squeeze(input_sgram[ii,jj,:]),
                                   sr=sr,
                                   hop_length=hop_length,
                                   fmin=fmin,
@@ -156,7 +156,7 @@ def cqt_positions(config_filepath):
     input_sgram = np.single(np.squeeze(factors_np_positional[2][:,3]))
 
     ## make a single spectrogram to get some size parameters for preallocation
-    Sxx_positional = cqt(np.squeeze(input_sgram),
+    Sxx_positional = librosa.cqt(np.squeeze(input_sgram),
                                 sr=sr, 
                                 hop_length=hop_length, 
                                 fmin=fmin, 
