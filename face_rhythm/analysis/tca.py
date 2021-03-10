@@ -21,7 +21,7 @@ from pynwb import NWBHDF5IO
 from face_rhythm.util import helpers
 
 FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
-                'frequential': ['points','frequential','temporal','cartesian']}
+                'spectrall': ['points','frequential','temporal','cartesian']}
 
 
 def tca(config_filepath, input_array):
@@ -432,7 +432,7 @@ def full_tca_workflow(config_filepath, data_key):
         else:
             factors_temporal_interp = interpolate_temporal_factor(factors_np[-2], interp_dim)
         helpers.create_nwb_group(session['nwb'], 'TCA')
-        save_factors(session['nwb'], factors_np, 'frequential', factors_temporal_interp, trials=general['trials'])
+        save_factors(session['nwb'], factors_np, 'spectral', factors_temporal_interp, trials=general['trials'])
 
 
         helpers.print_time('total elapsed time', time.time() - tic_all)
