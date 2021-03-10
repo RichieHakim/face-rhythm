@@ -7,6 +7,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 .. code-block:: console
 
     git clone https://github.com/akshay-jaggi/face-rhythm/
+    cd face-rhythm
     git checkout testing
 
 
@@ -22,7 +23,6 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
 .. code-block:: console
 
-    cd face-rhythm
     pip install -e .
 
 4. Install the correct version of cuda toolkit (if you plan on using a gpu).

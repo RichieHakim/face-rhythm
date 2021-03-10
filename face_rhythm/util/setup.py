@@ -87,7 +87,7 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
                     'CQT': {},
                     'TCA': {}}
     basic_config['Paths']['project'] = str(project_path)
-    basic_config['Paths']['sessions'] = str(sessions_path)
+    basic_config['Paths']['video'] = str(sessions_path)
     basic_config['Paths']['data'] = str(project_path / 'data')
     basic_config['Paths']['viz'] = str(project_path / 'viz')
     basic_config['Paths']['config'] = str(config_filepath)
