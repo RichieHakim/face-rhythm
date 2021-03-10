@@ -5,6 +5,19 @@ import scipy.signal
 from matplotlib import pyplot as plt
 
 def clean_displacements(config_filepath, displacements):
+    """
+    cleans and integrates a set of displacements according to a set of parameters
+
+    Parameters
+    ----------
+    config_filepath (Path): path to the config file
+    displacements (np.ndarray): array of displacements
+
+    Returns
+    -------
+    positions_new_sansOutliers (np.ndarray): positions
+    positions_new_absolute_sansOutliers (np.ndarray): absolute positions
+    """
 
     config = helpers.load_config(config_filepath)
     clean = config['Clean']
