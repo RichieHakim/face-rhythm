@@ -78,6 +78,7 @@ def create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
     group_name (str): name of group to write to
     ts_name (str): name of new ts
     data (np.array): data to be written
+    Fs (float): frequency of the data being written
 
     Returns
     -------
@@ -152,7 +153,7 @@ def load_data(config_filepath, data_key):
 
     Returns
     -------
-    data (np.ndarray): (usually) an np array with data
+    data (np.ndarray): a np array with data
 
     """
 
@@ -193,8 +194,7 @@ def load_h5(config_filepath, data_key):
     Parameters
     ----------
     config_filepath (Path): path to the config file
-    save_name (str): name of the object to be saved
-    data_dict (dict): dict of numpy arrays
+    data_key (str): name of the data to be loaded
 
     Returns
     -------
@@ -234,7 +234,7 @@ def print_time(action, time):
 
 
 def h5_to_dict(h5file, path='/'):
-    '''
+    """
     Reads all contents from h5 and returns them in a nested dict object.
 
     Parameters
@@ -245,7 +245,7 @@ def h5_to_dict(h5file, path='/'):
     Returns
     -------
     ans (dict): dictionary of all h5 group contents
-    '''
+    """
 
     ans = {}
 
@@ -263,7 +263,7 @@ def h5_to_dict(h5file, path='/'):
 
 
 def dict_to_h5(data_dict, h5):
-    '''
+    """
     Quick and dirty dict dumper to h5
 
     Parameters
@@ -273,7 +273,7 @@ def dict_to_h5(data_dict, h5):
 
     Returns
     -------
-    '''
+    """
 
     for key, item in data_dict.items():
         if isinstance(item, dict):
@@ -284,6 +284,16 @@ def dict_to_h5(data_dict, h5):
 
 
 def dump_nwb(nwb_path):
+    """
+    Print out nwb contents
+
+    Parameters
+    ----------
+    nwb_path (str): path to the nwb file
+
+    Returns
+    -------
+    """
     io = pynwb.NWBHDF5IO(nwb_path, 'r')
     nwbfile = io.read()
     for interface in nwbfile.processing['Face Rhythm'].data_interfaces:
