@@ -21,7 +21,7 @@ setup(
                       'pyyaml',
                       'imageio-ffmpeg',
                       'tqdm',
-                      'h5py',
+                      'h5py==2.10.0',
                       'pynwb',
                       'ipywidgets',
                       'pytest'
