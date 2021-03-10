@@ -26,7 +26,6 @@ setup(
                       'pynwb',
                       'ipywidgets',
                       'pytest',
-                      'Pillow==7.2.0',
-                      'SoundFile==0.10.3.post1'
+                      'Pillow==7.2.0'
                       ]
 )
