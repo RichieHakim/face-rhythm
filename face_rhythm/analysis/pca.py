@@ -12,9 +12,9 @@ def plot_diagnostics(output_PCA, pca, scores_points):
 
     Parameters
     ----------
-    output_PCA ():
-    pca ():
-    scores_points ():
+    output_PCA (np.ndarray): pca components
+    pca (sklearn.PCA): pca object
+    scores_points (np.ndarray): projected scores onto points
 
     Returns
     -------
@@ -40,6 +40,7 @@ def pca_workflow(config_filepath, data_key):
     Parameters
     ----------
     config_filepath (Path): path to the config file
+    data_key (str): key to the data we wann to dimensionally reduce
 
     Returns
     -------

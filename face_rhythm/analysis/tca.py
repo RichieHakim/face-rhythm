@@ -31,12 +31,11 @@ def tca(config_filepath, input_array):
     Parameters
     ----------
     config_filepath (Path): path to the config file
-    input_array ():
+    input_array (np.ndarray): tensor array
 
     Returns
     -------
-    factors_np ():
-
+    factors_np (list): list of factors
     """
     
     config = helpers.load_config(config_filepath)
@@ -93,7 +92,7 @@ def plot_factors(config_filepath, factors_np):
     Parameters
     ----------
     config_filepath (Path): path to the config file
-    factors_np ():
+    factors_np (list): list of factors
 
     Returns
     -------
@@ -149,6 +148,17 @@ def plot_factors(config_filepath, factors_np):
     # plt.plot(output_PCA)
 
 def plot_trial_factor(trial_factor):
+    """
+    plots the trial factors for visualization / analysis
+
+    Parameters
+    ----------
+    trial_factor (np.ndarray): plot the trial dimension if it exists
+
+    Returns
+    -------
+
+    """
     modelRank = trial_factor.shape[1]
     plt.figure()
     plt.plot(trial_factor)
@@ -158,16 +168,15 @@ def plot_trial_factor(trial_factor):
 
     
     
-def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor):
+def plot_factors_full(config_filepath, factors_np, freqs_Sxx):
     """
     plots the full set of factors
 
     Parameters
     ----------
     config_filepath (Path): path to the config file
-    factors_np ():
-    freqs_Sxx ():
-    Sxx_allPixels_normFactor  ():
+    factors_np (list): list of factors
+    freqs_Sxx (np.ndarray): frequency array
 
     Returns
     -------
@@ -225,6 +234,21 @@ def plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_norm
 
 
 def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, trials = False):
+    """
+    load factors from nwb file
+
+    Parameters
+    ----------
+    nwb_path (str): path to nwb file
+    factors_all (list): list of factors
+    ftype (str): factor type
+    factors_temporal_interp (np.ndarray): interpolated temporal factors (if they've been generated)
+    trials (bool): whether or not we're using trials
+
+    Returns
+    -------
+
+    """
     factor_names = FACTOR_NAMES[ftype]
     factor_names = (['trials'] + factor_names) if trials else factor_names
     for i, factor in enumerate(factors_all):
@@ -234,13 +258,38 @@ def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, t
 
 
 def load_factors(nwb_path, stem):
+    """
+    load factors from nwb file
+
+    Parameters
+    ----------
+    nwb_path (str): path to nwb file
+    stem (str): some substring of the time series to collect
+
+    Returns
+    -------
+    factors (list): list of factors matching given stem
+    """
     with NWBHDF5IO(nwb_path, 'r') as io:
         nwbfile = io.read()
         tca_data = nwbfile.processing['Face Rhythm']['TCA']
-        return [tca_data[ts].data[()] for ts in tca_data.time_series if stem in ts]
+        factors = [tca_data[ts].data[()] for ts in tca_data.time_series if stem in ts]
+        return factors
 
 
 def trial_reshape_positional(positions, trial_inds):
+    """
+    reshapes the positional data
+
+    Parameters
+    ----------
+    positions (np.ndarray): original positions array
+    trial_inds (np.ndarray): array of the trial indices
+
+    Returns
+    -------
+    reshaped (np.ndarray): reshaped positions array
+    """
     reshaped = np.zeros((trial_inds.shape[0], *positions.shape[:-1], trial_inds.shape[1]))
     for i, trial_ind in enumerate(trial_inds):
         reshaped[i, ...] = positions[..., trial_ind]
@@ -248,16 +297,45 @@ def trial_reshape_positional(positions, trial_inds):
 
 
 def downsample_trial_inds(trial_inds, len_original, len_cqt):
+    """
+    downsamples the trial indices given a new cqt length
+
+    Parameters
+    ----------
+    trial_inds (np.ndarray): array of the trial indices
+    len_original (int): length of the original trial
+    len_cqt (int): length of the trial after cqt
+
+    Returns
+    -------
+    downsampled (np.ndarray): downsampled trial indices
+    """
+
     idx_cqt_originalSamples = np.round(np.linspace(0, len_original, len_cqt))
     trial_idx_cqt = np.ones((trial_inds.shape[0], 1000)) * np.nan
     for ii in range(trial_inds.shape[0]):
         retained = np.where((idx_cqt_originalSamples > trial_inds[ii, 0]) * (idx_cqt_originalSamples < trial_inds[ii, -1]))[0]
         trial_idx_cqt[ii, :retained.shape[0]] = retained
     to_keep = ~np.any(np.isnan(trial_idx_cqt),axis=0)
-    return trial_idx_cqt[:,to_keep].astype(int)
+    downsampled = trial_idx_cqt[:,to_keep].astype(int)
+    return downsampled
 
 
 def trial_reshape_frequential(positions, spectrum, trial_inds):
+    """
+    reshapes the spectral data if the data is trial type
+
+    Parameters
+    ----------
+    positions (np.ndarray): point positions
+    spectrum (np.ndarray): spectrogram array
+    trial_inds (np.ndarray): array of the trial indices
+
+    Returns
+    -------
+    reshaped (np.ndarray): reshaped spectrogram array
+    """
+
     trial_inds = downsample_trial_inds(trial_inds,positions.shape[-1], spectrum.shape[-2])
     reshaped = np.zeros((trial_inds.shape[0], *spectrum.shape[:-2], trial_inds.shape[1], spectrum.shape[-1]))
     for i, trial_ind in enumerate(trial_inds):
@@ -272,6 +350,7 @@ def positional_tca_workflow(config_filepath, data_key):
     Parameters
     ----------
     config_filepath (Path): path to the config file
+    data_key (str): name of the positions on which to perform the tca
 
     Returns
     -------
@@ -306,6 +385,7 @@ def positional_tca_workflow(config_filepath, data_key):
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
 
+
 def interpolate_temporal_factor(y_input , numFrames):
     """
     Interpolates the temporal component from the frequential TCA step from CQT time steps into
@@ -314,14 +394,13 @@ def interpolate_temporal_factor(y_input , numFrames):
 
     Parameters
     ----------
-    y_input: This should be the temporal factor matrix [N,M] where N: factors, M: time steps
-    numFrames: This should be the number of frames from the original camera time series
-    ----------
+    y_input (np.ndarray): This should be the temporal factor matrix [N,M] where N: factors, M: time steps
+    numFrames (int): This should be the number of frames from the original camera time series
 
     Returns
     ----------
-    y_new: This will be the interpolated y_input
-    ----------
+    y_new (np.ndarray): This will be the interpolated y_input
+
     """
 
     x_old = np.linspace(0 , y_input.shape[0] , num=y_input.shape[0] , endpoint=True)
@@ -341,6 +420,7 @@ def full_tca_workflow(config_filepath, data_key):
     Parameters
     ----------
     config_filepath (Path): path to the config file
+    data_key (str): name of the positions to use
 
     Returns
     -------

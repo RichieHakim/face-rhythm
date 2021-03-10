@@ -18,6 +18,7 @@ def cqt_workflow(config_filepath, data_key):
     Parameters
     ----------
     config_filepath (Path): path to the config file
+    data_key (str): data name on which to perform cqt
 
     Returns
     -------
@@ -187,10 +188,6 @@ def cqt_positions(config_filepath):
     plt.imshow(test, aspect='auto', cmap='hot', origin='lower')
     plt.figure()
     plt.imshow(test2, aspect='auto', cmap='hot', origin='lower')
-
-    # helpers.save_data(config_filepath, 'Sxx_positional', Sxx_positional)
-    # helpers.save_data(config_filepath, 'test', test)
-    # helpers.save_data(config_filepath, 'test2', test2)
 
     helpers.create_nwb_group(config_filepath, 'CQT')
     helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional', Sxx_positional)
