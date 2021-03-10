@@ -24,6 +24,7 @@ setup(
                       'h5py==2.10.0',
                       'pynwb',
                       'ipywidgets',
-                      'pytest'
+                      'pytest',
+                      'Pillow==7.2.0'
                       ]
 )
