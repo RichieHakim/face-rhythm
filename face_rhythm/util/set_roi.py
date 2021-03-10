@@ -16,15 +16,13 @@ def load_video(vid_to_set, frame_to_set, videos):
     """
     loads the chosen video and returns chosen frame
 
-    Parameters
-    ----------
-    vidToSet (int): index of vid to load
-    frameToSet (int): index of frame to load
-    path_vid_allFiles (list): list of all video paths
+    Args:
+        vidToSet (int): index of vid to load
+        frameToSet (int): index of frame to load
+        path_vid_allFiles (list): list of all video paths
 
-    Returns
-    -------
-    frame (cv2.image): frame read using cv2
+    Returns:
+        frame (cv2.image): frame read using cv2
     """
     path_vid = videos[vid_to_set - 1]
     vid_reader = cv2.VideoCapture(path_vid)
@@ -38,13 +36,11 @@ def get_bbox(mask_frame):
     """
     get rectangular bounding box for irregular roi
 
-    Parameters
-    ----------
-    mask_frame (np.ndarray): the frame containing the mask
+    Args:
+        mask_frame (np.ndarray): the frame containing the mask
 
-    Returns
-    -------
-    bbox (np.ndarray): numpy array containing the indexes of the bounding box
+    Returns:
+        bbox (np.ndarray): numpy array containing the indexes of the bounding box
     """
     bbox = np.zeros(4)
     bbox[0] = np.min(np.where(np.max(mask_frame, axis=0)))  # x top left
@@ -88,14 +84,12 @@ def get_roi(config_filepath):
     """
     loads a interactive tool to set the roi in the user's window
 
-    Parameters
-    ----------
-    config_filepath (str): path to config file
+    Args:
+        config_filepath (str): path to config file
 
-    Returns
-    -------
-    frame (cv2.image): frame read using cv2
-    BBoxSelect(frame) (BBoxSelect): a bounding box selection object
+    Returns:
+        frame (cv2.image): frame read using cv2
+        BBoxSelect(frame) (BBoxSelect): a bounding box selection object
     """
 
     config = helpers.load_config(config_filepath)
@@ -118,14 +112,12 @@ def process_roi(config_filepath, frame, bs):
     """
     saves a set of points derived from a bounding box drawn by a user
 
-    Parameters
-    ----------
-    config_filepath (str): path to config file
-    frame (cv2.image) : current frame being analyzed
-    bs (BBoxSelect): a completed bbox select object
+    Args:
+        config_filepath (str): path to config file
+        frame (cv2.image) : current frame being analyzed
+        bs (BBoxSelect): a completed bbox select object
 
-    Returns
-    -------
+    Returns:
 
     """
     pts = bs.selected_points

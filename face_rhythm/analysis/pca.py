@@ -10,14 +10,12 @@ def plot_diagnostics(output_PCA, pca, scores_points):
     """
     displays some pca diagnostics like explained variance
 
-    Parameters
-    ----------
-    output_PCA (np.ndarray): pca components
-    pca (sklearn.PCA): pca object
-    scores_points (np.ndarray): projected scores onto points
+    Args:
+        output_PCA (np.ndarray): pca components
+        pca (sklearn.PCA): pca object
+        scores_points (np.ndarray): projected scores onto points
 
-    Returns
-    -------
+    Returns:
 
     """
     # plt.figure()
@@ -37,13 +35,11 @@ def pca_workflow(config_filepath, data_key):
     """
     performs pca on the cleaned optic flow output
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    data_key (str): key to the data we wann to dimensionally reduce
+    Args:
+        config_filepath (Path): path to the config file
+        data_key (str): key to the data we wann to dimensionally reduce
 
-    Returns
-    -------
+    Returns:
 
     """
 

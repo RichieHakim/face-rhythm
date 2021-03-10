@@ -15,13 +15,11 @@ def cqt_workflow(config_filepath, data_key):
     """
     computes spectral analysis on the cleaned optic flow output
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    data_key (str): data name on which to perform cqt
+    Args:
+        config_filepath (Path): path to the config file
+        data_key (str): data name on which to perform cqt
 
-    Returns
-    -------
+    Returns:
 
     """
     
@@ -129,12 +127,10 @@ def cqt_positions(config_filepath):
     computes spectral analysis on the cleaned optic flow output
     similar to cqt_all (consider removing/refactoring)
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 

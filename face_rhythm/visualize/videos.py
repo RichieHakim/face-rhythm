@@ -18,18 +18,16 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
     creates a single frame of points overlayed on a video 
     returns that frame to be displayed or saved in a higher level function
 
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    session (dict): dictionary of session level data
-    frame (cv2.image): current frame to display
-    points_inds_tracked_list (list): list of two containers of points to display
-    color_tuples (list): list of color tuples
-    counters (list): list of counters that track various stats about the video
+    Args:
+        config (dict): dictionary of config parameters
+        session (dict): dictionary of session level data
+        frame (cv2.image): current frame to display
+        points_inds_tracked_list (list): list of two containers of points to display
+        color_tuples (list): list of color tuples
+        counters (list): list of counters that track various stats about the video
 
-    Returns
-    -------
-    frame (cv2.image): labeled and processed image with points
+    Returns:
+        frame (cv2.image): labeled and processed image with points
     """
 
     dot_size = config['Video']['dot_size']
@@ -59,18 +57,16 @@ def visualize_progress(config, session, frame, point_inds_tracked_list, color_tu
     """
     gets frame and then saves ior displays it
 
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    session (dict): dictionary of session level data
-    frame (cv2.image): current frame to display
-    points_inds_tracked_list (list): list of two containers of points to display
-    color_tuples (list): list of color tuples
-    counters (list): list of counters that track various stats about the video
-    out (cv2.fileinterface): where to write the frames
+    Args:
+        config (dict): dictionary of config parameters
+        session (dict): dictionary of session level data
+        frame (cv2.image): current frame to display
+        points_inds_tracked_list (list): list of two containers of points to display
+        color_tuples (list): list of color tuples
+        counters (list): list of counters that track various stats about the video
+        out (cv2.fileinterface): where to write the frames
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -86,12 +82,10 @@ def visualize_points(config_filepath):
     """
     loops over all sessions and creates a short demo video from each session
 
-    Parameters
-    ----------
-    config_filepath (Path): path to current config file
+    Args:
+        config_filepath (Path): path to current config file
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -141,12 +135,10 @@ def visualize_factor(config_filepath):
     """
     creates videos of the points colored by their positional factor values
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -222,12 +214,10 @@ def visualize_factor_cartCat(config_filepath):
     """
     creates videos of the points colored by their positional factor values
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 

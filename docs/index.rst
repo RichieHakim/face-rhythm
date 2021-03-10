@@ -23,6 +23,7 @@ Programmer Reference
    face_rhythm.util
    face_rhythm.optic_flow
    face_rhythm.analysis
+   face_rhythm.visualize
 
 
 Indices and tables

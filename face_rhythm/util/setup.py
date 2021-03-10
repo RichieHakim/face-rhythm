@@ -18,18 +18,16 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
     Creates the config file (if it doesn't exist or overwrite requested)
     Returns path to the config file
 
-    Parameters
-    ----------
-    project_path (Path): path to the project (usually ./)
-    sessions_path (Path): path to the session folders and videos
-    run_name (str): name for this current run of Face Rhythm
-    overwrite_config (bool): whether to overwrite the config
-    remote (bool): whether running on remote
-    trials (bool): whether using a trial structure for the recordings
+    Args:
+        project_path (Path): path to the project (usually ./)
+        sessions_path (Path): path to the session folders and videos
+        run_name (str): name for this current run of Face Rhythm
+        overwrite_config (bool): whether to overwrite the config
+        remote (bool): whether running on remote
+        trials (bool): whether using a trial structure for the recordings
 
-    Returns
-    -------
-    config_filepath (str): path to the current config
+    Returns:
+        config_filepath (str): path to the current config
     """
     project_path.mkdir(parents=True, exist_ok=True)
     (project_path / 'configs').mkdir(parents=True, exist_ok=True)
@@ -49,11 +47,9 @@ def version_check():
     Checks the versions of various important softwares.
     Prints those versions
 
-    Parameters
-    ----------
+    Args:
 
-    Returns
-    -------
+    Returns:
 
     """
     ### find version of openCV
@@ -70,17 +66,14 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
     """
     Generates bare config file with just basic info
 
-    Parameters
-    ----------
-    config_filepath (Path): path to config file
-    project_path (Path): path to the project (usually ./)
-    sessions_path (Path): path to the session folders and videos
-    remote (bool): whether running on remote
-    trials (bool): whether using a trial structure for the recordings
+    Args:
+        config_filepath (Path): path to config file
+        project_path (Path): path to the project (usually ./)
+        sessions_path (Path): path to the session folders and videos
+        remote (bool): whether running on remote
+        trials (bool): whether using a trial structure for the recordings
 
-    Returns
-    -------
-
+    Returns:
     """
 
     basic_config = {'General': {},
@@ -119,12 +112,10 @@ def import_videos(config_filepath):
     """
     Loop over all sessions and find all videos for each session
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -154,12 +145,10 @@ def print_session_report(session):
     """
     Prints a simple report of all the session data
 
-    Parameters
-    ----------
-    session (dict): session dictionary
+    Args:
+        session (dict): session dictionary
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -173,12 +162,10 @@ def get_video_data(config_filepath):
     """
     get info on the imported video(s): num of frames, video height and width, framerate
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
     config = helpers.load_config(config_filepath)
@@ -214,12 +201,10 @@ def create_nwbs(config_filepath):
     """
     Create one nwb per session. This file will be used for all future data storage
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -252,12 +237,10 @@ def prepare_videos(config_filepath):
     """
     Collects key video information and stores in the config
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 

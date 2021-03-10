@@ -8,15 +8,13 @@ def clean_displacements(config_filepath, displacements):
     """
     cleans and integrates a set of displacements according to a set of parameters
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    displacements (np.ndarray): array of displacements
+    Args:
+        config_filepath (Path): path to the config file
+        displacements (np.ndarray): array of displacements
 
-    Returns
-    -------
-    positions_new_sansOutliers (np.ndarray): positions
-    positions_new_absolute_sansOutliers (np.ndarray): absolute positions
+    Returns:
+        positions_new_sansOutliers (np.ndarray): positions
+        positions_new_absolute_sansOutliers (np.ndarray): absolute positions
     """
 
     config = helpers.load_config(config_filepath)
@@ -76,12 +74,10 @@ def clean_workflow(config_filepath):
     """
     sequences all steps for cleaning the optic flow data
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 

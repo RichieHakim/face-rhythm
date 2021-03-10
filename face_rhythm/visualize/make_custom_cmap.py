@@ -3,12 +3,10 @@ def make_custom_cmap():
     """
     creates custom color map
 
-    Parameters
-    ----------
+    Args:
 
-    Returns
-    -------
-    cmap (np.ndarray): custom colormap
+    Returns:
+        cmap (np.ndarray): custom colormap
     """
     cmap = np.array([[255., 133.,  61.],
                     [255., 132.,  62.],
