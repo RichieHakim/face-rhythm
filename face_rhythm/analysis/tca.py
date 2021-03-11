@@ -20,11 +20,13 @@ from pynwb import NWBHDF5IO
 
 from face_rhythm.util import helpers
 
-FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
-                'spectral': ['points','frequential','temporal','cartesian']}
+
+FACTOR_NAMES = {'positional': ['points','temporal'],
+                'spectral': ['points','spectral','temporal','cartesian']}
 
 
-def tca(config_filepath, input_array):
+
+def tca(config_filepath, input_array, pref_non_negative):
     """
     computes the tca of the provided dataframe
 
@@ -58,12 +60,15 @@ def tca(config_filepath, input_array):
     else:
         input_tensor = tl.tensor(input_array, dtype=tl.float32, device=device, requires_grad=False)
 
-    print(f'Size of input (spectrogram): {input_tensor.shape}')
+    print(f'Size of input: {input_tensor.shape}')
 
     
     ### Fit TCA model
     ## If the input is small, set init='svd'
-    weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=tol, n_iter_max=n_iters, rank=rank, verbose=verbosity)
+    if pref_non_negative:
+        weights, factors = tensorly.decomposition.non_negative_parafac(input_tensor, init=init, tol=tol, n_iter_max=n_iters, rank=rank, verbose=verbosity)
+    else:
+        weights, factors = tensorly.decomposition.parafac(input_tensor, init=init, tol=tol, n_iter_max=n_iters, rank=rank, verbose=verbosity)
 
     ## make numpy version of tensorly output
 
@@ -351,11 +356,11 @@ def positional_tca_workflow(config_filepath, data_key):
             trial_inds = np.load(session['trial_inds'])
             positions_convDR_meanSub = trial_reshape_positional(positions_convDR_meanSub, trial_inds)
 
-        factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
+        factors_np_positional = tca(config_filepath, positions_convDR_meanSub.transpose(0,2,1) , 0)
 
-        plot_factors(config_filepath, factors_np_positional)
-        if general['trials']:
-            plot_trial_factor(factors_np_positional[0])
+        # plot_factors(config_filepath, factors_np_positional)
+        # if general['trials']:
+        #     plot_trial_factor(factors_np_positional[0])
 
         helpers.create_nwb_group(session['nwb'], 'TCA')
         save_factors(session['nwb'], factors_np_positional, 'positional', trials=general['trials'])
@@ -418,10 +423,10 @@ def full_tca_workflow(config_filepath, data_key):
             Sxx_allPixels_norm = trial_reshape_frequential(positions_toUse, Sxx_allPixels_norm, trial_inds)
 
         tic = time.time()
-        factors_np = tca(config_filepath, Sxx_allPixels_norm)
+        factors_np = tca(config_filepath, Sxx_allPixels_norm , 1)
         helpers.print_time('Decomposition completed', time.time() - tic)
 
-        plot_factors_full(config_filepath, factors_np, freqs_Sxx)
+        # plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
 
         if general['trials']:
             plot_trial_factor(factors_np[0])
