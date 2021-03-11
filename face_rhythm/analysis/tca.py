@@ -20,7 +20,7 @@ from pynwb import NWBHDF5IO
 
 from face_rhythm.util import helpers
 
-FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
+FACTOR_NAMES = {'positional': ['points','temporal'],
                 'frequential': ['points','frequential','temporal','cartesian']}
 
 
@@ -292,11 +292,11 @@ def positional_tca_workflow(config_filepath, data_key):
             trial_inds = np.load(session['trial_inds'])
             positions_convDR_meanSub = trial_reshape_positional(positions_convDR_meanSub, trial_inds)
 
-        factors_np_positional = tca(config_filepath, positions_convDR_meanSub)
+        factors_np_positional = tca(config_filepath, positions_convDR_meanSub.transpose(0,2,1))
 
-        plot_factors(config_filepath, factors_np_positional)
-        if general['trials']:
-            plot_trial_factor(factors_np_positional[0])
+        # plot_factors(config_filepath, factors_np_positional)
+        # if general['trials']:
+        #     plot_trial_factor(factors_np_positional[0])
 
         helpers.create_nwb_group(session['nwb'], 'TCA')
         save_factors(session['nwb'], factors_np_positional, 'positional', trials=general['trials'])
@@ -365,7 +365,7 @@ def full_tca_workflow(config_filepath, data_key):
         factors_np = tca(config_filepath, Sxx_allPixels_norm)
         helpers.print_time('Decomposition completed', time.time() - tic)
 
-        plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
+        # plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
 
         if general['trials']:
             plot_trial_factor(factors_np[0])
