@@ -40,7 +40,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
 1. Clone this repo to a good location 
 ```
-git clone https://github.com/RichieHakim/face-rhythm/
+git clone https://github.com/akshay-jaggi/face-rhythm/
 cd face-rhythm
 git checkout release
 ```
