@@ -6,8 +6,9 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
 .. code-block:: console
 
-    git clone https://github.com/RichieHakim/face-rhythm/
-    git checkout akshay
+    git clone https://github.com/akshay-jaggi/face-rhythm/
+    cd face-rhythm
+    git checkout testing
 
 
 2. Create a conda environment:
@@ -22,7 +23,6 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
 .. code-block:: console
 
-    cd face-rhythm
     pip install -e .
 
 4. Install the correct version of cuda toolkit (if you plan on using a gpu).
@@ -32,11 +32,18 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
     conda install cudatoolkit=10.2
 
-5. Copy your video(s) into the raw video folder
-
-6. Get started! I like to use jupyter lab for this stuff:
+5. Go ahead and create a "project directory" where you'd like your intermediate files, videos, and config files saved. Ideally outside of this repo so you don't have to worry about it when pushing and pulling. Again, given that your ipynb will change a lot (get populated with plots and new parameters, it's good to copy this out of the repo while you're doing analysis.
 
 .. code-block:: console
 
-    jupyter lab
+    cd ..
+    mkdir face_rhythm_runs
+    mkdir face_rhythm_runs/run_00
+    cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/run_00/
+
+6. Get started! I like to use jupyter notebook for this stuff:
+
+.. code-block:: console
+
+    jupyter notebook
 

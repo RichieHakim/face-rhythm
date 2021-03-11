@@ -3,6 +3,9 @@ data
 notebooks/config*
 docs/_build
 *__pycache__*
-*/.ipynb_checkpoints/*
+**.ipynb_checkpoint**
 *.egg-info/*
-face_rhythm/util/.ipynb_checkpoints/helpers-checkpoint.py
+**-checkpoint.ipynb
+.vscode
+
+test_run/*
