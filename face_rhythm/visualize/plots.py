@@ -4,6 +4,10 @@ import numpy as np
 from face_rhythm.util import helpers
 from face_rhythm.analysis import tca
 
+import pdb
+
+FACTOR_UNITS = {'positional':['trials','point number','time (s)'],
+                'spectral':['trials','point number', 'frequency (Hz)','time (s)']}
 
 def plot_pca_diagnostics(config_filepath):
     """
@@ -18,22 +22,32 @@ def plot_pca_diagnostics(config_filepath):
 
     """
     config = helpers.load_config(config_filepath)
+    n_factors = config['PCA']['n_factors_to_show']
+    legend = np.arange(n_factors) + 1
+    Fs = config['Video']['Fs']
     for session in config['General']['sessions']:
-        scores_points = helpers.load_nwb_ts(session['nwb'], 'PCA','scores_points')
+        factors_temporal = helpers.load_nwb_ts(session['nwb'], 'PCA','factors_temporal')
+        factors_points = helpers.load_nwb_ts(session['nwb'], 'PCA', 'factors_points')
         explained_variance = helpers.load_nwb_ts(session['nwb'], 'PCA', 'explained_variance')
-        output_PCA = helpers.load_nwb_ts(session['nwb'], 'PCA', 'pc_components')
 
         plt.figure()
-        plt.plot(output_PCA[:,:3])
+        plt.plot(np.arange(factors_temporal[:,:n_factors].shape[0]) / Fs, factors_temporal[:,:n_factors])
+        plt.legend(legend)
+        plt.xlabel('time (s)')
+        plt.ylabel('a.u.')
         plt.figure()
-        plt.plot(explained_variance)
+        plt.plot(factors_points[:,:n_factors])
+        plt.legend(legend)
+        plt.xlabel('point number')
+        plt.ylabel('a.u.')
         plt.figure()
-        plt.plot(output_PCA[:,0] , output_PCA[:,1]  , linewidth=.1)
-        plt.figure()
-        plt.plot(scores_points[:,:3])
+        plt.plot(np.cumsum(explained_variance))
+        plt.xlabel('factor number')
+        plt.ylabel('variance explained')
 
 
-def plot_positional_tca_factors(config_filepath):
+
+def plot_tca_factors(config_filepath):
     """
     plots the tca factors for visualization / analysis
 
@@ -45,15 +59,22 @@ def plot_positional_tca_factors(config_filepath):
     """
     config = helpers.load_config(config_filepath)
     Fs = config['Video']['Fs']
-    factor_units = ['time (s)','x vs. y','pixel number']
+    ftype = config['TCA']['ftype']
+    factor_units = FACTOR_UNITS[ftype].copy()
+    if not config['General']['trials']:
+        factor_units.remove('trials')
     for session in config['General']['sessions']:
-        factors = tca.load_factors(session['nwb'], 'positional')
+        factors = tca.load_factors(session['nwb'], ftype)
         model_rank = factors[0].shape[1]
         legend = np.arange(model_rank) + 1
-        for i in range(-3,0):
+        for i, factor in enumerate(factor_units):
             plt.figure()
-            if i == -3:
+            if 'time' in factor:
                 plt.plot(np.arange(factors[i].shape[0]) / Fs,factors[i])
+            elif 'freq' in  factor:
+                freqs_Sxx = helpers.load_data(config_filepath,'freqs_Sxx')
+                plt.plot(freqs_Sxx, factors[i])
+                plt.xscale('log')
             else:
                 plt.plot(factors[i])
             plt.legend(legend)
@@ -61,86 +82,25 @@ def plot_positional_tca_factors(config_filepath):
             plt.ylabel('a.u.')
         plt.figure()
         plt.imshow(np.single(np.corrcoef(factors[-1][:, :].T)))
-        if config['General']['trials']:
-            plot_trial_factor(factors[0])
 
 
-def plot_trial_factor(trial_factor):
+def plot_cqt(config_filepath):
     """
-    plots the trial factors for visualization / analysis
-
-    Args:
-        trial_factor (np.ndarray): plot the trial dimension if it exists
-
-    Returns:
-
-    """
-    modelRank = trial_factor.shape[1]
-    plt.figure()
-    plt.plot(trial_factor)
-    plt.legend(np.arange(modelRank) + 1)
-    plt.xlabel('trial number')
-    plt.ylabel('a.u.')
-
-
-def plot_factors_full(config_filepath, factors_np, freqs_Sxx):
-    """
-    plots the full set of factors
+    displays a cqt generated spectrogram for one pixel
 
     Args:
         config_filepath (Path): path to the config file
-        factors_np (list): list of factors
-        freqs_Sxx (np.ndarray): frequency array
 
     Returns:
 
     """
-
     config = helpers.load_config(config_filepath)
-    Fs = config['Video']['Fs']
-    # This bit is just to offset the indexing due to the loss of the last dimension in the case of concatenating the cartesian dimension
-    if config['TCA']['pref_concat_cartesian_dim']:
-        ind_offset = 1
-    else:
-        ind_offset = 0
+    for session in config['General']['sessions']:
+        Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_norm')
+        Sxx_allPixels_normFactor = helpers.load_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_normFactor')
 
-    factors_toUse = factors_np
-    modelRank = factors_toUse[0].shape[1]
+        plt.figure()
+        plt.imshow(Sxx_allPixels_norm[config['CQT']['pixelNum_toUse'], :, :, 0], aspect='auto', cmap='hot', origin='lower')
 
-    plt.figure()
-    # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
-    # factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
-    factors_temporal = factors_toUse[-2 + ind_offset][:, :]
-    # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
-    # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
-    plt.plot(np.arange(factors_temporal.shape[0]) / Fs, factors_temporal[:, ])
-    # plt.plot(factors_temporal[:,:])
-    plt.legend(np.arange(modelRank) + 1)
-    plt.xlabel('time (s)')
-    plt.ylabel('a.u.')
-
-    plt.figure()
-    plt.plot(freqs_Sxx, (factors_toUse[-3 + ind_offset][:, :]))
-    # plt.plot(freqXaxis , (factors_toUse[1][:,:]))
-    # plt.plot(f , (factors_toUse[1][:,:]))
-    # plt.plot((factors_toUse[1][:,:]))
-    plt.legend(np.arange(modelRank) + 1)
-    plt.xscale('log')
-    plt.xlabel('frequency (Hz)')
-    plt.ylabel('a.u.')
-    # plt.xscale('log')
-
-    plt.figure()
-    plt.plot(factors_toUse[-1 + ind_offset][:, :])
-    plt.legend(np.arange(modelRank) + 1)
-    plt.xlabel('x vs. y')
-    plt.ylabel('a.u.')
-
-    plt.figure()
-    plt.plot(factors_toUse[-4 + ind_offset][:, :])
-    plt.legend(np.arange(modelRank) + 1)
-    plt.xlabel('pixel number')
-    plt.ylabel('a.u.')
-
-    config['modelRank'] = modelRank
-    helpers.save_config(config, config_filepath)
+        plt.figure()
+        plt.plot(Sxx_allPixels_normFactor)

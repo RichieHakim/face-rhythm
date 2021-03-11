@@ -4,6 +4,7 @@ import time
 
 from face_rhythm.util import helpers
 
+import pdb
 
 def pca_workflow(config_filepath, data_key):
     """
@@ -34,21 +35,18 @@ def pca_workflow(config_filepath, data_key):
         input_dimRed_meanSub = np.concatenate((tmp_x - tmp_x.mean(1)[:,None] , tmp_y - tmp_y.mean(1)[:,None]) , axis=0 )
 
         tic = time.time()
-        pca = sklearn.decomposition.PCA(n_components=10)
-        # pca = sk.decomposition.FastICA(n_components=10)
-        pca.fit(np.float32(input_dimRed_meanSub))
-        output_PCA = pca.components_.transpose()
-        scores_points = np.dot(input_dimRed_meanSub , output_PCA)
+        pca = sklearn.decomposition.PCA()
+        factors_temporal = pca.fit_transform(np.float32(input_dimRed_meanSub.T))
+        factors_points = pca.components_.T
         helpers.print_time('PCA complete', time.time() - tic)
 
         helpers.create_nwb_group(session['nwb'], 'PCA')
-        helpers.create_nwb_ts(session['nwb'], 'PCA','scores_points',scores_points, 1.0)
+        helpers.create_nwb_ts(session['nwb'], 'PCA','factors_temporal',factors_temporal, 1.0)
+        helpers.create_nwb_ts(session['nwb'], 'PCA', 'factors_points', factors_points, 1.0)
         helpers.create_nwb_ts(session['nwb'], 'PCA', 'input_dimRed_meanSub', input_dimRed_meanSub, video['Fs'])
-        helpers.create_nwb_ts(session['nwb'], 'PCA', 'explained_variance', pca.explained_variance_, 1.0)
-        helpers.create_nwb_ts(session['nwb'], 'PCA', 'pc_components', output_PCA, 1.0)
+        helpers.create_nwb_ts(session['nwb'], 'PCA', 'explained_variance', pca.explained_variance_ratio_, 1.0)
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End pca ==')
-    return output_PCA, pca, input_dimRed_meanSub

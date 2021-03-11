@@ -21,8 +21,8 @@ from pynwb import NWBHDF5IO
 from face_rhythm.util import helpers
 
 
-FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
-                'spectral': ['points','spectral','temporal','cartesian']}
+FACTOR_NAMES = {'positional': ['points','temporal'],
+                'spectral': ['points','spectral','temporal']}
 
 
 
@@ -47,18 +47,15 @@ def tca(config_filepath, input_array, pref_non_negative):
     tol = tca['tolerance']
     verbosity = tca['verbosity']
     n_iters = tca['n_iters']
-    pref_concat_cartesian_dim = tca['pref_concat_cartesian_dim']
     
     tl.set_backend('pytorch')
     
     ## Prepare the input tensor
-    if pref_concat_cartesian_dim:
-        if config['General']['trials']:
-            input_tensor = tl.tensor(np.concatenate((input_array[...,0] , input_array[...,1]) , axis=1), dtype=tl.float32, device=device, requires_grad=False)
-        else:
-            input_tensor = tl.tensor(np.concatenate((input_array[...,0] , input_array[...,1]) , axis=0), dtype=tl.float32, device=device, requires_grad=False)
+    if config['General']['trials']:
+        input_tensor = tl.tensor(np.concatenate((input_array[...,0] , input_array[...,1]) , axis=1), dtype=tl.float32, device=device, requires_grad=False)
     else:
-        input_tensor = tl.tensor(input_array, dtype=tl.float32, device=device, requires_grad=False)
+        input_tensor = tl.tensor(np.concatenate((input_array[...,0] , input_array[...,1]) , axis=0), dtype=tl.float32, device=device, requires_grad=False)
+
 
     print(f'Size of input: {input_tensor.shape}')
 
@@ -88,7 +85,7 @@ def tca(config_filepath, input_array, pref_non_negative):
     return factors_np
 
 
-def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, trials = False, carcat = False):
+def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, trials = False):
     """
     load factors from nwb file
 
@@ -105,9 +102,6 @@ def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, t
     factor_names = FACTOR_NAMES[ftype].copy()
     if trials:
         factor_names = ['trials'] + factor_names
-    elif carcat:
-        factor_names.remove('cartesian')
-
     for i, factor in enumerate(factors_all):
         helpers.create_nwb_ts(nwb_path, 'TCA', f'factors_{ftype}_{factor_names[i]}', factor, 1.0)
     if factors_temporal_interp is not None:
@@ -221,8 +215,7 @@ def positional_tca_workflow(config_filepath, data_key):
         factors_np_positional = tca(config_filepath, positions_convDR_meanSub.transpose(0,2,1) , 0)
 
         helpers.create_nwb_group(session['nwb'], 'TCA')
-        save_factors(session['nwb'], factors_np_positional, 'positional',
-                     trials=general['trials'], carcat=config['TCA']['pref_concat_cartesian_dim'])
+        save_factors(session['nwb'], factors_np_positional, 'positional', trials=general['trials'])
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
@@ -272,11 +265,9 @@ def full_tca_workflow(config_filepath, data_key):
     config = helpers.load_config(config_filepath)
     general = config['General']
 
-    freqs_Sxx = helpers.load_data(config_filepath, 'freqs_Sxx')
     for session in general['sessions']:
         positions_toUse = helpers.load_nwb_ts(session['nwb'],'Optic Flow', data_key)
         Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_norm')
-        Sxx_allPixels_normFactor = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_normFactor')
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])
             Sxx_allPixels_norm = trial_reshape_frequential(positions_toUse, Sxx_allPixels_norm, trial_inds)
@@ -286,13 +277,10 @@ def full_tca_workflow(config_filepath, data_key):
         helpers.print_time('Decomposition completed', time.time() - tic)
 
         interp_dim = session['trial_len'] if general['trials'] else session['numFrames_total']
-        if config['TCA']['pref_concat_cartesian_dim']:
-            factors_temporal_interp = interpolate_temporal_factor(factors_np[-1], interp_dim)
-        else:
-            factors_temporal_interp = interpolate_temporal_factor(factors_np[-2], interp_dim)
+        factors_temporal_interp = interpolate_temporal_factor(factors_np[-1], interp_dim)
+
         helpers.create_nwb_group(session['nwb'], 'TCA')
         save_factors(session['nwb'], factors_np, 'spectral', factors_temporal_interp, trials=general['trials'])
-
 
         helpers.print_time('total elapsed time', time.time() - tic_all)
         print(f'== End Full TCA ==')

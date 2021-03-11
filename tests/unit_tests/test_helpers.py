@@ -13,10 +13,10 @@ from face_rhythm.util import  helpers
 #         nwbfile = io.read()
 #         assert group_name in nwbfile.processing['Face Rhythm'].data_interfaces.keys()
 #
-# def test_create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
-#     nwb_path = Path('data') / 'nwbs' / 'nwb_silver.nwb'
-#     group_name = 'Gold'
-#     ts_name = 'test'
-#     data = []
-#     Fs = 1
-#     helpers.create_nwb_ts(nwb_path, group_name, ts_name, data, Fs)
+def test_create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
+    nwb_path = Path('data') / 'nwbs' / 'nwb_silver.nwb'
+    group_name = 'Gold'
+    ts_name = 'test'
+    data = []
+    Fs = 1
+    helpers.create_nwb_ts(nwb_path, group_name, ts_name, data, Fs)

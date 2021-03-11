@@ -105,12 +105,6 @@ def cqt_workflow(config_filepath, data_key):
         Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[None,None,:,:]
         #Sxx_allPixels_norm.shape
 
-        plt.figure()
-        plt.imshow(Sxx_allPixels_norm[cqt['pixelNum_toUse'], :, :, 0], aspect='auto', cmap='hot', origin='lower')
-
-        plt.figure()
-        plt.plot(Sxx_allPixels_normFactor)
-
         helpers.create_nwb_group(session['nwb'], 'CQT')
         helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels', Sxx_allPixels,1.0)
         helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm,1.0)
