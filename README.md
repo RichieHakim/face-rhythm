@@ -52,7 +52,6 @@ conda activate face-rhythm
 ```
 3. Run the set up script
 ```
-cd face-rhythm
 pip install -e . 
 ```
 4. Install the correct version of cuda toolkit (if you plan on using a gpu). [This link](https://anaconda.org/anaconda/cudatoolkit) and [this link](https://pytorch.org/get-started/locally/) are useful for figuring that out
