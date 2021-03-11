@@ -5,9 +5,8 @@ from face_rhythm.util import helpers
 from face_rhythm.analysis import tca
 
 import pdb
-
-FACTOR_UNITS = {'positional':['trials','point number','time (s)'],
-                'spectral':['trials','point number', 'frequency (Hz)','time (s)']}
+FACTOR_UNITS = {'positional':['point number','time (s)','trials'],
+                'spectral':['point number', 'frequency (Hz)','time (binned)','time (s)','trials',]}
 
 def plot_pca_diagnostics(config_filepath):
     """

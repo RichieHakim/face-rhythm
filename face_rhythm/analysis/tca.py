@@ -211,8 +211,11 @@ def positional_tca_workflow(config_filepath, data_key):
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])
             positions_convDR_meanSub = trial_reshape_positional(positions_convDR_meanSub, trial_inds)
+            positions_convDR_meanSub = positions_convDR_meanSub.transpose(0, 1, 3, 2)
+        else:
+            positions_convDR_meanSub = positions_convDR_meanSub.transpose(0, 2, 1)
 
-        factors_np_positional = tca(config_filepath, positions_convDR_meanSub.transpose(0,2,1) , 0)
+        factors_np_positional = tca(config_filepath, positions_convDR_meanSub, 0)
 
         helpers.create_nwb_group(session['nwb'], 'TCA')
         save_factors(session['nwb'], factors_np_positional, 'positional', trials=general['trials'])
