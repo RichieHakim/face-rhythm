@@ -41,7 +41,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 1. Clone this repo to a good location 
 ```
 git clone https://github.com/RichieHakim/face-rhythm/
-git checkout testing
+git checkout release
 ```
 
 2. Create a conda environment 
@@ -69,5 +69,7 @@ cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/
 ```
 jupyter notebook
 ```
+If you run into a kernel error at this stage and are a Windows user, check out: 
+https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-issues
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
