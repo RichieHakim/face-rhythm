@@ -297,7 +297,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
         old_frame = new_frame_gray
 
         print(f'\n Calculating displacement field: video # {vidNum_iter+1}/{numVids}')
-        for iter_frame , new_frame in enumerate(vid):
+        for iter_frame , new_frame in enumerate(tqdm(vid, total=numFrames_rough)):
 
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 

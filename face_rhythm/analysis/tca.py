@@ -21,7 +21,7 @@ from pynwb import NWBHDF5IO
 from face_rhythm.util import helpers
 
 
-FACTOR_NAMES = {'positional': ['points','temporal'],
+FACTOR_NAMES = {'positional': ['points','cartesian','temporal'],
                 'spectral': ['points','spectral','temporal','cartesian']}
 
 
@@ -88,149 +88,7 @@ def tca(config_filepath, input_array, pref_non_negative):
     return factors_np
 
 
-def plot_factors(config_filepath, factors_np):
-    """
-    plots the positional factors for visualization / analysis
-
-    Args:
-        config_filepath (Path): path to the config file
-        factors_np (list): list of factors
-
-    Returns:
-
-    """
-
-    factors_toUse = factors_np
-    modelRank = factors_toUse[-2].shape[1]
-    ## just for plotting in case 
-#     if 'Fs' not in globals():
-#         Fs = 120
-    config = helpers.load_config(config_filepath)
-    Fs = config['Video']['Fs']
-
-    plt.figure()
-    # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
-    factors_temporal = scipy.stats.zscore(factors_toUse[-1][:,:] , axis=0)
-    factors_temporal = factors_toUse[-1][:,:]
-    # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
-    # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
-    plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,])
-    # plt.plot(factors_temporal[:,:])
-    plt.legend(np.arange(modelRank)+1)
-    plt.xlabel('time (s)')
-    plt.ylabel('a.u.')
-
-
-    plt.figure()
-    plt.plot(factors_toUse[-2][:,:])
-    plt.legend(np.arange(modelRank)+1)
-    plt.xlabel('x vs. y')
-    plt.ylabel('a.u.')
-
-    plt.figure()
-    plt.plot(factors_toUse[-3][:,:])
-    plt.legend(np.arange(modelRank)+1)
-    plt.xlabel('pixel number')
-    plt.ylabel('a.u.')
-
-
-    plt.figure()
-    plt.imshow(np.single(np.corrcoef(factors_toUse[-1][:,:].T)))
-
-    # input_dimRed = factors_toUse[2][:,:]
-    # # input_dimRed_meanSub = 
-    # pca = sk.decomposition.PCA(n_components=modelRank-2)
-    # # pca = sk.decomposition.FactorAnalysis(n_components=3)
-    # pca.fit(np.single(input_dimRed).transpose())
-    # output_PCA = pca.components_.transpose()
-    # # scores_points = np.dot(ensemble.factors(4)[0][2] , output_PCA)
-
-    # plt.figure()
-    # plt.plot(output_PCA)
-
-def plot_trial_factor(trial_factor):
-    """
-    plots the trial factors for visualization / analysis
-
-    Args:
-        trial_factor (np.ndarray): plot the trial dimension if it exists
-
-    Returns:
-
-    """
-    modelRank = trial_factor.shape[1]
-    plt.figure()
-    plt.plot(trial_factor)
-    plt.legend(np.arange(modelRank) + 1)
-    plt.xlabel('trial number')
-    plt.ylabel('a.u.')
-
-    
-    
-def plot_factors_full(config_filepath, factors_np, freqs_Sxx):
-    """
-    plots the full set of factors
-
-    Args:
-        config_filepath (Path): path to the config file
-        factors_np (list): list of factors
-        freqs_Sxx (np.ndarray): frequency array
-
-    Returns:
-
-    """
-
-    config = helpers.load_config(config_filepath)
-    Fs = config['Video']['Fs']
-    # This bit is just to offset the indexing due to the loss of the last dimension in the case of concatenating the cartesian dimension
-    if config['TCA']['pref_concat_cartesian_dim']:
-        ind_offset = 1
-    else:
-        ind_offset = 0
-
-    factors_toUse = factors_np
-    modelRank = factors_toUse[0].shape[1]
-
-    plt.figure()
-    # plt.plot(np.arange(factors_toUse.factors(4)[0][2].shape[0])/Fs , factors_toUse.factors(4)[0][2])
-    # factors_temporal = scipy.stats.zscore(factors_toUse[2][:,:] , axis=0)
-    factors_temporal = factors_toUse[-2+ind_offset][:,:]
-    # factors_temporal = scipy.stats.zscore(factors_temporal_reconstructed , axis=0)
-    # plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,:])
-    plt.plot(np.arange(factors_temporal.shape[0])/Fs, factors_temporal[:,])
-    # plt.plot(factors_temporal[:,:])
-    plt.legend(np.arange(modelRank)+1)
-    plt.xlabel('time (s)')
-    plt.ylabel('a.u.')
-
-    plt.figure()
-    plt.plot(freqs_Sxx , (factors_toUse[-3+ind_offset][:,:]))
-    # plt.plot(freqXaxis , (factors_toUse[1][:,:]))
-    # plt.plot(f , (factors_toUse[1][:,:]))
-    # plt.plot((factors_toUse[1][:,:]))
-    plt.legend(np.arange(modelRank)+1)
-    plt.xscale('log')
-    plt.xlabel('frequency (Hz)')
-    plt.ylabel('a.u.')
-    # plt.xscale('log')
-
-    plt.figure()
-    plt.plot(factors_toUse[-1+ind_offset][:,:])
-    plt.legend(np.arange(modelRank)+1)
-    plt.xlabel('x vs. y')
-    plt.ylabel('a.u.')
-
-    plt.figure()
-    plt.plot(factors_toUse[-4+ind_offset][:,:])
-    plt.legend(np.arange(modelRank)+1)
-    plt.xlabel('pixel number')
-    plt.ylabel('a.u.')
-
-    config['modelRank'] = modelRank
-    helpers.save_config(config, config_filepath)
-
-
-def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, trials = False):
+def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, trials = False, carcat = False):
     """
     load factors from nwb file
 
@@ -244,8 +102,12 @@ def save_factors(nwb_path, factors_all, ftype, factors_temporal_interp = None, t
     Returns:
 
     """
-    factor_names = FACTOR_NAMES[ftype]
-    factor_names = (['trials'] + factor_names) if trials else factor_names
+    factor_names = FACTOR_NAMES[ftype].copy()
+    if trials:
+        factor_names = ['trials'] + factor_names
+    elif carcat:
+        factor_names.remove('cartesian')
+
     for i, factor in enumerate(factors_all):
         helpers.create_nwb_ts(nwb_path, 'TCA', f'factors_{ftype}_{factor_names[i]}', factor, 1.0)
     if factors_temporal_interp is not None:
@@ -358,12 +220,9 @@ def positional_tca_workflow(config_filepath, data_key):
 
         factors_np_positional = tca(config_filepath, positions_convDR_meanSub.transpose(0,2,1) , 0)
 
-        # plot_factors(config_filepath, factors_np_positional)
-        # if general['trials']:
-        #     plot_trial_factor(factors_np_positional[0])
-
         helpers.create_nwb_group(session['nwb'], 'TCA')
-        save_factors(session['nwb'], factors_np_positional, 'positional', trials=general['trials'])
+        save_factors(session['nwb'], factors_np_positional, 'positional',
+                     trials=general['trials'], carcat=config['TCA']['pref_concat_cartesian_dim'])
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
@@ -425,11 +284,6 @@ def full_tca_workflow(config_filepath, data_key):
         tic = time.time()
         factors_np = tca(config_filepath, Sxx_allPixels_norm , 1)
         helpers.print_time('Decomposition completed', time.time() - tic)
-
-        # plot_factors_full(config_filepath, factors_np, freqs_Sxx, Sxx_allPixels_normFactor)
-
-        if general['trials']:
-            plot_trial_factor(factors_np[0])
 
         interp_dim = session['trial_len'] if general['trials'] else session['numFrames_total']
         if config['TCA']['pref_concat_cartesian_dim']:

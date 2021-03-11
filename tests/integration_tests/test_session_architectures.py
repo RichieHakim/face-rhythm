@@ -41,10 +41,7 @@ def test_single_session_single_video():
         pts_all = helpers.h5_to_dict(pt)
     helpers.save_h5(config_filepath, 'pts_all', pts_all)
 
-
-    from face_rhythm.optic_flow import optic_flow
-
-    # Optic FLow
+    # Optic Flow
     config = helpers.load_config(config_filepath)
     config['Optic']['vidNums_toUse'] = [0]
     config['Optic']['spacing'] = 16
@@ -82,6 +79,7 @@ def test_single_session_single_video():
     config['CDR']['width_cosKernel'] = 48
     config['CDR']['num_dots'] = pointInds_toUse.shape[0]
     config['CDR']['spacing'] = 16
+    config['CDR']['display_points'] = False
     config['CDR']['vidNum'] = 0
     config['CDR']['frameNum'] = 1
     config['CDR']['dot_size'] = 1
@@ -147,5 +145,4 @@ def test_single_session_single_video():
     config['TCA']['pref_concat_cartesian_dim'] = True  # New option
     helpers.save_config(config, config_filepath)
 
-if __name__ == '__main__':
-    test_single_session_single_video()
+
