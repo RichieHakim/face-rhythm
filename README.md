@@ -40,7 +40,8 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
 1. Clone this repo to a good location 
 ```
-git clone https://github.com/RichieHakim/face-rhythm/
+git clone https://github.com/akshay-jaggi/face-rhythm/
+cd face-rhythm
 git checkout release
 ```
 
@@ -51,7 +52,6 @@ conda activate face-rhythm
 ```
 3. Run the set up script
 ```
-cd face-rhythm
 pip install -e . 
 ```
 4. Install the correct version of cuda toolkit (if you plan on using a gpu). [This link](https://anaconda.org/anaconda/cudatoolkit) and [this link](https://pytorch.org/get-started/locally/) are useful for figuring that out
