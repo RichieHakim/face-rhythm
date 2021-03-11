@@ -12,8 +12,8 @@ from pathlib import Path
 def test_single_session_single_video():
     # SETUP
     run_name = 'single_session_single_video'
-    project_path = Path('../../test_runs/'+run_name).resolve()
-    video_path = Path('../../test_data/'+run_name).resolve()
+    project_path = Path('test_runs/'+run_name).resolve()
+    video_path = Path('test_data/'+run_name).resolve()
     overwrite_config = False
     remote = False
     trials = False
@@ -37,7 +37,7 @@ def test_single_session_single_video():
     config['ROI']['load_from_file'] = True  # if you've already run this and want to use the existing ROI, set to True
     helpers.save_config(config, config_filepath)
     #special line to just grab the points
-    with h5py.File(Path('../../test_data/pts_all.h5'), 'r') as pt:
+    with h5py.File(Path('test_data/pts_all.h5'), 'r') as pt:
         pts_all = helpers.h5_to_dict(pt)
     helpers.save_h5(config_filepath, 'pts_all', pts_all)
 
