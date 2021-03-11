@@ -10,6 +10,14 @@ import numpy as np
 # colors
 # Then copy and paste the printed array into here
 def make_custom_cmap():
+    """
+    creates custom color map
+
+    Args:
+
+    Returns:
+        cmap (np.ndarray): custom colormap
+    """
     cmap = np.array(
         [
             [58.0, 172.0, 255.0],

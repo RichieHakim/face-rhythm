@@ -12,16 +12,13 @@ from pynwb.behavior import BehavioralTimeSeries
 
 
 def load_config(config_filepath):
-    """
-    Loads config file into memory
+    """Loads config file into memory
     
-    Parameters
-    ----------
-    config_filepath (Path): path to config file
+    Args:
+        config_filepath (Path): path to config file
     
-    Returns
-    -------
-    config (dict) : actual config dict
+    Returns:
+        config (dict): actual config dict
     
     """
     with open(config_filepath, 'r') as f:
@@ -33,13 +30,11 @@ def save_config(config, config_filepath):
     """
     Dumps config file to yaml
     
-    Parameters
-    ----------
-    config (dict): config dict
-    config_filepath (Path): path to config file
+    Args:
+        config (dict): config dict
+        config_filepath (Path): path to config file
     
-    Returns
-    -------
+    Returns:
     
     """
     with open(config_filepath, 'w') as f:
@@ -50,13 +45,11 @@ def create_nwb_group(nwb_path, group_name):
     """
     Create an NWB BehavioralTimeSeries for grouping data
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    group_name (str): name of group to be created
+    Args:
+        config_filepath (Path): path to the config file
+        group_name (str): name of group to be created
 
-    Returns
-    -------
+    Returns:
 
     """
     with NWBHDF5IO(nwb_path,'a') as io:
@@ -72,15 +65,14 @@ def create_nwb_ts(nwb_path, group_name, ts_name, data, Fs):
     """
     Create a new TimeSeries for data to write
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    group_name (str): name of group to write to
-    ts_name (str): name of new ts
-    data (np.array): data to be written
+    Args:
+        config_filepath (Path): path to the config file
+        group_name (str): name of group to write to
+        ts_name (str): name of new ts
+        data (np.array): data to be written
+        Fs (float): frequency of the data being written
 
-    Returns
-    -------
+    Returns:
 
     """
     print(f'Saving {ts_name} in Group {group_name}')
@@ -104,14 +96,12 @@ def load_nwb_ts(nwb_path, group_name, ts_name):
     """
     Create a new TimeSeries for data to write
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    group_name (str): name of group to write to
-    ts_name (str): name of ts
+    Args:
+        config_filepath (Path): path to the config file
+        group_name (str): name of group to write to
+        ts_name (str): name of ts
 
-    Returns
-    -------
+    Returns:
 
     """
     with NWBHDF5IO(nwb_path, 'a') as io:
@@ -123,14 +113,12 @@ def save_data(config_filepath, save_name, data_to_save):
     """
     save an npy file with data
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    save_name (str): name of the object to be saved
-    data_to_save (np.ndarray): (usually) a numpy array
+    Args:
+        config_filepath (Path): path to the config file
+        save_name (str): name of the object to be saved
+        data_to_save (np.ndarray): (usually) a numpy array
 
-    Returns
-    -------
+    Returns:
 
     """
     config = load_config(config_filepath)
@@ -145,14 +133,12 @@ def load_data(config_filepath, data_key):
     """
     load an npy file with data
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    data_key (str): config key for the target data
+    Args:
+        config_filepath (Path): path to the config file
+        data_key (str): config key for the target data
 
-    Returns
-    -------
-    data (np.ndarray): (usually) an np array with data
+    Returns:
+        data (np.ndarray): a np array with data
 
     """
 
@@ -164,14 +150,12 @@ def save_h5(config_filepath, save_name, data_dict):
     """
     save an h5 file from a data dictionary
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    save_name (str): name of the object to be saved
-    data_dict (dict): dict of numpy arrays
+    Args:
+        config_filepath (Path): path to the config file
+        save_name (str): name of the object to be saved
+        data_dict (dict): dict of numpy arrays
 
-    Returns
-    -------
+    Returns:
 
     """
     config = load_config(config_filepath)
@@ -190,14 +174,11 @@ def load_h5(config_filepath, data_key):
     load an h5 file into a data dictionary
     proceed with caution given that this loads the entire h5 file into mem
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    save_name (str): name of the object to be saved
-    data_dict (dict): dict of numpy arrays
+    Args:
+        config_filepath (Path): path to the config file
+        data_key (str): name of the data to be loaded
 
-    Returns
-    -------
+    Returns:
 
     """
     config = load_config(config_filepath)
@@ -208,13 +189,11 @@ def print_time(action, time):
     """
     prints the time adjusted for hours/minutes/seconds based on length
 
-    Parameters
-    ----------
-    action (str): description of the completed action
-    time (float): elapsed time
+    Args:
+        action (str): description of the completed action
+        time (float): elapsed time
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -234,18 +213,16 @@ def print_time(action, time):
 
 
 def h5_to_dict(h5file, path='/'):
-    '''
+    """
     Reads all contents from h5 and returns them in a nested dict object.
 
-    Parameters
-    ----------
-    h5file (str): path to h5 file
-    path (str): path to group within h5 file
+    Args:
+        h5file (str): path to h5 file
+        path (str): path to group within h5 file
 
-    Returns
-    -------
+    Returns:
     ans (dict): dictionary of all h5 group contents
-    '''
+    """
 
     ans = {}
 
@@ -263,17 +240,15 @@ def h5_to_dict(h5file, path='/'):
 
 
 def dict_to_h5(data_dict, h5):
-    '''
+    """
     Quick and dirty dict dumper to h5
 
-    Parameters
-    ----------
-    data_dict (dict): dictionary (potentially nested) of data!
-    h5 (h5py.File): h5 File (or Group) to populate
+    Args:
+        data_dict (dict): dictionary (potentially nested) of data!
+        h5 (h5py.File): h5 File (or Group) to populate
 
-    Returns
-    -------
-    '''
+    Returns:
+    """
 
     for key, item in data_dict.items():
         if isinstance(item, dict):
@@ -284,6 +259,14 @@ def dict_to_h5(data_dict, h5):
 
 
 def dump_nwb(nwb_path):
+    """
+    Print out nwb contents
+
+    Args:
+        nwb_path (str): path to the nwb file
+
+    Returns:
+    """
     io = pynwb.NWBHDF5IO(nwb_path, 'r')
     nwbfile = io.read()
     for interface in nwbfile.processing['Face Rhythm'].data_interfaces:

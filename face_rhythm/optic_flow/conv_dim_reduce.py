@@ -19,15 +19,13 @@ def make_distance_matrix(center_idx, vid_height, vid_width):
     """
     creates a matrix of cartesian coordinate distances from the center
 
-    Parameters
-    ----------
-    center_idx (): chosen center index
-    vid_height (): height of the video
-    vid_width (): width of the video
+    Args:
+        center_idx (list): chosen center index
+        vid_height (int): height of the video in pixels
+        vid_width (int): width of the video in pixels
 
-    Returns
-    -------
-    distance_matrix (): array of distances to the center index
+    Returns:
+        distance_matrix (np.ndarray): array of distances to the center index
 
     """
 
@@ -39,15 +37,13 @@ def create_kernel(config_filepath, point_idxs):
     """
     creates convolutional kernel
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    point_idxs ():
+    Args:
+        config_filepath (Path): path to the config file
+        point_idxs (np.ndarray): point indices
 
-    Returns
-    -------
-    cos_kernel ():
-    cos_kernel_mean ():
+    Returns:
+        cos_kernel (np.ndarray): cosine kernel
+        cos_kernel_mean (np.ndarray): mean of cosine kernel
     """
 
     config = helpers.load_config(config_filepath)
@@ -75,14 +71,12 @@ def space_points(config_filepath, pts_all):
     """
     spaces out the points
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    pts_all (dict): dict of point arrays
+    Args:
+        config_filepath (Path): path to the config file
+        pts_all (dict): dict of point arrays
 
-    Returns
-    -------
-    pts_spaced_convDR (): spaced out point array
+    Returns:
+        pts_spaced_convDR (np.ndarray): spaced out point array
     """
 
     config = helpers.load_config(config_filepath)
@@ -111,16 +105,16 @@ def space_points(config_filepath, pts_all):
 
 def points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel):
     """
-    shows the points
+    shows the points with the cosKernel overlayed
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
-    pts_all (dict): dict of point arrays
-    pts_spaced_convDR (): array of spaced points
+    Args:
+        config_filepath (Path): path to the config file
+        session (dict): current session dictionary
+        pts_all (dict): dict of point arrays
+        pts_spaced_convDR (np.ndarray): array of spaced points
+        cosKernel (np.ndarray): cosine kernel
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -155,19 +149,17 @@ def makeConvDR(ii, input_traces, cos_kernel, cos_kernel_mean, pca, rank_reduced,
     performs the convolutional dimensionality reduction
     called within the multithreading
 
-    Parameters
-    ----------
-    ii ():
-    input_traces ():
-    cos_kernel ():
-    cos_kernel_mean ():
-    pca ():
-    rank_reduced ():
-    dots_new ():
+    Args:
+        ii ():
+        input_traces ():
+        cos_kernel ():
+        cos_kernel_mean ():
+        pca ():
+        rank_reduced ():
+        dots_new ():
 
-    Returns
-    -------
-    positions_convDR_meanSub ():
+    Returns:
+        positions_convDR_meanSub ():
 
     """
 
@@ -200,19 +192,17 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     """
     performs single-threaded convolutional dimensionality reduction
 
-    Parameters
-    ----------
-    config_filepath ():
-    pointInds_toUse ():
-    pts_spaced_convDR ():
-    cosKernel ():
-    cosKernel_mean ():
-    positions_new_sansOutliers ():
+    Args:
+        config_filepath (Path): path to current config file
+        pointInds_toUse (np.ndarray): original point indices
+        pts_spaced_convDR (np.ndarray): point locations after dimensionality reduction
+        cosKernel (np.ndarray): cosine kernel
+        cosKernel_mean (np.ndarray): mean of the cosine kernel
+        positions_new_sansOutliers (np.ndarray): integrated positions
 
-    Returns
-    -------
-    positions_convDR_meanSub ():
-
+    Returns:
+        positions_convDR_meanSub (np.ndarray): positions after dim red with mean substracted
+        positions_convDR_absolute (np.ndarray): absolute positions after dim red
     """
 
     config = helpers.load_config(config_filepath)
@@ -256,6 +246,16 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
 
 
 def conv_dim_reduce_workflow(config_filepath):
+    """
+    sequences the steps for performing convolutional dimensionality reduction on the points
+
+    Args:
+        config_filepath (Path): path to the current config file
+
+    Returns:
+
+    """
+
     print(f'== Beginning convolutional dimensionality reduction ==')
     tic_all = time.time()
 
@@ -279,11 +279,11 @@ def conv_dim_reduce_workflow(config_filepath):
 
     for session in general['sessions']:
         tic_session = time.time()
-        points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
+        if config['CDR']['display_points']:
+            points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
         positions_new_sansOutliers = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'positions')
         positions_convDR_meanSub, positions_convDR_absolute = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean, positions_new_sansOutliers)
-
 
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub, video['Fs'])
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute, video['Fs'])

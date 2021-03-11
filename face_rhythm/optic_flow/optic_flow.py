@@ -20,19 +20,19 @@ def setup(config, session, pts_all):
     """
     initializes the arrays for optic flow analysis
 
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    pts_all (dict): dictionary of important points
+    Args:
+        config (dict): dictionary of config parameters
+        session (dict): dictionary of session parameters
+        pts_all (dict): dictionary of important points
 
-    Returns
-    -------
-    pointInds_toUse
-    pointInds_tracked
-    pointInds_tracked_tuple
-    displacements
-    pts_spaced
-    color_tuples
+    Returns:
+        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+        pointInds_tracked (np.ndarray): points for plotting
+        pointInds_tracked_tuple (list of tuples): points for plotting
+        displacements (np.ndarray): array of displacements
+        pts_spaced (np.ndarray): spaced out points (similar to pointInds_toUse)
+        color_tuples (list of tuples): colors for plotting
+        positions_recursive (np.ndarray): recursively updated point locations
     """
     optic = config['Optic']
     general = config['General']
@@ -94,19 +94,19 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
     Computes the optic flow between frames
     Saves this to displacements frame
 
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    pointInds_toUse ():
-    pointInds_tracked ():
-    pointInds_tracked_tuple ():
-    displacements ():
-    pts_spaced ():
+    Args:
+        config (dict): dictionary of config parameters
+        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+        pointInds_tracked (np.ndarray): points for plotting
+        pointInds_tracked_tuple (list of tuples): points for plotting
+        displacements (np.ndarray): array of displacements
+        pts_spaced (np.ndarray): spaced out point locations
+        color_tuples (list of tuples): colors for plotting
+        session (dict): dict of session parameters
 
-    Returns
-    -------
-    displacements (): array of displacements
-    numFrames_total (int): number of frames
+    Returns:
+        displacements (np.ndarray): array of displacements
+        numFrames_total (int): number of frames
     """
 
     ## Main loop to pull out displacements in each video
@@ -228,19 +228,20 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     Computes the optic flow between frames
     Saves this to displacements frame
 
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    pointInds_toUse ():
-    pointInds_tracked ():
-    pointInds_tracked_tuple ():
-    displacements ():
-    pts_spaced ():
+    Args:
+        config (dict): dictionary of config parameters
+        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+        pointInds_tracked_tuple (list of tuples): points for plotting
+        positions_recursive(np.ndarray): recursively updated point locations
+        pts_spaced (np.ndarray): spaced out points locations
+        color_tuples (list of tuples): colors for plotting
+        relaxation_factor (float): relaxation factor between frames
+        session (dict): dict of session parameters
 
-    Returns
-    -------
-    displacements (): array of displacements
-    numFrames_total (int): number of frames
+    Returns:
+        displacements (np.ndarray): array of displacements
+        numFrames_total (int): number of frames
+        positions_recursive (np.ndarray): recursively updated point locations
     """
 
     ## Main loop to pull out displacements in each video
@@ -296,7 +297,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
         old_frame = new_frame_gray
 
         print(f'\n Calculating displacement field: video # {vidNum_iter+1}/{numVids}')
-        for iter_frame , new_frame in enumerate(vid):
+        for iter_frame , new_frame in enumerate(tqdm(vid, total=numFrames_rough)):
 
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
@@ -369,18 +370,17 @@ def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced, session):  #
     similar to displacements monothread
     eventually refactor / recombine with displacements monothread
 
-    Parameters
-    ----------
-    vidNum_iter ():
-    config (dict): dictionary of config parameters
-    pointInds_toUse ():
-    displacements ():
-    pts_spaced ():
+    Args:
+        vidNum_iter (int): current video of analysis
+        config (dict): dictionary of config parameters
+        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+        displacements (np.ndarray): displacement of each point for each time step
+        pts_spaced (np.ndarray): spaced out points (similar to pointInds_toUse)
 
-    Returns
-    -------
-    displacements (): array of displacements
+    Returns:
+        displacements_tmp (np.ndarray): array of displacements
     """
+
     optic = config['Optic']
 
     numVids = session['num_vids']
@@ -433,17 +433,16 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     wrapper for multithreaded optic flow computation
     operates on multiple videos at once
 
-    Parameters
-    ----------
-    config (dict): dictionary of config parameters
-    pointInds_toUse ():
-    displacements ():
-    pts_spaced ():
+    Args:
+        config (dict): dictionary of config parameters
+        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+        displacements (np.ndarray): displacement of each point for each time step
+        pts_spaced (np.ndarray): spaced out point locations
+        session (dict): dictionary of session level information
 
-    Returns
-    -------
-    displacements (): array of displacements
-    numFrames_total (int): number of frames
+    Returns:
+        displacements (np.ndarray): array of displacements
+        numFrames_total (int): number of frames
     """
 
     numVids = session['num_vids']
@@ -479,12 +478,10 @@ def optic_workflow(config_filepath):
     """
     sequences the steps of the optic flow computation
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 

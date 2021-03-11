@@ -1,8 +1,8 @@
-face\_rhythm.analysis package
+face\_rhythm.analysis module
 =============================
 
 
-Analysis - PCA
+PCA
 -------------------------------
 
 .. automodule:: face_rhythm.analysis.pca
@@ -10,7 +10,7 @@ Analysis - PCA
    :undoc-members:
    :show-inheritance:
 
-Analysis - Spectral Analysis
+Spectral Analysis
 -------------------------------
 
 .. automodule:: face_rhythm.analysis.spectral_analysis
@@ -18,7 +18,7 @@ Analysis - Spectral Analysis
    :undoc-members:
    :show-inheritance:
 
-Analysis - TCA
+TCA
 ------------------------------
 
 .. automodule:: face_rhythm.analysis.tca

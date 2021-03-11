@@ -15,12 +15,11 @@ def cqt_workflow(config_filepath, data_key):
     """
     computes spectral analysis on the cleaned optic flow output
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
+        data_key (str): data name on which to perform cqt
 
-    Returns
-    -------
+    Returns:
 
     """
     
@@ -106,12 +105,6 @@ def cqt_workflow(config_filepath, data_key):
         Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[None,None,:,:]
         #Sxx_allPixels_norm.shape
 
-        plt.figure()
-        plt.imshow(Sxx_allPixels_norm[cqt['pixelNum_toUse'], :, :, 0], aspect='auto', cmap='hot', origin='lower')
-
-        plt.figure()
-        plt.plot(Sxx_allPixels_normFactor)
-
         helpers.create_nwb_group(session['nwb'], 'CQT')
         helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels', Sxx_allPixels,1.0)
         helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm,1.0)
@@ -128,12 +121,10 @@ def cqt_positions(config_filepath):
     computes spectral analysis on the cleaned optic flow output
     similar to cqt_all (consider removing/refactoring)
 
-    Parameters
-    ----------
-    config_filepath (Path): path to the config file
+    Args:
+        config_filepath (Path): path to the config file
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -159,7 +150,7 @@ def cqt_positions(config_filepath):
     input_sgram = np.single(np.squeeze(factors_np_positional[2][:,3]))
 
     ## make a single spectrogram to get some size parameters for preallocation
-    Sxx_positional = librosa.cqt(np.squeeze(input_sgram), 
+    Sxx_positional = librosa.cqt(np.squeeze(input_sgram),
                                 sr=sr, 
                                 hop_length=hop_length, 
                                 fmin=fmin, 
@@ -187,10 +178,6 @@ def cqt_positions(config_filepath):
     plt.imshow(test, aspect='auto', cmap='hot', origin='lower')
     plt.figure()
     plt.imshow(test2, aspect='auto', cmap='hot', origin='lower')
-
-    # helpers.save_data(config_filepath, 'Sxx_positional', Sxx_positional)
-    # helpers.save_data(config_filepath, 'test', test)
-    # helpers.save_data(config_filepath, 'test2', test2)
 
     helpers.create_nwb_group(config_filepath, 'CQT')
     helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional', Sxx_positional)
