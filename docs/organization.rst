@@ -25,15 +25,15 @@ The file name stem is useful if there are other videos in this folder that you w
 
 Example
 
-Settings:
-video_folder = path/to/session1
-file_prefix = 'session1_chunk'
+| Settings:
+| video_folder = path/to/session1
+| file_prefix = 'session1_chunk'
 
-Organization:
-session1
-- session1_chunk1.avi <-analyzed
-- session1_chunk2.avi <-analyzed
-- session1_test.avi <-ignored
+| Organization:
+| session1
+| - session1_chunk1.avi <-analyzed
+| - session1_chunk2.avi <-analyzed
+| - session1_test.avi <-ignored
 
 
 2. Trials
@@ -43,17 +43,17 @@ two trials of length three, the indices would look like [[0,1,2],[3,4,5]]. To ad
 
 Example
 
-Settings:
-trials = True
-video_folder = path/to/session1
-file_prefix = 'session1_chunk'
+| Settings:
+| trials = True
+| video_folder = path/to/session1
+| file_prefix = 'session1_chunk'
 
-Organization:
-session1
-- session1_chunk1.avi <-analyzed
-- session1_chunk2.avi <-analyzed
-- session1_test.avi <-ignored
-- trial_indices.npy
+| Organization:
+| session1
+| - session1_chunk1.avi <-analyzed
+| - session1_chunk2.avi <-analyzed
+| - session1_test.avi <-ignored
+| - trial_indices.npy
 
 
 3. Multiple Sessions
@@ -67,16 +67,16 @@ are slightly different. Now we list the data folder and then set a session prefi
 
 Example
 
-Settings:
-data_folder = path/to/all_data
-session_prefix = 'session'
+| Settings:
+| data_folder = path/to/all_data
+| session_prefix = 'session'
 
-Organization:
-all_data
-- session1
-   - session1_chunk1.avi <-analyzed
-- session2
-   - session2_chunk1.avi <- analyzed
+| Organization:
+| all_data
+| - session1
+|    - session1_chunk1.avi <-analyzed
+| - session2
+|    - session2_chunk1.avi <- analyzed
 
 
 
