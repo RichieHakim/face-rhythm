@@ -8,7 +8,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
     git clone https://github.com/akshay-jaggi/face-rhythm/
     cd face-rhythm
-    git checkout release
+    git checkout dev
 
 
 2. Create a conda environment:
@@ -39,7 +39,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
     cd ..
     mkdir face_rhythm_runs
     mkdir face_rhythm_runs/run_00
-    cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/run_00/
+    cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_runs/run_00/
 
 6. Get started! I like to use jupyter notebook for this stuff:
 

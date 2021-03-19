@@ -11,6 +11,34 @@ from face_rhythm.util import helpers
 from face_rhythm.analysis import tca
 
 
+def prepare_freqs(config_filepath):
+    config = helpers.load_config(config_filepath)
+    eps = 1.19209e-07 #float32 eps
+    fmin_rough = config['CQT']['fmin_rough']
+    sampling_rate = config['CQT']['sampling_rate']
+    n_bins = config['CQT']['n_bins']
+
+    bins_per_octave = int(np.round((n_bins) / np.log2((sampling_rate / 2) / fmin_rough)))
+    fmin = ((sampling_rate / 2) / (2 ** ((n_bins) / bins_per_octave))) - (2 * eps)
+    fmax = fmin * (2 ** ((n_bins) / bins_per_octave))
+
+    freqs_Sxx = fmin * (2 ** ((np.arange(n_bins) + 1) / bins_per_octave))
+
+    print(f'bins_per_octave: {round(bins_per_octave)} bins/octave')
+    print(f'minimum frequency (fmin): {round(fmin, 3)} Hz')
+    print(f'maximum frequency (fmax): {round(fmax, 8)} Hz')
+    print(f'Nyquist                 : {sampling_rate / 2} Hz')
+    print(f'number of frequencies   : {n_bins} bins')
+    print(f'Frequencies: {np.round(freqs_Sxx, 3)}')
+    plt.figure()
+    plt.plot(freqs_Sxx)
+
+    config['CQT']['bins_per_octave'] = bins_per_octave
+    config['CQT']['fmin'] = fmin
+    config['CQT']['fmax'] = fmax
+
+    helpers.save_data(config_filepath, 'freqs_Sxx', freqs_Sxx)
+
 def cqt_workflow(config_filepath, data_key):
     """
     computes spectral analysis on the cleaned optic flow output
@@ -32,12 +60,10 @@ def cqt_workflow(config_filepath, data_key):
     cqt = config['CQT']
 
     hop_length = cqt['hop_length']
-    fmin_rough = cqt['fmin_rough']
-    sr = cqt['sr']
+    sampling_rate = cqt['sampling_rate']
     n_bins = cqt['n_bins']
     bins_per_octave = cqt['bins_per_octave']
     fmin = cqt['fmin']
-    pixelNum_toUse = cqt['pixelNum_toUse']
 
     freqs_Sxx = helpers.load_data(config_filepath, 'freqs_Sxx')
 
@@ -51,7 +77,7 @@ def cqt_workflow(config_filepath, data_key):
 
         ## make a single spectrogram to get some size parameters for preallocation
         Sxx = librosa.cqt(np.squeeze(input_sgram[0,0,:]),
-                          sr=sr,
+                          sr=sampling_rate,
                           hop_length=hop_length,
                           fmin=fmin,
                           n_bins=n_bins,
@@ -74,7 +100,7 @@ def cqt_workflow(config_filepath, data_key):
 
 
                 tmp = librosa.cqt(np.squeeze(input_sgram[ii,jj,:]),
-                                  sr=sr,
+                                  sr=sampling_rate,
                                   hop_length=hop_length,
                                   fmin=fmin,
                                   n_bins=n_bins,
@@ -112,77 +138,5 @@ def cqt_workflow(config_filepath, data_key):
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
-    helpers.print_time('total elapsed time', time.time() - tic_all)
-    print(f'== End spectrogram computation ==')
-
-
-def cqt_positions(config_filepath):
-    """
-    computes spectral analysis on the cleaned optic flow output
-    similar to cqt_all (consider removing/refactoring)
-
-    Args:
-        config_filepath (Path): path to the config file
-
-    Returns:
-
-    """
-
-    print(f'== Beginning Spectrogram Computation ==')
-    tic_all = time.time()
-    
-    ## get parameters
-    config = helpers.load_config(config_filepath)
-    hop_length = config['cqt_hop_length']
-    fmin_rough = config['cqt_fmin_rough']
-    sr = config['cqt_sr']
-    n_bins = config['cqt_n_bins']
-    bins_per_octave = config['cqt_bins_per_octave']
-    fmin = config['cqt_fmin']
-
-    factors_np_positional = tca.load_factors(config_filepath, 'factors_positional')
-    freqs_Sxx = helpers.load_data(config_filepath, 'path_freqs_Sxx')
-
-    print(f'starting spectrogram calculation')
-    tic = time.time()
-    
-    ## define positions traces to use
-    input_sgram = np.single(np.squeeze(factors_np_positional[2][:,3]))
-
-    ## make a single spectrogram to get some size parameters for preallocation
-    Sxx_positional = librosa.cqt(np.squeeze(input_sgram),
-                                sr=sr, 
-                                hop_length=hop_length, 
-                                fmin=fmin, 
-                                n_bins=n_bins, 
-                                bins_per_octave=bins_per_octave, 
-                                window=('hann'),
-                                filter_scale=0.8)
-    Sxx_positional = abs(Sxx_positional) * freqs_Sxx[:,None]
-    # Sxx_positional = abs(Sxx_positional)
-    # test = scipy.stats.zscore(Sxx_positional , axis=0)
-    test_std = np.std(Sxx_positional , axis=0)
-    test_sum = np.sum(Sxx_positional , axis=0)
-    test = Sxx_positional / (test_std[None,:] )
-    # test = (Sxx_positional) / (test_sum[None,:])
-    # test = test - np.min(test , axis=0)[None,:]
-    
-    helpers.print_time('Spectrogram', time.time() - tic_all)
-
-    test2 = scipy.stats.zscore(Sxx_positional , axis=1)
-    test2 = test2 - np.min(test2 , axis=1)[:,None]
-
-    plt.figure()
-    plt.imshow(Sxx_positional, aspect='auto', cmap='hot', origin='lower')
-    plt.figure()
-    plt.imshow(test, aspect='auto', cmap='hot', origin='lower')
-    plt.figure()
-    plt.imshow(test2, aspect='auto', cmap='hot', origin='lower')
-
-    helpers.create_nwb_group(config_filepath, 'CQT')
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional', Sxx_positional)
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional_norm', test)
-    helpers.create_nwb_ts(config_filepath, 'CQT', 'Sxx_positional_normFactor', test2)
-    
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End spectrogram computation ==')

@@ -1,11 +1,7 @@
-import sys
-import time
-import imageio
 
-import cv2
-import matplotlib
-from matplotlib import pyplot as plt
+import time
 import numpy as np
+import torch.cuda
 
 import scipy
 import scipy.signal
@@ -184,6 +180,16 @@ def trial_reshape_frequential(positions, spectrum, trial_inds):
     for i, trial_ind in enumerate(trial_inds):
         reshaped[i, ...] = spectrum[..., trial_ind,:]
     return reshaped
+
+
+def use_gpu(pref_useGPU):
+    if pref_useGPU:
+        cuda_device_number = torch.cuda.current_device()
+        print(f"using CUDA device: 'cuda:{cuda_device_number}'")
+        return f'cuda:{cuda_device_number}'
+    else:
+        print(f"using CPU")
+        return 'cpu'
 
 
 def positional_tca_workflow(config_filepath, data_key):
