@@ -14,8 +14,9 @@ User Guide
 .. toctree::
 
    installation
-   support
    standards
+   organization
+   support
 
 Programmer Reference
 --------------------

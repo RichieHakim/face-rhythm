@@ -23,57 +23,60 @@ This method of data organization works great if you're just trying analyze a sin
 We just assume that you provide us a folder with videos in it and a file name stem that helps us narrow down what videos you want.
 The file name stem is useful if there are other videos in this folder that you want to ignore.
 
-Example:
+Example
 
-Video_Folder
-- session1_chunk1.avi
-- session1_chunk2.avi
-- session1_test.avi
+Settings:
+video_folder = path/to/session1
+file_prefix = 'session1_chunk'
 
-
-
-1. Clone this repo to a good location:
-
-.. code-block:: console
-
-    git clone https://github.com/akshay-jaggi/face-rhythm/
-    cd face-rhythm
-    git checkout dev
+Organization:
+session1
+- session1_chunk1.avi <-analyzed
+- session1_chunk2.avi <-analyzed
+- session1_test.avi <-ignored
 
 
-2. Create a conda environment:
+2. Trials
+You may have divided up your session into trials. As described above, we just expect that you provide a list of list
+of frame indices indicating which frames belong to which trial. For example, if the total video is 6 frames long with
+two trials of length three, the indices would look like [[0,1,2],[3,4,5]]. To add trials, just add a trial index file.
 
-.. code-block:: console
+Example
 
-    conda create -n face-rhythm python=3.8
-    conda activate face-rhythm
+Settings:
+trials = True
+video_folder = path/to/session1
+file_prefix = 'session1_chunk'
+
+Organization:
+session1
+- session1_chunk1.avi <-analyzed
+- session1_chunk2.avi <-analyzed
+- session1_test.avi <-ignored
+- trial_indices.npy
 
 
-3. Run the set up script:
+3. Multiple Sessions
+You may want to analyze multiple sessions within a single Face Rhythm analysis. This is especially useful if you've
+optimized your workflow, and you want to start pushing more data through this pipeline. For general sanity, we
+require a somewhat strict organization of sessions to keep the workflow simple.
 
-.. code-block:: console
+We expect that you have a top level data folder full of session folders. We then expect that
+each session be a single folder with one or more videos inside it. To accommodate this setup, our parameters
+are slightly different. Now we list the data folder and then set a session prefix for which sessions we want.
 
-    pip install -e .
+Example
 
-4. Install the correct version of cuda toolkit (if you plan on using a gpu).
-`This link <https://anaconda.org/anaconda/cudatoolkit>`_ and `this link <https://pytorch.org/get-started/locally/>`_ are useful for figuring that out:
+Settings:
+data_folder = path/to/all_data
+session_prefix = 'session'
 
-.. code-block:: console
+Organization:
+all_data
+- session1
+   - session1_chunk1.avi <-analyzed
+- session2
+   - session2_chunk1.avi <- analyzed
 
-    conda install cudatoolkit=10.2
 
-5. Go ahead and create a "project directory" where you'd like your intermediate files, videos, and config files saved. Ideally outside of this repo so you don't have to worry about it when pushing and pulling. Again, given that your ipynb will change a lot (get populated with plots and new parameters, it's good to copy this out of the repo while you're doing analysis.
-
-.. code-block:: console
-
-    cd ..
-    mkdir face_rhythm_runs
-    mkdir face_rhythm_runs/run_00
-    cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_runs/run_00/
-
-6. Get started! I like to use jupyter notebook for this stuff:
-
-.. code-block:: console
-
-    jupyter notebook
 
