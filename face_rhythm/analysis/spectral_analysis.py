@@ -38,6 +38,7 @@ def prepare_freqs(config_filepath):
     config['CQT']['fmax'] = fmax
 
     helpers.save_data(config_filepath, 'freqs_Sxx', freqs_Sxx)
+    helpers.save_config(config, config_filepath)
 
 def cqt_workflow(config_filepath, data_key):
     """

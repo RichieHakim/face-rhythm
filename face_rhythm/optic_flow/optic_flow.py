@@ -269,9 +269,14 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
 
     numVids = session['num_vids']
     path_vid_allFiles = session['videos']
-    lk_names = [key for key in optic.keys() if 'lk_' in key]
-    lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
+    # lk_names = [key for key in optic.keys() if 'lk_' in key]
+    # lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
+    #              for k in lk_names}
+    
+    lk_names = [key for key in optic['lk'].keys()]
+    lk_params = {k: (tuple(optic['lk'][k]) if type(optic['lk'][k]) is list else optic['lk'][k]) \
                  for k in lk_names}
+    
 
     # Define the codec and create VideoWriter object
     if showVideo_pref and remote:
