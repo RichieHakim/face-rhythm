@@ -104,7 +104,7 @@ def load_nwb_ts(nwb_path, group_name, ts_name):
     Returns:
 
     """
-    with NWBHDF5IO(nwb_path, 'a') as io:
+    with NWBHDF5IO(nwb_path, 'r') as io:
         nwbfile = io.read()
         return nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()]
 
@@ -278,4 +278,13 @@ def dump_nwb(nwb_path):
 
 def absolute_index(session, vid_num, iter_frame):
     return int(sum(session['vid_lens'][:vid_num]) + iter_frame)
+
+
+def get_pts(nwb_path):
+    pts_all = {}
+    with NWBHDF5IO(nwb_path, 'r') as io:
+        nwbfile = io.read()
+        for ts_name, ts in nwbfile.processing['Face Rhythm']['Original Points'].time_series.items():
+            pts_all[ts_name] = ts.data[()]
+    return pts_all
 

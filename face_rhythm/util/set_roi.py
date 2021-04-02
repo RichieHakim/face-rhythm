@@ -130,11 +130,20 @@ def process_roi(config_filepath, frame, bs):
     pts_displacement, pts_x_displacement, pts_y_displacement = pts, pts_x, pts_y
     mask_frame_displacement = mask_frame
     cv2.destroyAllWindows()
+
+    config = helpers.load_config(config_filepath)
+    general = config['General']
+    roi = config['ROI']
+    video = config['Video']
+    session = general['sessions'][roi['session_to_set']]
+    helpers.create_nwb_group(session['nwb'], 'Original Points')
+
     pts_all = dict([
-        ('bbox_subframe_displacement', bbox_subframe_displacement),
-        ('pts_displacement', pts_displacement),
-        ('pts_x_displacement', pts_x_displacement),
-        ('pts_y_displacement', pts_y_displacement),
-        ('mask_frame_displacement', mask_frame_displacement)
+        ('bbox_subframe_displacement', np.array(bbox_subframe_displacement)),
+        ('pts_displacement', np.array(pts_displacement)),
+        ('pts_x_displacement', np.array(pts_x_displacement)),
+        ('pts_y_displacement', np.array(pts_y_displacement)),
+        ('mask_frame_displacement', np.array(mask_frame_displacement))
     ])
-    helpers.save_h5(config_filepath, 'pts_all', pts_all)
+    for point_name, points in pts_all.items():
+        helpers.create_nwb_ts(session['nwb'], 'Original Points', point_name, points, video['Fs'])

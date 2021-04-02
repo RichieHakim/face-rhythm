@@ -13,32 +13,34 @@ from face_rhythm.util import helpers
 
 def prepare_freqs(config_filepath):
     config = helpers.load_config(config_filepath)
-    eps = 1.19209e-07 #float32 eps
-    fmin_rough = config['CQT']['fmin_rough']
-    sampling_rate = config['CQT']['sampling_rate']
-    n_bins = config['CQT']['n_bins']
+    for session in config['General']['sessions']:
+        eps = 1.19209e-07 #float32 eps
+        fmin_rough = config['CQT']['fmin_rough']
+        sampling_rate = config['CQT']['sampling_rate']
+        n_bins = config['CQT']['n_bins']
 
-    bins_per_octave = int(np.round((n_bins) / np.log2((sampling_rate / 2) / fmin_rough)))
-    fmin = ((sampling_rate / 2) / (2 ** ((n_bins) / bins_per_octave))) - (2 * eps)
-    fmax = fmin * (2 ** ((n_bins) / bins_per_octave))
+        bins_per_octave = int(np.round((n_bins) / np.log2((sampling_rate / 2) / fmin_rough)))
+        fmin = ((sampling_rate / 2) / (2 ** ((n_bins) / bins_per_octave))) - (2 * eps)
+        fmax = fmin * (2 ** ((n_bins) / bins_per_octave))
 
-    freqs_Sxx = fmin * (2 ** ((np.arange(n_bins) + 1) / bins_per_octave))
+        freqs_Sxx = fmin * (2 ** ((np.arange(n_bins) + 1) / bins_per_octave))
 
-    print(f'bins_per_octave: {round(bins_per_octave)} bins/octave')
-    print(f'minimum frequency (fmin): {round(fmin, 3)} Hz')
-    print(f'maximum frequency (fmax): {round(fmax, 8)} Hz')
-    print(f'Nyquist                 : {sampling_rate / 2} Hz')
-    print(f'number of frequencies   : {n_bins} bins')
-    print(f'Frequencies: {np.round(freqs_Sxx, 3)}')
-    plt.figure()
-    plt.plot(freqs_Sxx)
+        print(f'bins_per_octave: {round(bins_per_octave)} bins/octave')
+        print(f'minimum frequency (fmin): {round(fmin, 3)} Hz')
+        print(f'maximum frequency (fmax): {round(fmax, 8)} Hz')
+        print(f'Nyquist                 : {sampling_rate / 2} Hz')
+        print(f'number of frequencies   : {n_bins} bins')
+        print(f'Frequencies: {np.round(freqs_Sxx, 3)}')
+        plt.figure()
+        plt.plot(freqs_Sxx)
 
-    config['CQT']['bins_per_octave'] = bins_per_octave
-    config['CQT']['fmin'] = fmin
-    config['CQT']['fmax'] = fmax
+        config['CQT']['bins_per_octave'] = bins_per_octave
+        config['CQT']['fmin'] = fmin
+        config['CQT']['fmax'] = fmax
 
-    helpers.save_config(config, config_filepath)
-    helpers.save_data(config_filepath, 'freqs_Sxx', freqs_Sxx)
+        helpers.save_config(config, config_filepath)
+        helpers.create_nwb_group(session['nwb'], 'CQT')
+        helpers.create_nwb_ts(session['nwb'], 'CQT', 'freqs_Sxx', freqs_Sxx, 1.0)
 
 def cqt_workflow(config_filepath, data_key):
     """
@@ -66,11 +68,10 @@ def cqt_workflow(config_filepath, data_key):
     bins_per_octave = cqt['bins_per_octave']
     fmin = cqt['fmin']
 
-    freqs_Sxx = helpers.load_data(config_filepath, 'freqs_Sxx')
-
     for session in general['sessions']:
         tic_session = time.time()
 
+        freqs_Sxx = helpers.load_nwb_ts(session['nwb'], 'CQT', 'freqs_Sxx')
         positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', data_key)
         ## define positions traces to use
         # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
@@ -132,7 +133,6 @@ def cqt_workflow(config_filepath, data_key):
         Sxx_allPixels_norm = Sxx_allPixels / Sxx_allPixels_normFactor[None,None,:,:]
         #Sxx_allPixels_norm.shape
 
-        helpers.create_nwb_group(session['nwb'], 'CQT')
         helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels', Sxx_allPixels,1.0)
         helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_norm', Sxx_allPixels_norm,1.0)
         helpers.create_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_normFactor', Sxx_allPixels_normFactor,1.0)

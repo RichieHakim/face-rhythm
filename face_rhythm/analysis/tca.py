@@ -162,7 +162,7 @@ def downsample_trial_inds(trial_inds, len_original, len_cqt):
     return downsampled
 
 
-def trial_reshape_frequential(positions, spectrum, trial_inds):
+def trial_reshape_spectral(positions, spectrum, trial_inds):
     """
     reshapes the spectral data if the data is trial type
 
@@ -283,7 +283,7 @@ def full_tca_workflow(config_filepath, data_key):
         Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_norm')
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])
-            Sxx_allPixels_norm = trial_reshape_frequential(positions_toUse, Sxx_allPixels_norm, trial_inds)
+            Sxx_allPixels_norm = trial_reshape_spectral(positions_toUse, Sxx_allPixels_norm, trial_inds)
 
         tic = time.time()
         factors_np = tca(config_filepath, Sxx_allPixels_norm , 1)
