@@ -6,9 +6,9 @@ import scipy.stats
 import librosa
 from matplotlib import pyplot as plt
 from tqdm.notebook import tqdm
+import gc
 
 from face_rhythm.util import helpers
-from face_rhythm.analysis import tca
 
 
 def prepare_freqs(config_filepath):
@@ -37,8 +37,8 @@ def prepare_freqs(config_filepath):
     config['CQT']['fmin'] = fmin
     config['CQT']['fmax'] = fmax
 
-    helpers.save_data(config_filepath, 'freqs_Sxx', freqs_Sxx)
     helpers.save_config(config, config_filepath)
+    helpers.save_data(config_filepath, 'freqs_Sxx', freqs_Sxx)
 
 def cqt_workflow(config_filepath, data_key):
     """
@@ -139,5 +139,9 @@ def cqt_workflow(config_filepath, data_key):
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
+        del Sxx, Sxx_allPixels, Sxx_allPixels_norm, Sxx_allPixels_normFactor, positions_convDR_meanSub, input_sgram
+
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End spectrogram computation ==')
+
+    gc.collect()

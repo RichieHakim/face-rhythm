@@ -1,13 +1,11 @@
 import numpy as np
 import sklearn.decomposition
+import gc
 
 import cv2
 import imageio
-import multiprocessing
-from multiprocessing import Pool, RLock, freeze_support
 import copy
 import time
-from functools import partial
 from tqdm.notebook import tqdm, trange
 
 from matplotlib import pyplot as plt
@@ -289,6 +287,11 @@ def conv_dim_reduce_workflow(config_filepath):
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute, video['Fs'])
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
+        del positions_new_sansOutliers, positions_convDR_meanSub, positions_convDR_absolute
+
     helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End convolutional dimensionality reduction ==')
+
+    del cosKernel, cosKernel_mean, pts_spaced_convDR, pts_all, pointInds_toUse
+    gc.collect()

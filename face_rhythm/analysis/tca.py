@@ -1,7 +1,7 @@
-
 import time
 import numpy as np
 import torch.cuda
+import gc
 
 import scipy
 import scipy.signal
@@ -228,8 +228,12 @@ def positional_tca_workflow(config_filepath, data_key):
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
+        del positions_convDR_meanSub, factors_np_positional
+
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
+
+    gc.collect()
 
 
 def interpolate_temporal_factor(y_input , numFrames):
@@ -293,3 +297,7 @@ def full_tca_workflow(config_filepath, data_key):
 
         helpers.print_time('total elapsed time', time.time() - tic_all)
         print(f'== End Full TCA ==')
+
+        del positions_toUse, Sxx_allPixels_norm, factors_np, factors_temporal_interp
+
+    gc.collect()

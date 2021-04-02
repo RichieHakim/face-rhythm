@@ -1,6 +1,8 @@
 import time
 import numpy as np
 import copy
+import gc
+
 from face_rhythm.util import helpers
 from face_rhythm.visualize import videos
 
@@ -536,7 +538,12 @@ def optic_workflow(config_filepath):
         print(f'Total number of frames: {numFrames_total} frames')
         print(f'Average frames per second: {round(numFrames_total / (time.time() - tic_session), 2)} fps')
 
+        del pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, positions_recursive
+
     helpers.save_data(config_filepath, 'color_tuples', color_tuples)
     helpers.save_data(config_filepath, 'pointInds_toUse', pointInds_toUse)
+    del color_tuples, pointInds_toUse
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Optic Flow Computation ==')
+
+    gc.collect()

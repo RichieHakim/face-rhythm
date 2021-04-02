@@ -2,7 +2,7 @@ import numpy as np
 from face_rhythm.util import helpers
 import time
 import scipy.signal
-from matplotlib import pyplot as plt
+import gc
 
 def clean_displacements(config_filepath, displacements):
     """
@@ -98,6 +98,10 @@ def clean_workflow(config_filepath):
                               video['Fs'])
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
+        del displacements, positions_new_sansOutliers, positions_new_absolute_sansOutliers
+
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End outlier removal ==')
+
+    gc.collect()
 
