@@ -12,7 +12,7 @@ from pynwb import NWBFile, NWBHDF5IO
 from face_rhythm.util import helpers
 
 
-def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials):
+def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials, multisession):
     """
     Creates the project folder and data folder (if they don't exist)
     Creates the config file (if it doesn't exist or overwrite requested)
@@ -36,7 +36,7 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
     sessions_path.mkdir(parents=True, exist_ok=True)
     config_filepath = project_path / 'configs' / f'config_{run_name}.yaml'
     if not config_filepath.exists() or overwrite_config:
-        generate_config(config_filepath, project_path, sessions_path, remote, trials)
+        generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession)
 
     version_check()
     return config_filepath
@@ -62,7 +62,7 @@ def version_check():
     print(f'Pytorch version: {torch.__version__}')
 
 
-def generate_config(config_filepath, project_path, sessions_path, remote, trials):
+def generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession):
     """
     Generates bare config file with just basic info
 
@@ -72,6 +72,7 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
         sessions_path (Path): path to the session folders and videos
         remote (bool): whether running on remote
         trials (bool): whether using a trial structure for the recordings
+        multisession (bool): whether we'll be handling multiple sessions
 
     Returns:
     """
@@ -93,6 +94,7 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
     basic_config['Paths']['config'] = str(config_filepath)
     basic_config['General']['remote'] = remote
     basic_config['General']['trials'] = trials
+    basic_config['General']['multisession'] = multisession
 
     demo_path = project_path / 'viz' / 'demos'
     demo_path.mkdir(parents=True, exist_ok=True)
@@ -107,8 +109,65 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
     with open(str(config_filepath), 'w') as f:
         yaml.safe_dump(basic_config, f)
 
+class NoFilesError(Exception):
+    """Exception raised for errors in the input salary.
+
+    Attributes:
+        salary -- input salary which caused the error
+        message -- explanation of the error
+    """
+
+    def __init__(self, folder, pattern):
+        self.message = f'No files found in {folder} with pattern {pattern}'
+        super().__init__(self.message)
+
+class NoFoldersError(Exception):
+    """Exception raised for errors in the input salary.
+
+    Attributes:
+        salary -- input salary which caused the error
+        message -- explanation of the error
+    """
+
+    def __init__(self, folder, pattern):
+        self.message = f'No folders found in {folder} with pattern {pattern}'
+        super().__init__(self.message)
 
 def import_videos(config_filepath):
+    """
+    Loop over one folder and find all videos of interest
+
+    Args:
+        config_filepath (Path): path to the config file
+
+    Returns:
+
+    """
+
+    config = helpers.load_config(config_filepath)
+    paths = config['Paths']
+    video = config['Video']
+    general = config['General']
+    general['sessions'] = []
+
+    session = {'name': 'session', 'videos': []}
+    for vid in Path(paths['video']).iterdir():
+        if video['file_prefix'] in str(vid.name):
+            if vid.suffix in ['.avi', '.mp4']:
+                session['videos'].append(str(vid))
+            elif vid.suffix in ['.npy'] and general['trials']:
+                session['trial_inds'] = str(vid)
+                trial_inds = np.load(session['trial_inds'])
+                session['num_trials'] = trial_inds.shape[0]
+                session['trial_len'] = trial_inds.shape[1]
+    general['sessions'].append(session)
+    helpers.save_config(config, config_filepath)
+
+    if len(session['videos']) == 0:
+        raise NoFilesError(paths['video'], video['file_prefix'])
+
+
+def import_videos_multisession(config_filepath):
     """
     Loop over all sessions and find all videos for each session
 
@@ -137,8 +196,12 @@ def import_videos(config_filepath):
                     session['num_trials'] = trial_inds.shape[0]
                     session['trial_len'] = trial_inds.shape[1]
             general['sessions'].append(session)
-
     helpers.save_config(config, config_filepath)
+
+    if len(general['sessions']) == 0:
+        raise NoFoldersError(paths['video'], video['session_prefix'])
+
+
 
 
 def print_session_report(session):
@@ -244,7 +307,10 @@ def prepare_videos(config_filepath):
     Returns:
 
     """
-
-    import_videos(config_filepath)
+    config = helpers.load_config(config_filepath)
+    if config['General']['multisession']:
+        import_videos_multisession(config_filepath)
+    else:
+        import_videos(config_filepath)
     get_video_data(config_filepath)
     create_nwbs(config_filepath)

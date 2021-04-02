@@ -17,14 +17,15 @@ def test_single_session_single_video():
     overwrite_config = False
     remote = False
     trials = False
+    multisession = True
 
-    config_filepath = setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials)
+    config_filepath = setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials, multisession)
 
     # VIDEO LOAD
     config = helpers.load_config(config_filepath)
     config['Video']['session_prefix'] = 'session'
     config['Video']['print_filenames'] = True
-    config['General']['overwrite_nwbs'] = False
+    config['General']['overwrite_nwbs'] = True
     helpers.save_config(config, config_filepath)
 
     setup.prepare_videos(config_filepath)
@@ -36,10 +37,11 @@ def test_single_session_single_video():
     config['ROI']['frame_to_set'] = 1  # 0 indexed. Sets the frame number to use to make an image
     config['ROI']['load_from_file'] = True  # if you've already run this and want to use the existing ROI, set to True
     helpers.save_config(config, config_filepath)
-    #special line to just grab the points
+    # special line to just grab the points
     with h5py.File(Path('test_data/pts_all.h5'), 'r') as pt:
         pts_all = helpers.h5_to_dict(pt)
-    helpers.save_h5(config_filepath, 'pts_all', pts_all)
+    for session in config['General']['sessions']:
+        helpers.save_pts(session['nwb'], pts_all)
 
     # Optic Flow
     config = helpers.load_config(config_filepath)
@@ -75,9 +77,8 @@ def test_single_session_single_video():
 
     # ConvDR
     config = helpers.load_config(config_filepath)
-    pointInds_toUse = helpers.load_data(config_filepath, 'pointInds_toUse')
     config['CDR']['width_cosKernel'] = 48
-    config['CDR']['num_dots'] = pointInds_toUse.shape[0]
+    config['CDR']['num_dots'] = config['Optic']['num_dots']
     config['CDR']['spacing'] = 16
     config['CDR']['display_points'] = False
     config['CDR']['vidNum'] = 0
@@ -94,55 +95,41 @@ def test_single_session_single_video():
 
     # Positional TCA
     config = helpers.load_config(config_filepath)
+    config['TCA']['device'] = tca.use_gpu(False)
     config['TCA']['pref_useGPU'] = False
-    config['TCA']['device'] = 'cpu'
     config['TCA']['rank'] = 4
     config['TCA']['init'] = 'random'
-    config['TCA']['tolerance'] = 1e-06  # best to set around 1e-05 to 1e-07
+    config['TCA']['tolerance'] = 1e-06
     config['TCA']['verbosity'] = 0
-    config['TCA']['n_iters'] = 100
-    config['TCA']['pref_concat_cartesian_dim'] = True  # New option
+    config['TCA']['n_iters'] = 10
     helpers.save_config(config, config_filepath)
 
     tca.positional_tca_workflow(config_filepath, 'positions_convDR_meanSub')
 
-    #CQT
-    config = helpers.load_config(config_filepath)
-    eps = 1.19209e-07  # float32 epsilon
-    hop_length = 16
-    fmin_rough = 1.8
-    Fs = config['Video']['Fs']
-    sr = Fs
-    n_bins = 35
-    bins_per_octave = int(np.round((n_bins) / np.log2((Fs / 2) / fmin_rough)))
-    fmin = ((Fs / 2) / (2 ** ((n_bins) / bins_per_octave))) - (2 * eps)
-    fmax = fmin * (2 ** ((n_bins) / bins_per_octave))
-    freqs_Sxx = fmin * (2 ** ((np.arange(n_bins) + 1) / bins_per_octave))
+    # CQT
 
     config = helpers.load_config(config_filepath)
-    config['CQT']['hop_length'] = hop_length
-    config['CQT']['sr'] = sr
-    config['CQT']['n_bins'] = n_bins
-    config['CQT']['bins_per_octave'] = bins_per_octave
-    config['CQT']['fmin'] = fmin
-    config['CQT']['fmin_rough'] = fmin_rough
-    config['CQT']['fmax'] = fmax
-    config['CQT']['pixelNum_toUse'] = 1
+    config['CQT']['hop_length'] = 16
+    config['CQT']['fmin_rough'] = 1.8
+    config['CQT']['sampling_rate'] = config['Video']['Fs']
+    config['CQT']['n_bins'] = 35
     helpers.save_config(config, config_filepath)
-    helpers.save_data(config_filepath, 'freqs_Sxx', freqs_Sxx)
+
+    spectral_analysis.prepare_freqs(config_filepath)
 
     spectral_analysis.cqt_workflow(config_filepath, 'positions_convDR_meanSub')
 
     # Spectral TCA
     config = helpers.load_config(config_filepath)
-    config['TCA']['pref_useGPU'] = True
-    config['TCA']['device'] = 'cpu'
+    config['TCA']['device'] = tca.use_gpu(False)
+    config['TCA']['pref_useGPU'] = False
     config['TCA']['rank'] = 8
-    config['TCA']['init'] = 'random'  # If the input is small, set init='svd'
-    config['TCA']['tolerance'] = 1e-06  # best to set around 1e-05 to 1e-07
+    config['TCA']['init'] = 'random'
+    config['TCA']['tolerance'] = 1e-06
     config['TCA']['verbosity'] = 1
-    config['TCA']['n_iters'] = 100  # best to set around 100-600
-    config['TCA']['pref_concat_cartesian_dim'] = True  # New option
+    config['TCA']['n_iters'] = 10
     helpers.save_config(config, config_filepath)
+
+    tca.full_tca_workflow(config_filepath, 'positions_convDR_meanSub')
 
 

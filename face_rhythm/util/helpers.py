@@ -104,7 +104,7 @@ def load_nwb_ts(nwb_path, group_name, ts_name):
     Returns:
 
     """
-    with NWBHDF5IO(nwb_path, 'a') as io:
+    with NWBHDF5IO(nwb_path, 'r') as io:
         nwbfile = io.read()
         return nwbfile.processing['Face Rhythm'][group_name][ts_name].data[()]
 
@@ -275,3 +275,20 @@ def dump_nwb(nwb_path):
         for ii, time_series in enumerate(time_series_list):
             print(f"     {time_series}:    {nwbfile.processing['Face Rhythm'][interface][time_series].data.shape}   ,  {nwbfile.processing['Face Rhythm'][interface][time_series].data.dtype}")
 
+
+def absolute_index(session, vid_num, iter_frame):
+    return int(sum(session['vid_lens'][:vid_num]) + iter_frame)
+
+
+def get_pts(nwb_path):
+    pts_all = {}
+    with NWBHDF5IO(nwb_path, 'r') as io:
+        nwbfile = io.read()
+        for ts_name, ts in nwbfile.processing['Face Rhythm']['Original Points'].time_series.items():
+            pts_all[ts_name] = ts.data[()]
+    return pts_all
+
+def save_pts(nwb_path, pts_all):
+    create_nwb_group(nwb_path, 'Original Points')
+    for point_name, points in pts_all.items():
+        create_nwb_ts(nwb_path, 'Original Points', point_name, points, 1.0)
