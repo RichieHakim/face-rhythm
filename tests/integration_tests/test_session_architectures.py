@@ -17,8 +17,9 @@ def test_single_session_single_video():
     overwrite_config = False
     remote = False
     trials = False
+    multisession = True
 
-    config_filepath = setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials)
+    config_filepath = setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials, multisession)
 
     # VIDEO LOAD
     config = helpers.load_config(config_filepath)
