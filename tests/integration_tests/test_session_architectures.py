@@ -24,7 +24,7 @@ def test_single_session_single_video():
     config = helpers.load_config(config_filepath)
     config['Video']['session_prefix'] = 'session'
     config['Video']['print_filenames'] = True
-    config['General']['overwrite_nwbs'] = False
+    config['General']['overwrite_nwbs'] = True
     helpers.save_config(config, config_filepath)
 
     setup.prepare_videos(config_filepath)
