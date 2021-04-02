@@ -58,7 +58,7 @@ class BBoxSelect:
         self.fig, ax = plt.subplots()
         self.img = ax.imshow(self.im.copy())
         self.ka = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
-        disconnect_button = widgets.Button(description="Disconnect mpl")
+        disconnect_button = widgets.Button(description="Confirm ROI")
         Disp.display(disconnect_button)
         disconnect_button.on_click(self.disconnect_mpl)
 

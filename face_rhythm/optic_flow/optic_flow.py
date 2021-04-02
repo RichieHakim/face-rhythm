@@ -206,11 +206,9 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                 tic_fps = time.time()
 
         ## Calculate how long calculation took
-        elapsed = time.time() - tic_all
-        if elapsed < 60:
-            print(f'time elapsed: {np.uint32(elapsed)} seconds. Capture rate: {round(ind_concat / elapsed, 3)} fps')
-        else:
-            print(f'time elapsed: {round(elapsed / 60, 3)} minutes. Capture rate: {round(ind_concat / elapsed, 3)} fps')
+        elapsed = time() - tic_all
+        helpers.print_time('video time elapsed:', elapsed)
+        print(f'Capture rate: {round(ind_concat / elapsed, 3)} fps')
 
     numFrames_total = ind_concat - 1
     cv2.destroyAllWindows()
@@ -267,13 +265,10 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     vid_width = video['width']
     vid_height = video['height']
     test_len = video['demo_len']
-    save_pathFull = str(Path(config['Paths']['project']) / 'optic_test.avi')
+    save_pathFull = str(Path(config['Paths']['viz']) / 'optic_test.avi')
 
     numVids = session['num_vids']
     path_vid_allFiles = session['videos']
-    # lk_names = [key for key in optic.keys() if 'lk_' in key]
-    # lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
-    #              for k in lk_names}
     
     lk_names = [key for key in optic['lk'].keys()]
     lk_params = {k: (tuple(optic['lk'][k]) if type(optic['lk'][k]) is list else optic['lk'][k]) \
@@ -281,13 +276,14 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     
 
     # Define the codec and create VideoWriter object
-    if showVideo_pref and remote:
+    if showVideo_pref and (save_vid or remote):
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         print(f'saving to file {save_pathFull}')
         out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
     else:
         out = None
 
+    vid_lens = []
     pointInds_old = pointInds_toUse
     for vidNum_iter in vidNums_toUse:
         vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
@@ -353,22 +349,21 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
                 if printFPS_pref:
                     print(fps)
                 tic_fps = time.time()
+        vid_lens.append(iter_frame+1)
 
         ## Calculate how long calculation took
-        elapsed = time.time() - tic_all
-        if elapsed < 60:
-            print(f'time elapsed: {np.uint32(elapsed)} seconds. Capture rate: {round(ind_concat / elapsed, 3)} fps')
-        else:
-            print(f'time elapsed: {round(elapsed / 60, 3)} minutes. Capture rate: {round(ind_concat / elapsed, 3)} fps')
+        elapsed = time() - tic_all
+        helpers.print_time('video time elapsed:', elapsed)
+        print(f'Capture rate: {round(ind_concat / elapsed, 3)} fps')
 
-    numFrames_total = ind_concat - 1
+    numFrames_total = ind_concat
     cv2.destroyAllWindows()
 
     positions_recursive = positions_recursive[:, :, ~np.isnan(positions_recursive[0, 0, :])]
     displacements = np.zeros_like(positions_recursive)
     displacements[:,:,1:] = np.diff(positions_recursive , axis=2)
 
-    return displacements, numFrames_total , positions_recursive
+    return displacements, numFrames_total , positions_recursive, vid_lens
 
 
 def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced, session):  # function needed for multiprocessing
@@ -516,7 +511,7 @@ def optic_workflow(config_filepath):
         if optic['multithread']:
             displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
         elif optic['recursive']:
-            displacements, numFrames_total , positions_recursive = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
+            displacements, numFrames_total , positions_recursive, vid_lens = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
                                                                      pointInds_tracked_tuple, positions_recursive, pts_spaced,
                                                                      color_tuples,
                                                                      optic['recursive_relaxation_factor'], session)
@@ -528,6 +523,7 @@ def optic_workflow(config_filepath):
 
         helpers.print_time('Displacements computed', time.time() - tic)
         session['numFrames_total'] = numFrames_total
+        session['vid_lens_true'] = vid_lens
         helpers.save_config(config, config_filepath)
 
         helpers.create_nwb_group(session['nwb'], 'Optic Flow')
