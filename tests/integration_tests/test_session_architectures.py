@@ -76,9 +76,8 @@ def test_single_session_single_video():
 
     # ConvDR
     config = helpers.load_config(config_filepath)
-    pointInds_toUse = helpers.load_data(config_filepath, 'pointInds_toUse')
     config['CDR']['width_cosKernel'] = 48
-    config['CDR']['num_dots'] = pointInds_toUse.shape[0]
+    config['CDR']['num_dots'] = config['Optic']['num_dots']
     config['CDR']['spacing'] = 16
     config['CDR']['display_points'] = False
     config['CDR']['vidNum'] = 0

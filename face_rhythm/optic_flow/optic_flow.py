@@ -146,7 +146,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
         out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
     else:
         out = None
-
+    vid_lens = []
     for vidNum_iter in vidNums_toUse:
         vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
         #     metadata = vid.get_meta_data()
@@ -204,7 +204,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                 if printFPS_pref:
                     print(fps)
                 tic_fps = time.time()
-
+        vid_lens.append(iter_frame+1)
         ## Calculate how long calculation took
         elapsed = time.time() - tic_all
         helpers.print_time('video time elapsed:', elapsed)
@@ -215,7 +215,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
 
-    return displacements, numFrames_total
+    return displacements, numFrames_total, vid_lens
 
 
 
@@ -462,8 +462,9 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     p.join()
 
     cv2.destroyAllWindows()
-
+    vid_lens = []
     for ii in range(len(displacements_list)):
+        vid_lens.append(displacements_list[ii].shape[-1])
         if ii == 0:
             displacements = displacements_list[ii]
         else:
@@ -472,7 +473,7 @@ def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced
     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
     numFrames_total = displacements.shape[-1]
 
-    return displacements, numFrames_total
+    return displacements, numFrames_total, vid_lens
 
 
 
@@ -510,14 +511,14 @@ def optic_workflow(config_filepath):
             tic = time.time()
 
             if optic['multithread']:
-                displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
+                displacements, numFrames_total, vid_lens = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
             elif optic['recursive']:
                 displacements, numFrames_total , positions_recursive, vid_lens = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
                                                                          pointInds_tracked_tuple, positions_recursive, pts_spaced,
                                                                          color_tuples,
                                                                          optic['recursive_relaxation_factor'], session)
             else:
-                displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
+                displacements, numFrames_total, vid_lens = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
                                                                           pointInds_tracked_tuple, displacements, pts_spaced,
                                                                           color_tuples, session)
 
