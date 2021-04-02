@@ -93,8 +93,8 @@ def clean_workflow(config_filepath):
         pointInds_toUse = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'pointInds_toUse')
         positions_new_sansOutliers, positions_new_absolute_sansOutliers = clean_displacements(config_filepath, displacements, pointInds_toUse)
 
-        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions', positions_new_sansOutliers, video['Fs'])
-        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_absolute', positions_new_absolute_sansOutliers,
+        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_cleanup', positions_new_sansOutliers, video['Fs'])
+        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_cleanup_absolute', positions_new_absolute_sansOutliers,
                               video['Fs'])
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 

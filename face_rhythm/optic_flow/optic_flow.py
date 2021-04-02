@@ -498,46 +498,49 @@ def optic_workflow(config_filepath):
     if optic['recursive'] and optic['multithread']:
         raise NameError("Incompatible option combination:  If optic_recursive==True, optic_multithread MUST ==False \n\
     The recursive calculation is done serially, so it is not possible to parallelize it.")
+    try:
+        for session in general['sessions']:
+            tic_session = time.time()
+            tic = tic_session
+            pts_all = helpers.get_pts(session['nwb'])
 
-    for session in general['sessions']:
-        tic_session = time.time()
-        tic = tic_session
-        pts_all = helpers.get_pts(session['nwb'])
+            pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples,positions_recursive = setup(config, session, pts_all)
+            helpers.print_time('Optic Flow Set Up', time.time() - tic)
 
-        pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples,positions_recursive = setup(config, session, pts_all)
-        helpers.print_time('Optic Flow Set Up', time.time() - tic)
+            tic = time.time()
 
-        tic = time.time()
-
-        if optic['multithread']:
-            displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
-        elif optic['recursive']:
-            displacements, numFrames_total , positions_recursive, vid_lens = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
-                                                                     pointInds_tracked_tuple, positions_recursive, pts_spaced,
-                                                                     color_tuples,
-                                                                     optic['recursive_relaxation_factor'], session)
-        else:
-            displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
-                                                                      pointInds_tracked_tuple, displacements, pts_spaced,
-                                                                      color_tuples, session)
+            if optic['multithread']:
+                displacements, numFrames_total = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
+            elif optic['recursive']:
+                displacements, numFrames_total , positions_recursive, vid_lens = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
+                                                                         pointInds_tracked_tuple, positions_recursive, pts_spaced,
+                                                                         color_tuples,
+                                                                         optic['recursive_relaxation_factor'], session)
+            else:
+                displacements, numFrames_total = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
+                                                                          pointInds_tracked_tuple, displacements, pts_spaced,
+                                                                          color_tuples, session)
 
 
-        helpers.print_time('Displacements computed', time.time() - tic)
-        session['numFrames_total'] = numFrames_total
-        session['vid_lens_true'] = vid_lens
-        optic['num_dots'] = pointInds_toUse.shape[0]
-        helpers.save_config(config, config_filepath)
+            helpers.print_time('Displacements computed', time.time() - tic)
+            session['numFrames_total'] = numFrames_total
+            session['vid_lens_true'] = vid_lens
+            optic['num_dots'] = pointInds_toUse.shape[0]
+            helpers.save_config(config, config_filepath)
 
-        helpers.create_nwb_group(session['nwb'], 'Optic Flow')
-        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'displacements', displacements, video['Fs'])
-        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_recursive', positions_recursive,video['Fs'])
-        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'color_tuples', np.array(color_tuples),video['Fs'])
-        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'pointInds_toUse', pointInds_toUse, video['Fs'])
+            helpers.create_nwb_group(session['nwb'], 'Optic Flow')
+            helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'displacements', displacements, video['Fs'])
+            helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_recursive', positions_recursive,video['Fs'])
+            helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'color_tuples', np.array(color_tuples),video['Fs'])
+            helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'pointInds_toUse', pointInds_toUse, video['Fs'])
 
-        helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
-        print(f'Total number of frames: {numFrames_total} frames')
-        print(f'Average frames per second: {round(numFrames_total / (time.time() - tic_session), 2)} fps')
+            helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
+            print(f'Total number of frames: {numFrames_total} frames')
+            print(f'Average frames per second: {round(numFrames_total / (time.time() - tic_session), 2)} fps')
 
+            del pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, positions_recursive, color_tuples, pointInds_toUse
+    except KeyboardInterrupt:
+        print('"Shutdown requested...exiting"')
         del pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, positions_recursive, color_tuples, pointInds_toUse
 
     helpers.print_time('total elapsed time', time.time() - tic_all)

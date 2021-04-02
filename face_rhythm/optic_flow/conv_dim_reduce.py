@@ -279,7 +279,7 @@ def conv_dim_reduce_workflow(config_filepath):
         tic_session = time.time()
         if config['CDR']['display_points']:
             points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
-        positions_new_sansOutliers = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'positions')
+        positions_new_sansOutliers = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'positions_cleanup')
         positions_convDR_meanSub, positions_convDR_absolute = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean, positions_new_sansOutliers)
 
