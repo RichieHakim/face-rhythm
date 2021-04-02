@@ -39,7 +39,8 @@ def test_single_session_single_video():
     #special line to just grab the points
     with h5py.File(Path('test_data/pts_all.h5'), 'r') as pt:
         pts_all = helpers.h5_to_dict(pt)
-    helpers.save_h5(config_filepath, 'pts_all', pts_all)
+    for session in config['General']['sessions']:
+        helpers.save_pts(session['nwb'], pts_all)
 
     # Optic Flow
     config = helpers.load_config(config_filepath)

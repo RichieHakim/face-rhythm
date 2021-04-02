@@ -136,7 +136,6 @@ def process_roi(config_filepath, frame, bs):
     roi = config['ROI']
     video = config['Video']
     session = general['sessions'][roi['session_to_set']]
-    helpers.create_nwb_group(session['nwb'], 'Original Points')
 
     pts_all = dict([
         ('bbox_subframe_displacement', np.array(bbox_subframe_displacement)),
@@ -145,5 +144,4 @@ def process_roi(config_filepath, frame, bs):
         ('pts_y_displacement', np.array(pts_y_displacement)),
         ('mask_frame_displacement', np.array(mask_frame_displacement))
     ])
-    for point_name, points in pts_all.items():
-        helpers.create_nwb_ts(session['nwb'], 'Original Points', point_name, points, video['Fs'])
+    helpers.save_pts(session['nwb'],pts_all)

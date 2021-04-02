@@ -288,3 +288,7 @@ def get_pts(nwb_path):
             pts_all[ts_name] = ts.data[()]
     return pts_all
 
+def save_pts(nwb_path, pts_all):
+    create_nwb_group(nwb_path, 'Original Points')
+    for point_name, points in pts_all.items():
+        create_nwb_ts(nwb_path, 'Original Points', point_name, points, 1.0)
