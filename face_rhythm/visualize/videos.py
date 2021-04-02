@@ -115,7 +115,8 @@ def visualize_points(config_filepath):
             vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
             for iter_frame in trange(demo_len):
                 new_frame = vid.get_data(iter_frame)
-                points = [positions[:,np.newaxis,:,iter_frame],position_tuples]
+                absolute_ind = helpers.absolute_index(session, vid_num, iter_frame)
+                points = [positions[:,np.newaxis,:,absolute_ind],position_tuples]
                 counters = [iter_frame, vid_num, ind_concat, Fs]
                 visualize_progress(config, session, new_frame, points, color_tuples, counters, out)
 

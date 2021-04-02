@@ -24,7 +24,7 @@ def test_single_session_single_video():
     config = helpers.load_config(config_filepath)
     config['Video']['session_prefix'] = 'session'
     config['Video']['print_filenames'] = True
-    config['General']['overwrite_nwbs'] = False
+    config['General']['overwrite_nwbs'] = True
     helpers.save_config(config, config_filepath)
 
     setup.prepare_videos(config_filepath)
@@ -36,10 +36,11 @@ def test_single_session_single_video():
     config['ROI']['frame_to_set'] = 1  # 0 indexed. Sets the frame number to use to make an image
     config['ROI']['load_from_file'] = True  # if you've already run this and want to use the existing ROI, set to True
     helpers.save_config(config, config_filepath)
-    #special line to just grab the points
+    # special line to just grab the points
     with h5py.File(Path('test_data/pts_all.h5'), 'r') as pt:
         pts_all = helpers.h5_to_dict(pt)
-    helpers.save_h5(config_filepath, 'pts_all', pts_all)
+    for session in config['General']['sessions']:
+        helpers.save_pts(session['nwb'], pts_all)
 
     # Optic Flow
     config = helpers.load_config(config_filepath)
@@ -75,9 +76,8 @@ def test_single_session_single_video():
 
     # ConvDR
     config = helpers.load_config(config_filepath)
-    pointInds_toUse = helpers.load_data(config_filepath, 'pointInds_toUse')
     config['CDR']['width_cosKernel'] = 48
-    config['CDR']['num_dots'] = pointInds_toUse.shape[0]
+    config['CDR']['num_dots'] = config['Optic']['num_dots']
     config['CDR']['spacing'] = 16
     config['CDR']['display_points'] = False
     config['CDR']['vidNum'] = 0
