@@ -100,7 +100,7 @@ def get_roi(config_filepath):
     if roi['load_from_file']:
         with h5py.File(Path(paths['data']) / 'pts_all.h5', 'r') as pt:
             pts_all = helpers.h5_to_dict(pt)
-        helpers.save_h5(config_filepath, 'pts_all', pts_all)
+        helpers.save_pts(config_filepath, pts_all)
         return None, None
 
     video_list = general['sessions'][roi['session_to_set']]['videos']
@@ -144,4 +144,4 @@ def process_roi(config_filepath, frame, bs):
         ('pts_y_displacement', np.array(pts_y_displacement)),
         ('mask_frame_displacement', np.array(mask_frame_displacement))
     ])
-    helpers.save_pts(session['nwb'],pts_all)
+    helpers.save_pts(session['nwb'], pts_all)

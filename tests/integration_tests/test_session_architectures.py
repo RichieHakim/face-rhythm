@@ -36,7 +36,7 @@ def test_single_session_single_video():
     config['ROI']['frame_to_set'] = 1  # 0 indexed. Sets the frame number to use to make an image
     config['ROI']['load_from_file'] = True  # if you've already run this and want to use the existing ROI, set to True
     helpers.save_config(config, config_filepath)
-    #special line to just grab the points
+    # special line to just grab the points
     with h5py.File(Path('test_data/pts_all.h5'), 'r') as pt:
         pts_all = helpers.h5_to_dict(pt)
     for session in config['General']['sessions']:
