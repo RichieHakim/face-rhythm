@@ -94,55 +94,41 @@ def test_single_session_single_video():
 
     # Positional TCA
     config = helpers.load_config(config_filepath)
+    config['TCA']['device'] = tca.use_gpu(False)
     config['TCA']['pref_useGPU'] = False
-    config['TCA']['device'] = 'cpu'
     config['TCA']['rank'] = 4
     config['TCA']['init'] = 'random'
-    config['TCA']['tolerance'] = 1e-06  # best to set around 1e-05 to 1e-07
+    config['TCA']['tolerance'] = 1e-06
     config['TCA']['verbosity'] = 0
-    config['TCA']['n_iters'] = 100
-    config['TCA']['pref_concat_cartesian_dim'] = True  # New option
+    config['TCA']['n_iters'] = 10
     helpers.save_config(config, config_filepath)
 
     tca.positional_tca_workflow(config_filepath, 'positions_convDR_meanSub')
 
-    #CQT
-    config = helpers.load_config(config_filepath)
-    eps = 1.19209e-07  # float32 epsilon
-    hop_length = 16
-    fmin_rough = 1.8
-    Fs = config['Video']['Fs']
-    sr = Fs
-    n_bins = 35
-    bins_per_octave = int(np.round((n_bins) / np.log2((Fs / 2) / fmin_rough)))
-    fmin = ((Fs / 2) / (2 ** ((n_bins) / bins_per_octave))) - (2 * eps)
-    fmax = fmin * (2 ** ((n_bins) / bins_per_octave))
-    freqs_Sxx = fmin * (2 ** ((np.arange(n_bins) + 1) / bins_per_octave))
+    # CQT
 
     config = helpers.load_config(config_filepath)
-    config['CQT']['hop_length'] = hop_length
-    config['CQT']['sr'] = sr
-    config['CQT']['n_bins'] = n_bins
-    config['CQT']['bins_per_octave'] = bins_per_octave
-    config['CQT']['fmin'] = fmin
-    config['CQT']['fmin_rough'] = fmin_rough
-    config['CQT']['fmax'] = fmax
-    config['CQT']['pixelNum_toUse'] = 1
+    config['CQT']['hop_length'] = 16
+    config['CQT']['fmin_rough'] = 1.8
+    config['CQT']['sampling_rate'] = config['Video']['Fs']
+    config['CQT']['n_bins'] = 35
     helpers.save_config(config, config_filepath)
-    helpers.save_data(config_filepath, 'freqs_Sxx', freqs_Sxx)
+
+    spectral_analysis.prepare_freqs(config_filepath)
 
     spectral_analysis.cqt_workflow(config_filepath, 'positions_convDR_meanSub')
 
     # Spectral TCA
     config = helpers.load_config(config_filepath)
-    config['TCA']['pref_useGPU'] = True
-    config['TCA']['device'] = 'cpu'
+    config['TCA']['device'] = tca.use_gpu(False)
+    config['TCA']['pref_useGPU'] = False
     config['TCA']['rank'] = 8
-    config['TCA']['init'] = 'random'  # If the input is small, set init='svd'
-    config['TCA']['tolerance'] = 1e-06  # best to set around 1e-05 to 1e-07
+    config['TCA']['init'] = 'random'
+    config['TCA']['tolerance'] = 1e-06
     config['TCA']['verbosity'] = 1
-    config['TCA']['n_iters'] = 100  # best to set around 100-600
-    config['TCA']['pref_concat_cartesian_dim'] = True  # New option
+    config['TCA']['n_iters'] = 10
     helpers.save_config(config, config_filepath)
+
+    tca.full_tca_workflow(config_filepath, 'positions_convDR_meanSub')
 
 
