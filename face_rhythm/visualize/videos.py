@@ -91,14 +91,13 @@ def visualize_points(config_filepath):
     video = config['Video']
     optic = config['Optic']
 
-    color_tuples = helpers.load_data(config_filepath, 'color_tuples')
-
     demo_len = video['demo_len']
     vid_width = video['width']
     vid_height = video['height']
     Fs = video['Fs']
 
     for session in general['sessions']:
+        color_tuples = helpers.load_nwb_ts(session['nwb'],'Optic Flow', 'color_tuples')
         save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_demo.avi')
 
         if general['remote'] or video['save_demo']:

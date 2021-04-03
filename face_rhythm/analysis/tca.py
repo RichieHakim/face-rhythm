@@ -182,14 +182,16 @@ def trial_reshape_spectral(positions, spectrum, trial_inds):
     return reshaped
 
 
-def use_gpu(pref_useGPU):
-    if pref_useGPU:
+def set_device(config_filepath):
+    config = helpers.load_config(config_filepath)
+    if config['TCA']['pref_useGPU']:
         cuda_device_number = torch.cuda.current_device()
         print(f"using CUDA device: 'cuda:{cuda_device_number}'")
-        return f'cuda:{cuda_device_number}'
+        config['TCA']['device'] = f'cuda:{cuda_device_number}'
     else:
         print(f"using CPU")
-        return 'cpu'
+        config['TCA']['device'] = 'cpu'
+    helpers.save_config(config, config_filepath)
 
 
 def positional_tca_workflow(config_filepath, data_key):
@@ -206,6 +208,7 @@ def positional_tca_workflow(config_filepath, data_key):
 
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
+    set_device(config_filepath)
     config = helpers.load_config(config_filepath)
     general = config['General']
 
@@ -275,6 +278,7 @@ def full_tca_workflow(config_filepath, data_key):
 
     print(f'== Beginning Full TCA Workflow ==')
     tic_all = time.time()
+    set_device(config_filepath)
     config = helpers.load_config(config_filepath)
     general = config['General']
 

@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 import h5py
 
 from face_rhythm.util import helpers, set_roi, setup
@@ -95,19 +94,17 @@ def test_single_session_single_video():
 
     # Positional TCA
     config = helpers.load_config(config_filepath)
-    config['TCA']['device'] = tca.use_gpu(False)
     config['TCA']['pref_useGPU'] = False
     config['TCA']['rank'] = 4
     config['TCA']['init'] = 'random'
     config['TCA']['tolerance'] = 1e-06
     config['TCA']['verbosity'] = 0
-    config['TCA']['n_iters'] = 10
+    config['TCA']['n_iters'] = 100
     helpers.save_config(config, config_filepath)
 
     tca.positional_tca_workflow(config_filepath, 'positions_convDR_meanSub')
 
     # CQT
-
     config = helpers.load_config(config_filepath)
     config['CQT']['hop_length'] = 16
     config['CQT']['fmin_rough'] = 1.8
@@ -121,13 +118,12 @@ def test_single_session_single_video():
 
     # Spectral TCA
     config = helpers.load_config(config_filepath)
-    config['TCA']['device'] = tca.use_gpu(False)
     config['TCA']['pref_useGPU'] = False
     config['TCA']['rank'] = 8
     config['TCA']['init'] = 'random'
     config['TCA']['tolerance'] = 1e-06
-    config['TCA']['verbosity'] = 1
-    config['TCA']['n_iters'] = 10
+    config['TCA']['verbosity'] = 0
+    config['TCA']['n_iters'] = 100
     helpers.save_config(config, config_filepath)
 
     tca.full_tca_workflow(config_filepath, 'positions_convDR_meanSub')
