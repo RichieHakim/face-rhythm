@@ -4,8 +4,10 @@ import h5py
 from face_rhythm.util import helpers, set_roi, setup
 from face_rhythm.optic_flow import optic_flow, clean_results, conv_dim_reduce
 from face_rhythm.analysis import pca, spectral_analysis, tca
+from face_rhythm.visualize import videos, plots
 
 from pathlib import Path
+import shutil
 
 
 def test_single_session_single_video():
@@ -14,7 +16,7 @@ def test_single_session_single_video():
     project_path = Path('test_runs/'+run_name).resolve()
     video_path = Path('test_data/'+run_name).resolve()
     overwrite_config = False
-    remote = False
+    remote = True
     trials = False
     multisession = True
 
@@ -74,6 +76,15 @@ def test_single_session_single_video():
 
     clean_results.clean_workflow(config_filepath)
 
+    # Visualize
+    config = helpers.load_config(config_filepath)
+    config['Video']['demo_len'] = 10
+    config['Video']['data_to_display'] = 'positions_cleanup_absolute'
+    config['Video']['save_demo'] = True
+    helpers.save_config(config, config_filepath)
+
+    videos.visualize_points(config_filepath)
+
     # ConvDR
     config = helpers.load_config(config_filepath)
     config['CDR']['width_cosKernel'] = 48
@@ -90,7 +101,34 @@ def test_single_session_single_video():
 
     conv_dim_reduce.conv_dim_reduce_workflow(config_filepath)
 
+    # Visualize
+    config = helpers.load_config(config_filepath)
+    config['Video']['demo_len'] = 10
+    config['Video']['data_to_display'] = 'positions_convDR_absolute'
+    config['Video']['save_demo'] = True
+    helpers.save_config(config, config_filepath)
+
+    videos.visualize_points(config_filepath)
+
     pca.pca_workflow(config_filepath, 'positions_convDR_absolute')
+
+    config = helpers.load_config(config_filepath)
+    config['PCA']['n_factors_to_show'] = 3
+    helpers.save_config(config, config_filepath)
+
+    plots.plot_pca_diagnostics(config_filepath)
+
+    # Visualize PCs
+    config = helpers.load_config(config_filepath)
+    config['Video']['factor_category_to_display'] = 'PCA'
+    config['Video']['factor_to_display'] = 'factors_points'
+    config['Video']['points_to_display'] = 'positions_convDR_absolute'
+    config['Video']['demo_len'] = 10
+    config['Video']['dot_size'] = 2
+    config['Video']['save_demo'] = True
+    helpers.save_config(config, config_filepath)
+
+    videos.visualize_factor(config_filepath)
 
     # Positional TCA
     config = helpers.load_config(config_filepath)
@@ -104,6 +142,23 @@ def test_single_session_single_video():
 
     tca.positional_tca_workflow(config_filepath, 'positions_convDR_meanSub')
 
+    config = helpers.load_config(config_filepath)
+    config['TCA']['ftype'] = 'positional'
+    helpers.save_config(config, config_filepath)
+
+    plots.plot_tca_factors(config_filepath)
+
+    config = helpers.load_config(config_filepath)
+    config['Video']['factor_category_to_display'] = 'TCA'
+    config['Video']['factor_to_display'] = 'factors_positional_points'
+    config['Video']['points_to_display'] = 'positions_convDR_absolute'
+    config['Video']['demo_len'] = 10
+    config['Video']['dot_size'] = 2
+    config['Video']['save_demo'] = True
+    helpers.save_config(config, config_filepath)
+
+    videos.visualize_factor(config_filepath)
+
     # CQT
     config = helpers.load_config(config_filepath)
     config['CQT']['hop_length'] = 16
@@ -116,6 +171,12 @@ def test_single_session_single_video():
 
     spectral_analysis.cqt_workflow(config_filepath, 'positions_convDR_meanSub')
 
+    config = helpers.load_config(config_filepath)
+    config['CQT']['pixelNum_toUse'] = 10
+    helpers.save_config(config, config_filepath)
+
+    plots.plot_cqt(config_filepath)
+
     # Spectral TCA
     config = helpers.load_config(config_filepath)
     config['TCA']['pref_useGPU'] = False
@@ -127,5 +188,25 @@ def test_single_session_single_video():
     helpers.save_config(config, config_filepath)
 
     tca.full_tca_workflow(config_filepath, 'positions_convDR_meanSub')
+
+    config = helpers.load_config(config_filepath)
+    config['TCA']['ftype'] = 'spectral'
+    helpers.save_config(config, config_filepath)
+
+    plots.plot_tca_factors(config_filepath)
+
+    config = helpers.load_config(config_filepath)
+    config['Video']['factor_category_to_display'] = 'TCA'
+    config['Video']['factor_to_display'] = 'factors_spectral_points'
+    config['Video']['points_to_display'] = 'positions_convDR_absolute'
+    config['Video']['demo_len'] = 10
+    config['Video']['dot_size'] = 2
+    config['Video']['save_demo'] = True
+    helpers.save_config(config, config_filepath)
+
+    videos.visualize_factor(config_filepath)
+
+    # Cleanup
+    shutil.rmtree(project_path)
 
 
