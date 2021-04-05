@@ -372,7 +372,7 @@ def face_with_trace(config_filepath):
 
             for vid_num in optic['vidNums_toUse'][first_vid_ind:]:
                 vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
-                for iter_frame in range(start_frame, int(session['vid_lens'][vid_num])):
+                for iter_frame in trange(start_frame, int(session['vid_lens'][vid_num])):
                     new_frame = vid.get_data(iter_frame)
                     if pulse_ind and ind_concat == pulse_ind:
                         new_frame = np.zeros_like(new_frame)
