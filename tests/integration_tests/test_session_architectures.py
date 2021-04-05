@@ -206,6 +206,22 @@ def test_single_session_single_video():
 
     videos.visualize_factor(config_filepath)
 
+    config = helpers.load_config(config_filepath)
+    config['Video']['factor_category_to_display'] = 'TCA'
+    config['Video']['factor_to_display'] = 'factors_spectral_points'
+    config['Video']['points_to_display'] = 'positions_convDR_absolute'
+    config['Video']['start_vid'] = 0
+    config['Video']['start_frame'] = 0
+    config['Video']['demo_len'] = 500
+    config['Video']['dot_size'] = 2
+    config['Video']['save_demo'] = True
+    config['Video']['factors_to_show'] = []
+    config['Video']['show_alpha'] = True
+    config['Video']['pulse_test_index'] = 0
+    helpers.save_config(config, config_filepath)
+
+    videos.face_with_trace(config_filepath)
+
     # Cleanup
     shutil.rmtree(project_path)
 
