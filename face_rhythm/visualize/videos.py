@@ -1,7 +1,7 @@
 import numpy as np
-from matplotlib import pyplot as plt
 import matplotlib
 matplotlib.use('TKAgg')
+from matplotlib import pyplot as plt
 from scipy.stats import norm
 import colorsys
 
