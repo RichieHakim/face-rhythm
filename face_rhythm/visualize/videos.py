@@ -1,7 +1,10 @@
+import sys
+
 import numpy as np
+if sys.platform == 'darwin':
+    import matplotlib
+    matplotlib.use('TKAgg')
 from matplotlib import pyplot as plt
-import matplotlib
-matplotlib.use('TKAgg')
 from scipy.stats import norm
 import colorsys
 

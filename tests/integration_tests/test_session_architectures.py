@@ -212,7 +212,7 @@ def test_single_session_single_video():
     config['Video']['points_to_display'] = 'positions_convDR_absolute'
     config['Video']['start_vid'] = 0
     config['Video']['start_frame'] = 0
-    config['Video']['demo_len'] = 500
+    config['Video']['demo_len'] = 10
     config['Video']['dot_size'] = 2
     config['Video']['save_demo'] = True
     config['Video']['factors_to_show'] = []
