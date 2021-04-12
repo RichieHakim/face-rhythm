@@ -71,7 +71,7 @@ def plot_tca_factors(config_filepath):
             if 'time' in factor:
                 plt.plot(np.arange(factors[i].shape[0]) / Fs,factors[i])
             elif 'freq' in  factor:
-                freqs_Sxx = helpers.load_data(config_filepath,'freqs_Sxx')
+                freqs_Sxx = helpers.load_nwb_ts(session['nwb'],'CQT','freqs_Sxx')
                 plt.plot(freqs_Sxx, factors[i])
                 plt.xscale('log')
             else:

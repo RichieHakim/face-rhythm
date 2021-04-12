@@ -1,7 +1,7 @@
-
 import time
 import numpy as np
 import torch.cuda
+import gc
 
 import scipy
 import scipy.signal
@@ -162,7 +162,7 @@ def downsample_trial_inds(trial_inds, len_original, len_cqt):
     return downsampled
 
 
-def trial_reshape_frequential(positions, spectrum, trial_inds):
+def trial_reshape_spectral(positions, spectrum, trial_inds):
     """
     reshapes the spectral data if the data is trial type
 
@@ -182,14 +182,16 @@ def trial_reshape_frequential(positions, spectrum, trial_inds):
     return reshaped
 
 
-def use_gpu(pref_useGPU):
-    if pref_useGPU:
+def set_device(config_filepath):
+    config = helpers.load_config(config_filepath)
+    if config['TCA']['pref_useGPU']:
         cuda_device_number = torch.cuda.current_device()
         print(f"using CUDA device: 'cuda:{cuda_device_number}'")
-        return f'cuda:{cuda_device_number}'
+        config['TCA']['device'] = f'cuda:{cuda_device_number}'
     else:
         print(f"using CPU")
-        return 'cpu'
+        config['TCA']['device'] = 'cpu'
+    helpers.save_config(config, config_filepath)
 
 
 def positional_tca_workflow(config_filepath, data_key):
@@ -206,6 +208,7 @@ def positional_tca_workflow(config_filepath, data_key):
 
     print(f'== Beginning Positional TCA Workflow ==')
     tic_all = time.time()
+    set_device(config_filepath)
     config = helpers.load_config(config_filepath)
     general = config['General']
 
@@ -228,8 +231,12 @@ def positional_tca_workflow(config_filepath, data_key):
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
+        del positions_convDR_meanSub, factors_np_positional
+
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End Positional TCA ==')
+
+    gc.collect()
 
 
 def interpolate_temporal_factor(y_input , numFrames):
@@ -271,6 +278,7 @@ def full_tca_workflow(config_filepath, data_key):
 
     print(f'== Beginning Full TCA Workflow ==')
     tic_all = time.time()
+    set_device(config_filepath)
     config = helpers.load_config(config_filepath)
     general = config['General']
 
@@ -279,7 +287,7 @@ def full_tca_workflow(config_filepath, data_key):
         Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_norm')
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])
-            Sxx_allPixels_norm = trial_reshape_frequential(positions_toUse, Sxx_allPixels_norm, trial_inds)
+            Sxx_allPixels_norm = trial_reshape_spectral(positions_toUse, Sxx_allPixels_norm, trial_inds)
 
         tic = time.time()
         factors_np = tca(config_filepath, Sxx_allPixels_norm , 1)
@@ -293,3 +301,7 @@ def full_tca_workflow(config_filepath, data_key):
 
         helpers.print_time('total elapsed time', time.time() - tic_all)
         print(f'== End Full TCA ==')
+
+        del positions_toUse, Sxx_allPixels_norm, factors_np, factors_temporal_interp
+
+    gc.collect()

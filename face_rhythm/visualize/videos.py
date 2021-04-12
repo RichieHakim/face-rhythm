@@ -91,14 +91,13 @@ def visualize_points(config_filepath):
     video = config['Video']
     optic = config['Optic']
 
-    color_tuples = helpers.load_data(config_filepath, 'color_tuples')
-
     demo_len = video['demo_len']
     vid_width = video['width']
     vid_height = video['height']
     Fs = video['Fs']
 
     for session in general['sessions']:
+        color_tuples = helpers.load_nwb_ts(session['nwb'],'Optic Flow', 'color_tuples')
         save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_demo.avi')
 
         if general['remote'] or video['save_demo']:
@@ -115,7 +114,8 @@ def visualize_points(config_filepath):
             vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
             for iter_frame in trange(demo_len):
                 new_frame = vid.get_data(iter_frame)
-                points = [positions[:,np.newaxis,:,iter_frame],position_tuples]
+                absolute_ind = helpers.absolute_index(session, vid_num, iter_frame)
+                points = [positions[:,np.newaxis,:,absolute_ind],position_tuples]
                 counters = [iter_frame, vid_num, ind_concat, Fs]
                 visualize_progress(config, session, new_frame, points, color_tuples, counters, out)
 
