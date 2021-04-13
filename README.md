@@ -2,6 +2,7 @@ face-rhythm
 ==============================
 
 Project structure for Rich Hakim's Face Rhythms
+Learn more at https://face-rhythm.readthedocs.io/
 
 Project Organization
 ------------
