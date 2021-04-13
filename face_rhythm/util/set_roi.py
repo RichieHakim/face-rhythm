@@ -58,7 +58,7 @@ class BBoxSelect:
         self.fig, ax = plt.subplots()
         self.img = ax.imshow(self.im.copy())
         self.ka = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
-        disconnect_button = widgets.Button(description="Disconnect mpl")
+        disconnect_button = widgets.Button(description="Confirm ROI")
         Disp.display(disconnect_button)
         disconnect_button.on_click(self.disconnect_mpl)
 
@@ -100,7 +100,7 @@ def get_roi(config_filepath):
     if roi['load_from_file']:
         with h5py.File(Path(paths['data']) / 'pts_all.h5', 'r') as pt:
             pts_all = helpers.h5_to_dict(pt)
-        helpers.save_h5(config_filepath, 'pts_all', pts_all)
+        helpers.save_pts(config_filepath, pts_all)
         return None, None
 
     video_list = general['sessions'][roi['session_to_set']]['videos']
@@ -130,11 +130,18 @@ def process_roi(config_filepath, frame, bs):
     pts_displacement, pts_x_displacement, pts_y_displacement = pts, pts_x, pts_y
     mask_frame_displacement = mask_frame
     cv2.destroyAllWindows()
+
+    config = helpers.load_config(config_filepath)
+    general = config['General']
+    roi = config['ROI']
+    video = config['Video']
+    session = general['sessions'][roi['session_to_set']]
+
     pts_all = dict([
-        ('bbox_subframe_displacement', bbox_subframe_displacement),
-        ('pts_displacement', pts_displacement),
-        ('pts_x_displacement', pts_x_displacement),
-        ('pts_y_displacement', pts_y_displacement),
-        ('mask_frame_displacement', mask_frame_displacement)
+        ('bbox_subframe_displacement', np.array(bbox_subframe_displacement)),
+        ('pts_displacement', np.array(pts_displacement)),
+        ('pts_x_displacement', np.array(pts_x_displacement)),
+        ('pts_y_displacement', np.array(pts_y_displacement)),
+        ('mask_frame_displacement', np.array(mask_frame_displacement))
     ])
-    helpers.save_h5(config_filepath, 'pts_all', pts_all)
+    helpers.save_pts(session['nwb'], pts_all)

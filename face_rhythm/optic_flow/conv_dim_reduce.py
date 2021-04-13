@@ -1,13 +1,11 @@
 import numpy as np
 import sklearn.decomposition
+import gc
 
 import cv2
 import imageio
-import multiprocessing
-from multiprocessing import Pool, RLock, freeze_support
 import copy
 import time
-from functools import partial
 from tqdm.notebook import tqdm, trange
 
 from matplotlib import pyplot as plt
@@ -263,32 +261,36 @@ def conv_dim_reduce_workflow(config_filepath):
     general = config['General']
     video = config['Video']
 
-    pointInds_toUse = helpers.load_data(config_filepath, 'pointInds_toUse')
-    pts_all = helpers.load_h5(config_filepath, 'pts_all')
-
-    # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
-    tic = time.time()
-    cosKernel, cosKernel_mean = create_kernel(config_filepath, pointInds_toUse)
-    helpers.print_time('Kernel created', time.time() - tic)
-
-    # let's make new dots with wider spacing
-    tic = time.time()
-    pts_spaced_convDR = space_points(config_filepath, pts_all)
-    print(f'number of points: {pts_spaced_convDR.shape[0]}')
-    helpers.print_time('Points spaced out', time.time() - tic)
-
     for session in general['sessions']:
+        pointInds_toUse = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'pointInds_toUse')
+        pts_all = helpers.get_pts(session['nwb'])
+
+        # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
+        tic = time.time()
+        cosKernel, cosKernel_mean = create_kernel(config_filepath, pointInds_toUse)
+        helpers.print_time('Kernel created', time.time() - tic)
+
+        # let's make new dots with wider spacing
+        tic = time.time()
+        pts_spaced_convDR = space_points(config_filepath, pts_all)
+        print(f'number of points: {pts_spaced_convDR.shape[0]}')
+        helpers.print_time('Points spaced out', time.time() - tic)
+
         tic_session = time.time()
         if config['CDR']['display_points']:
             points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
-        positions_new_sansOutliers = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'positions')
+        positions_new_sansOutliers = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'positions_cleanup')
         positions_convDR_meanSub, positions_convDR_absolute = compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR,
                                                                  cosKernel, cosKernel_mean, positions_new_sansOutliers)
 
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_meanSub', positions_convDR_meanSub, video['Fs'])
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_convDR_absolute', positions_convDR_absolute, video['Fs'])
+        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'pts_spaced_convDR', pts_spaced_convDR, video['Fs'])
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
-    helpers.save_data(config_filepath, 'pts_spaced_convDR', pts_spaced_convDR)
+        del positions_new_sansOutliers, positions_convDR_meanSub, positions_convDR_absolute, cosKernel, cosKernel_mean, pts_spaced_convDR, pts_all, pointInds_toUse
+
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End convolutional dimensionality reduction ==')
+
+    gc.collect()

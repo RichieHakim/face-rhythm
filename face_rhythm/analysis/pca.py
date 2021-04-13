@@ -3,8 +3,7 @@ import sklearn.decomposition
 import time
 
 from face_rhythm.util import helpers
-
-import pdb
+import gc
 
 def pca_workflow(config_filepath, data_key):
     """
@@ -47,6 +46,11 @@ def pca_workflow(config_filepath, data_key):
         helpers.create_nwb_ts(session['nwb'], 'PCA', 'explained_variance', pca.explained_variance_ratio_, 1.0)
 
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
+
+        del factors_temporal, factors_points, input_dimRed_meanSub, positions_convDR_meanSub, tmp_x, tmp_y
+        del pca
     
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End pca ==')
+
+    gc.collect()
