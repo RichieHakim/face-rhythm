@@ -1,5 +1,6 @@
 import cv2
 import h5py
+from matplotlib import  pyplot as plt
 
 from face_rhythm.util import helpers, set_roi, setup
 from face_rhythm.optic_flow import optic_flow, clean_results, conv_dim_reduce
@@ -9,18 +10,37 @@ from face_rhythm.visualize import videos, plots
 from pathlib import Path
 import shutil
 
+def run_basic(run_name):
+    project_path = Path('test_runs').resolve() / run_name
+    video_path = Path('test_data').resolve() / run_name / 'session1'
+    overwrite_config = True
+    remote = True
+    trials = False
+    multisession = False
 
-def test_single_session_single_video():
-    # SETUP
-    run_name = 'single_session_single_video'
-    project_path = Path('test_runs/'+run_name).resolve()
-    video_path = Path('test_data/'+run_name).resolve()
-    overwrite_config = False
+    config_filepath = setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials,
+                                          multisession)
+
+    # VIDEO LOAD
+    config = helpers.load_config(config_filepath)
+    config['Video']['file_prefix'] = 'gmou06'
+    config['Video']['print_filenames'] = True
+    config['General']['overwrite_nwbs'] = True
+    helpers.save_config(config, config_filepath)
+    setup.prepare_videos(config_filepath)
+
+    run_downstream(config_filepath)
+
+def run_multi(run_name):
+    project_path = Path('test_runs/' + run_name).resolve()
+    video_path = Path('test_data/' + run_name).resolve()
+    overwrite_config = True
     remote = True
     trials = False
     multisession = True
 
-    config_filepath = setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials, multisession)
+    config_filepath = setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials,
+                                          multisession)
 
     # VIDEO LOAD
     config = helpers.load_config(config_filepath)
@@ -28,9 +48,11 @@ def test_single_session_single_video():
     config['Video']['print_filenames'] = True
     config['General']['overwrite_nwbs'] = True
     helpers.save_config(config, config_filepath)
-
     setup.prepare_videos(config_filepath)
 
+    run_downstream(config_filepath)
+
+def run_downstream(config_filepath):
     # ROI Selection
     config = helpers.load_config(config_filepath)
     config['ROI']['session_to_set'] = 0  # 0 indexed. Chooses the session to use
@@ -117,6 +139,7 @@ def test_single_session_single_video():
     helpers.save_config(config, config_filepath)
 
     plots.plot_pca_diagnostics(config_filepath)
+    plt.close('all')
 
     # Visualize PCs
     config = helpers.load_config(config_filepath)
@@ -147,6 +170,7 @@ def test_single_session_single_video():
     helpers.save_config(config, config_filepath)
 
     plots.plot_tca_factors(config_filepath)
+    plt.close('all')
 
     config = helpers.load_config(config_filepath)
     config['Video']['factor_category_to_display'] = 'TCA'
@@ -176,6 +200,7 @@ def test_single_session_single_video():
     helpers.save_config(config, config_filepath)
 
     plots.plot_cqt(config_filepath)
+    plt.close('all')
 
     # Spectral TCA
     config = helpers.load_config(config_filepath)
@@ -194,6 +219,7 @@ def test_single_session_single_video():
     helpers.save_config(config, config_filepath)
 
     plots.plot_tca_factors(config_filepath)
+    plt.close('all')
 
     config = helpers.load_config(config_filepath)
     config['Video']['factor_category_to_display'] = 'TCA'
@@ -206,7 +232,52 @@ def test_single_session_single_video():
 
     videos.visualize_factor(config_filepath)
 
+    config = helpers.load_config(config_filepath)
+    config['Video']['factor_category_to_display'] = 'TCA'
+    config['Video']['factor_to_display'] = 'factors_spectral_points'
+    config['Video']['points_to_display'] = 'positions_convDR_absolute'
+    config['Video']['start_vid'] = 0
+    config['Video']['start_frame'] = 0
+    config['Video']['demo_len'] = 10
+    config['Video']['dot_size'] = 2
+    config['Video']['save_demo'] = True
+    config['Video']['factors_to_show'] = []
+    config['Video']['show_alpha'] = True
+    config['Video']['pulse_test_index'] = 0
+    helpers.save_config(config, config_filepath)
+
+    videos.face_with_trace(config_filepath)
+    plt.close('all')
+
     # Cleanup
-    shutil.rmtree(project_path)
+    shutil.rmtree(config['Paths']['project'])
 
 
+def test_single_session_single_video():
+    run_name = 'single_session_single_video'
+    run_multi(run_name)
+
+
+def test_single_session_multi_video():
+    run_name = 'single_session_multi_video'
+    run_multi(run_name)
+
+
+def test_multi_session_single_video():
+    run_name = 'multi_session_single_video'
+    run_multi(run_name)
+
+
+def test_multi_session_multi_video():
+    run_name = 'multi_session_multi_video'
+    run_multi(run_name)
+
+
+def test_basic_single_video():
+    run_name = 'single_session_single_video'
+    run_basic(run_name)
+
+
+def test_basic_multi_video():
+    run_name = 'single_session_multi_video'
+    run_basic(run_name)
