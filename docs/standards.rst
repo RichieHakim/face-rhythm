@@ -1,4 +1,5 @@
-Data standards for face-rhythm
+Data Standards
+=================
 
 **Minimum video requirements:**
 
@@ -85,7 +86,7 @@ kinds of data can work as well. Below are some of the constraints.
 
 4.  Decrease exposure time per frame
 
-5.  Get a brighter light (but don’t over expose video) in order to
+5.  Get a brighter light (but don't over expose video) in order to
     achieve above recommendations
 
 6.  Minimize large shadows (though increasing small shadows like over
@@ -108,4 +109,4 @@ Updates:
 
 2/12/2021 - doc made
 
-3/9/2021 - added ‘minimize overexposed pixels; bonsai; typos’
+3/9/2021 - added 'minimize overexposed pixels; bonsai; typos'
