@@ -58,11 +58,17 @@ pip install -e .
 ```
 conda install cudatoolkit=10.2
 ```
-5. Go ahead and create a "project directory" where you'd like your intermediate files, videos, and config files saved. Ideally outside of this repo so you don't have to worry about it when pushing and pulling. Again, given that your ipynb will change a lot (get populated with plots and new parameters, it's good to copy this out of the repo while you're doing analysis. 
+5. Create a "project directory" where we will save intermediate files, videos, and config files.
+This project directory should ideally be outside of the repo, and you'll create a new one each time
+you analyze a new dataset.
+Again, given that your ipynb will change a lot (get populated with plots and new parameters,
+it's good to copy this out of the repo while you're doing analysis. I typically put one notebook in
+each of my project folders.
+
 ```
 cd ..
-mkdir face_rhythm_runs
-cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_runs/
+mkdir face_rhythm_run
+cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_run/
 ```
 
 6. Get started! The plots display better using Jupyter Notebook
