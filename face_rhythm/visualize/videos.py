@@ -409,5 +409,5 @@ def face_with_trace(config_filepath):
 
             if general['remote'] or video['save_demo']:
                 out.release()
-
     cv2.destroyAllWindows()
+
