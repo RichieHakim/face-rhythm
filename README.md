@@ -40,7 +40,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
 1. Clone this repo to a good location 
 ```
-git clone https://github.com/akshay-jaggi/face-rhythm/
+git clone https://github.com/RichieHakim/face-rhythm/
 cd face-rhythm
 git checkout release
 ```
@@ -62,7 +62,7 @@ conda install cudatoolkit=10.2
 ```
 cd ..
 mkdir face_rhythm_runs
-cp face-rhythm/notebooks/opticflow_notebook_new.ipynb face_rhythm_runs/
+cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_runs/
 ```
 
 6. Get started! The plots display better using Jupyter Notebook
