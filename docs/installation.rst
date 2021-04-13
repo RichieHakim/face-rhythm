@@ -8,7 +8,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
     git clone https://github.com/RichieHakim/face-rhythm/
     cd face-rhythm
-    git checkout dev
+    git checkout release
 
 
 2. Create a conda environment:
