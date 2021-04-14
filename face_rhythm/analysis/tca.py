@@ -218,7 +218,7 @@ def positional_tca_workflow(config_filepath, data_key):
         positions_convDR_meanSub = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', data_key)
 
         if general['trials']:
-            trial_inds = np.load(session['trial_inds'])
+            trial_inds = np.load(session['trial_inds']).astype(int)
             positions_convDR_meanSub = trial_reshape_positional(positions_convDR_meanSub, trial_inds)
             positions_convDR_meanSub = positions_convDR_meanSub.transpose(0, 1, 3, 2)
         else:

@@ -81,6 +81,7 @@ def plot_tca_factors(config_filepath):
             plt.ylabel('a.u.')
         plt.figure()
         plt.imshow(np.single(np.corrcoef(factors[-1][:, :].T)))
+        plt.colorbar()
 
 
 def plot_cqt(config_filepath):
