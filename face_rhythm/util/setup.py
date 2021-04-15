@@ -153,7 +153,7 @@ def import_videos(config_filepath):
     session = {'name': 'session', 'videos': []}
     for vid in Path(paths['video']).iterdir():
         if video['file_prefix'] in str(vid.name):
-            if vid.suffix in ['.avi', '.mp4']:
+            if vid.suffix in ['.avi', '.mp4','.mov','.MOV']:
                 session['videos'].append(str(vid))
             elif vid.suffix in ['.npy'] and general['trials']:
                 session['trial_inds'] = str(vid)
@@ -188,7 +188,7 @@ def import_videos_multisession(config_filepath):
         if path.is_dir() and video['session_prefix'] in str(path.name):
             session = {'name': path.stem, 'videos': []}
             for vid in path.iterdir():
-                if vid.suffix in ['.avi', '.mp4']:
+                if vid.suffix in ['.avi', '.mp4','.MOV','.mov']:
                     session['videos'].append(str(vid))
                 elif vid.suffix in ['.npy'] and general['trials']:
                     session['trial_inds'] = str(vid)
