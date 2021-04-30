@@ -15,7 +15,7 @@ def load_config(config_filepath):
     """Loads config file into memory
     
     Args:
-        config_filepath (Path): path to config file
+        config_filepath (str): path to config file
     
     Returns:
         config (dict): actual config dict
@@ -32,7 +32,7 @@ def save_config(config, config_filepath):
     
     Args:
         config (dict): config dict
-        config_filepath (Path): path to config file
+        config_filepath (str): path to config file
     
     Returns:
     
@@ -292,3 +292,15 @@ def save_pts(nwb_path, pts_all):
     create_nwb_group(nwb_path, 'Original Points')
     for point_name, points in pts_all.items():
         create_nwb_ts(nwb_path, 'Original Points', point_name, points, 1.0)
+
+
+def update_config(new_project_path, config_name):
+    config_filepath = str(Path(new_project_path) / 'configs' / ('config_' + config_name + '.yaml'))
+    config = load_config(config_filepath)
+    old_project_path = config['Paths']['project']
+    for cat, cat_dict in config.items():
+        for key, value in cat_dict.items():
+            if type(value) is str and old_project_path in value:
+                cat_dict[key] = value.replace(old_project_path, new_project_path)
+    save_config(config, config_filepath)
+    return config_filepath
