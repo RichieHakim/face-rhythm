@@ -1,7 +1,5 @@
 import numpy as np
 import imageio
-from decord import VideoReader
-from decord import cpu, gpu
 
 def get_crop_limits(mask):
     mask_indexes = np.ix_(mask.any(1),mask.any(0))
