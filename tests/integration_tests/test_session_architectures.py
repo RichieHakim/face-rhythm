@@ -6,6 +6,7 @@ from face_rhythm.util import helpers, set_roi, setup
 from face_rhythm.optic_flow import optic_flow, clean_results, conv_dim_reduce
 from face_rhythm.analysis import pca, spectral_analysis, tca
 from face_rhythm.visualize import videos, plots
+from face_rhythm.comparisons import facemap, hog
 
 from pathlib import Path
 import shutil
@@ -261,6 +262,22 @@ def run_downstream(config_filepath):
 
     videos.face_with_trace(config_filepath)
     plt.close('all')
+
+    # Comparisons
+    config = helpers.load_config(config_filepath)
+    config['Comps'] = {}
+    config['Comps']['sbin'] = 4
+    config['Comps']['ncomps'] = 100
+    helpers.save_config(config, config_filepath)
+
+    facemap.facemap_workflow(config_filepath)
+
+    config = helpers.load_config(config_filepath)
+    config['Comps']['sbin'] = 4
+    config['Comps']['cell_size'] = 8
+    helpers.save_config(config, config_filepath)
+
+    hog.hog_workflow(config_filepath)
 
     # Cleanup
     shutil.rmtree(config['Paths']['project'])
