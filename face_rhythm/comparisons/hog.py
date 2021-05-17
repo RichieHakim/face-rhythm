@@ -2,12 +2,12 @@
 # https://zenodo.org/record/3618395#.YJr0BWZKjOQ
 
 import numpy as np
-
-import pims
 from skimage.feature import hog
-from joblib import Parallel, delayed
 
-from tqdm import tqdm
+from joblib import Parallel, delayed
+from tqdm.auto import tqdm
+
+from face_rhythm.util import helpers, batch
 
 
 def imagesToHogsCellCrop(vid_chunk, pixelsPerCell):
@@ -23,47 +23,49 @@ def imagesToHogsCellCrop(vid_chunk, pixelsPerCell):
     return hog_arrs, hog_ims
 
 
-def hog_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, cell_size):
-    nt0 = min(1000, nframes)  # chunk size
-    nsegs = int(np.ceil(nframes / nt0))
+def hog_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, cell_size):
 
-    # time ranges
-    tf = np.floor(np.linspace(0, nframes, nsegs + 1)).astype(int)
+    chunk_size = min(1000, nframes)
+    num_chunks = int(np.ceil(nframes / chunk_size))
+
+    chunk_starts = np.floor(np.linspace(0, nframes, num_chunks)).astype(int)
 
     hog_arrays = []
     hog_images = []  # np.zeros((len(video), video.frame_shape[0], video.frame_shape[1]), np.float32)
 
-    for n in tqdm(range(nsegs), desc="Computing HoG"):
-        t = tf[n]
-        im = prep_chunk(video, mask, crop_limits, t, nt0, sbin, Lyb, Lxb)
+    for chunk_ind, chunk_start in enumerate(tqdm(chunk_starts, "Computing HoG")):
+        video_slice = batch.chunked_video_slicer(video_paths, vid_lens, chunk_start, chunk_size)
+        im = batch.prep_chunk(video_slice, mask, crop_limits, sbin, Lyb, Lxb)
 
         hog_arrs, hog_ims = imagesToHogsCellCrop(im, cell_size)
         hog_arrays.append(hog_arrs)
-        # hog_images[t:t+nt0,...] = hog_ims
         hog_images.append(hog_ims)
 
     hog_arrays = np.stack(hog_arrays)
     hog_arrays = hog_arrays.reshape(hog_arrays.shape[0] * hog_arrays.shape[1], hog_arrays.shape[2])
+    hog_images_flat = [im for sublist in hog_images for im in sublist]
+    hog_images = np.stack(hog_images_flat)
 
     return hog_arrays, hog_images
 
 
-def hog_workflow(video_filepath, cell_size, mask_path='', display_plots=False):
-    video = pims.Video(video_filepath)
-    Ly = video.frame_shape[0]
-    Lx = video.frame_shape[1]
-    nframes = len(video)
-    sbin = 0
 
-    if mask_path:
-        mask = np.load(mask_path)
-    else:
-        mask = select_mask(video_filepath)
+def hog_workflow(config_filepath):
+    config = helpers.load_config(config_filepath)
 
-    crop_limits = get_crop_limits(mask)
+    sbin = config['Comps']['sbin']
+    cell_size = config['Comps']['cell_size']
 
-    Lyb, Lxb = get_binned_limits(sbin, crop_limits)
+    for session in config['General']['sessions']:
+        video_paths = session['videos']
+        vid_lens = session['vid_lens_true']
+        nframes = session['numFrames_total']
+        mask = helpers.load_nwb_ts(session['nwb'],'Original Points','mask_frame_displacement')
+        crop_limits = batch.get_crop_limits(mask)
+        Lyb, Lxb = batch.get_binned_limits(sbin, crop_limits)
 
-    hog_arrays, hog_images = hog_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, cell_size)
+        hog_arrays, hog_images = hog_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, cell_size)
 
-    return hog_arrays, hog_images
+        helpers.create_nwb_group(session['nwb'], 'HoG')
+        helpers.create_nwb_ts(session['nwb'], 'HoG', 'arrays', hog_arrays, config['Video']['Fs'])
+        helpers.create_nwb_ts(session['nwb'], 'HoG', 'images', hog_images, config['Video']['Fs'])

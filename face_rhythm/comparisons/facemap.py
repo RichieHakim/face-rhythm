@@ -4,8 +4,12 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.sparse.linalg import eigsh
+from sklearn.decomposition import IncrementalPCA
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
+
+from face_rhythm.util import helpers, batch
+import pdb
 
 def svdecon(X, k=100):
     np.random.seed(0)   # Fix seed to get same output for eigsh
@@ -30,85 +34,31 @@ def svdecon(X, k=100):
     return U, Sv, V
 
 
-def get_binned_limits(sbin, crop_limits):
-    Ly = [crop_limits[1] - crop_limits[0]]
-    Lx = [crop_limits[3] - crop_limits[2]]
-    Lyb, Lxb, ir = binned_inds(Ly, Lx, sbin)
-    Lyb = Lyb[0]
-    Lxb = Lxb[0]
-    return Lyb, Lxb
 
-
-def binned_inds(Ly, Lx, sbin):
-    Lyb = np.zeros((len(Ly),), np.int32)
-    Lxb = np.zeros((len(Ly),), np.int32)
-    ir = []
-    ix = 0
-    for n in range(len(Ly)):
-        Lyb[n] = int(np.floor(Ly[n] / sbin))
-        Lxb[n] = int(np.floor(Lx[n] / sbin))
-        ir.append(np.arange(ix, ix + Lyb[n] * Lxb[n], 1, int))
-        ix += Lyb[n] * Lxb[n]
-    return Lyb, Lxb, ir
-
-
-def spatial_bin(im, sbin, Lyb, Lxb):
-    imbin = im.astype(np.float32)
-    if sbin > 1:
-        imbin = (np.reshape(im[:, :Lyb * sbin, :Lxb * sbin], (-1, Lyb, sbin, Lxb, sbin))).mean(axis=-1).mean(axis=-2)
-    return imbin
-
-
-def prep_chunk(video, mask, crop_limits, t, nt0, sbin, Lyb, Lxb):
-    im = np.array(video[t:t + nt0])
-    # im is TIME x Ly x Lx x 3 (3 is RGB)
-    if im.ndim > 3:
-        im = im[:, :, :, 0]
-
-    # mask the image
-    im = np.multiply(im, mask)[:, crop_limits[0]:crop_limits[1], crop_limits[2]:crop_limits[3]]
-
-    # spatially bin the image
-    im = spatial_bin(im, sbin, Lyb, Lxb)
-
-    # convert im to Ly x Lx x TIME
-    im_old = im
-    im = np.transpose(im, (1, 2, 0)).astype(np.float32)
-
-    # most movies have integer values
-    # convert to float to average
-    im = im.astype(np.float32)
-    return im
-
-
-def mean_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb):
+def mean_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb):
     # get subsampled mean across frames
     # grab up to 2000 frames to average over for mean
-    nf = min(2000, nframes)
+    nframes_subsample = min(2000, nframes)
 
     # load in chunks of up to 200 frames (for speed)
-    nt0 = min(200, nframes)
-    nsegs = int(np.floor(nf / nt0))
-
-    # what times to sample
-    tf = np.floor(np.linspace(0, nframes - nt0, nsegs)).astype(int)
+    chunk_size = min(200, nframes_subsample)
+    num_chunks = int(np.floor(nframes_subsample / chunk_size))
+    chunk_starts = np.floor(np.linspace(0, nframes - chunk_size, num_chunks)).astype(int)
 
     avgframe = np.zeros((Lyb, Lxb), np.float32)
     avgmotion = np.zeros((Lyb, Lxb), np.float32)
 
-    ns = 0
-    for n in tqdm(range(nsegs), "Computing Mean"):
-        t = tf[n]
-        im = prep_chunk(video, mask, crop_limits, t, nt0, sbin, Lyb, Lxb)
+    for chunk_start in tqdm(chunk_starts, "Computing Mean"):
+        video_slice = batch.chunked_video_slicer(video_paths, vid_lens, chunk_start, chunk_size)
+        im = batch.prep_chunk(video_slice, mask, crop_limits, sbin, Lyb, Lxb)
 
         # add to averages
         avgframe += im.mean(axis=-1)
         immotion = np.abs(np.diff(im, axis=-1))
         avgmotion += immotion.mean(axis=-1)
-        ns += 1
 
-    avgframe /= float(ns)
-    avgmotion /= float(ns)
+    avgframe /= float(num_chunks)
+    avgmotion /= float(num_chunks)
 
     return avgframe, avgmotion
 
@@ -127,26 +77,26 @@ def display_averages(avgframe, avgmotion):
     plt.show()
 
 
-def svd_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmotion, ncomps):
+def svd_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, avgmotion, ncomps):
     # compute incremental SVD across frames
     # load chunks of 1000 and take 250 PCs from each
     # then concatenate and take SVD of compilation of 250 PC chunks
     # number of components kept from SVD is ncomps
 
-    nt0 = min(1000, nframes)  # chunk size
-    nsegs = int(min(np.floor(25000 / nt0), np.floor(nframes / nt0)))
-    nc = 250  # <- how many PCs to keep in each chunk
+    chunk_size = min(1000, nframes)
+    nframes_subsample = min(25000,nframes)
+    num_chunks = int(np.floor(nframes_subsample / chunk_size))
+    pcs_per_chunk = min(Lyb*Lxb,250)
 
     # what times to sample
-    tf = np.floor(np.linspace(0, nframes - nt0 - 1, nsegs)).astype(int)
+    chunk_starts = np.floor(np.linspace(0, nframes - chunk_size, num_chunks)).astype(int)
 
     # giant U that we will fill up with smaller SVDs
-    U = np.zeros((Lyb * Lxb, nsegs * nc), np.float32)
+    U = np.zeros((Lyb * Lxb, num_chunks * pcs_per_chunk), np.float32)
 
-    for n in tqdm(range(nsegs), desc="Computing SVD"):
-        t = tf[n]
-
-        im = prep_chunk(video, mask, crop_limits, t, nt0, sbin, Lyb, Lxb)
+    for chunk_ind, chunk_start in enumerate(tqdm(chunk_starts, "Computing SVD")):
+        video_slice = batch.chunked_video_slicer(video_paths, vid_lens, chunk_start, chunk_size)
+        im = batch.prep_chunk(video_slice, mask, crop_limits, sbin, Lyb, Lxb)
 
         im = np.abs(np.diff(im, axis=-1))
         im = np.reshape(im, (Lyb * Lxb, -1))
@@ -155,9 +105,9 @@ def svd_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmotion, nc
         im -= avgmotion.flatten()[:, np.newaxis]
 
         # take SVD
-        usv = svdecon(im, k=nc)
+        usv = svdecon(im, k=pcs_per_chunk)
 
-        U[:, n * nc:(n + 1) * nc] = usv[0]
+        U[:, chunk_ind * pcs_per_chunk:(chunk_ind + 1) * pcs_per_chunk] = usv[0]
 
     # take SVD of concatenated spatial PCs
     USV = svdecon(U, k=ncomps)
@@ -166,9 +116,48 @@ def svd_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmotion, nc
     return USV, U
 
 
+def ipca_fit(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, ncomps):
+    # compute incremental SVD across frames
+    # load chunks of 1000 and take 250 PCs from each
+    # then concatenate and take SVD of compilation of 250 PC chunks
+    # number of components kept from SVD is ncomps
+
+    chunk_size = min(1000, nframes)
+    nframes_subsample = min(25000,nframes)
+    num_chunks = int(np.floor(nframes_subsample / chunk_size))
+    pcs_per_chunk = min(Lyb*Lxb,250)
+
+    # what times to sample
+    chunk_starts = np.floor(np.linspace(0, nframes - chunk_size, num_chunks)).astype(int)
+
+    # giant U that we will fill up with smaller SVDs
+    ipca = IncrementalPCA(n_components=ncomps)
+    U = np.zeros((Lyb * Lxb, num_chunks * pcs_per_chunk), np.float32)
+
+    for chunk_ind, chunk_start in enumerate(tqdm(chunk_starts, "Computing SVD")):
+        video_slice = batch.chunked_video_slicer(video_paths, vid_lens, chunk_start, chunk_size)
+        im = batch.prep_chunk(video_slice, mask, crop_limits, sbin, Lyb, Lxb)
+
+        im = np.abs(np.diff(im, axis=-1))
+        im = np.reshape(im, (Lyb * Lxb, -1))
+
+        # take SVD
+        ipca.partial_fit(im.T)
+
+    # take SVD of concatenated spatial PCs
+    USV = (ipca.components_.T, ipca.singular_values_, ipca.components_)
+    U = USV[0]
+
+    return USV, U, ipca
+
+
 def display_variance_explained(USV, U):
     plt.plot(np.cumsum(USV[1] ** 2 / (U.shape[0] - 1)))
     plt.show()
+
+
+def get_variance_explained(USV,U):
+    return np.cumsum(USV[1] ** 2 / (U.shape[0] - 1))
 
 
 def display_eigenvectors(U, Lyb, Lxb, ncomps):
@@ -181,30 +170,30 @@ def display_eigenvectors(U, Lyb, Lxb, ncomps):
     plt.show()
 
 
-def project_pcs_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmotion, U):
+def project_pcs_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, avgmotion, U):
     # when do these spatial PCs occur in time?
     # project spatial PCs onto movies (in chunks again)
 
     ncomps = U.shape[1]
-    nt0 = min(1000, nframes)  # chunk size
-    nsegs = int(np.ceil(nframes / nt0))
+    chunk_size = min(1000, nframes)
+    num_chunks = int(np.ceil(nframes / chunk_size))
 
-    # time ranges
-    tf = np.floor(np.linspace(0, nframes, nsegs + 1)).astype(int)
+    chunk_starts = np.floor(np.linspace(0, nframes, num_chunks+1)).astype(int)
 
     # projection of spatial PCs onto movie
     motSVD = np.zeros((nframes, ncomps), np.float32)
 
-    for n in tqdm(range(nsegs), desc="Projecting SVD"):
-        t = tf[n]
-        im = prep_chunk(video, mask, crop_limits, t, nt0, sbin, Lyb, Lxb)
+    for chunk_ind, chunk_start in enumerate(tqdm(chunk_starts[:-1], "Projecting PCs")):
+        chunk_size = min(nframes-chunk_start, chunk_size)
+        video_slice = batch.chunked_video_slicer(video_paths, vid_lens, chunk_start, chunk_size)
+        im = batch.prep_chunk(video_slice, mask, crop_limits, sbin, Lyb, Lxb)
 
         im = np.reshape(im, (Lyb * Lxb, -1))
 
         # we need to keep around the last frame for the next chunk
-        if n > 0:
-            im = np.concatenate((imend[:, np.newaxis], im), axis=-1)
         imend = im[:, -1]
+        if chunk_ind > 0:
+            im = np.concatenate((imend[:, np.newaxis], im), axis=-1)
         im = np.abs(np.diff(im, axis=-1))
 
         # subtract off average motion
@@ -212,12 +201,107 @@ def project_pcs_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmo
 
         # project U onto immotion
         vproj = im.T @ U
-        if n == 0:
+        if chunk_ind == 0:
             vproj = np.concatenate((vproj[0, :][np.newaxis, :], vproj), axis=0)
 
-        motSVD[tf[n]:tf[n + 1], :] = vproj
+        motSVD[chunk_start:(chunk_start+chunk_size), :] = vproj
 
     return motSVD
+
+
+def ipca_project(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, ipca, U):
+    # when do these spatial PCs occur in time?
+    # project spatial PCs onto movies (in chunks again)
+
+    ncomps = U.shape[1]
+    chunk_size = min(1000, nframes)
+    num_chunks = int(np.ceil(nframes / chunk_size))
+
+    chunk_starts = np.floor(np.linspace(0, nframes, num_chunks+1)).astype(int)
+
+    # projection of spatial PCs onto movie
+    motSVD = np.zeros((nframes, ncomps), np.float32)
+
+    for chunk_ind, chunk_start in enumerate(tqdm(chunk_starts[:-1], "Projecting PCs")):
+        chunk_size = min(nframes-chunk_start, chunk_size)
+        video_slice = batch.chunked_video_slicer(video_paths, vid_lens, chunk_start, chunk_size)
+        im = batch.prep_chunk(video_slice, mask, crop_limits, sbin, Lyb, Lxb)
+
+        im = np.reshape(im, (Lyb * Lxb, -1))
+
+        # we need to keep around the last frame for the next chunk
+        imend = im[:, -1]
+        if chunk_ind > 0:
+            im = np.concatenate((imend[:, np.newaxis], im), axis=-1)
+        im = np.abs(np.diff(im, axis=-1))
+
+        # project U onto immotion
+        vproj = ipca.transform(im)
+        if chunk_ind == 0:
+            vproj = np.concatenate((vproj[0, :][np.newaxis, :], vproj), axis=0)
+
+        motSVD[chunk_start:(chunk_start+chunk_size), :] = vproj
+
+    return motSVD
+
+
+def facemap_workflow(config_filepath):
+    config = helpers.load_config(config_filepath)
+
+    sbin = config['Comps']['sbin']
+    ncomps = config['Comps']['ncomps']
+
+    for session in config['General']['sessions']:
+        video_paths = session['videos']
+        vid_lens = session['vid_lens_true']
+        nframes = session['numFrames_total']
+        mask = helpers.load_nwb_ts(session['nwb'],'Original Points','mask_frame_displacement')
+        crop_limits = batch.get_crop_limits(mask)
+        Lyb, Lxb = batch.get_binned_limits(sbin, crop_limits)
+        print(f'y:{Lyb}, x:{Lxb}, t:{nframes}')
+
+        avgframe, avgmotion = mean_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb)
+        USV, U = svd_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, avgmotion, ncomps)
+        motSVD = project_pcs_chunked(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, avgmotion, U)
+
+        variance_explained = get_variance_explained(USV, U)
+        display_eigenvectors(U, Lyb, Lxb, ncomps)
+
+        helpers.create_nwb_group(session['nwb'], 'FaceMap')
+        helpers.create_nwb_ts(session['nwb'], 'FaceMap', 'eigenvectors', U, config['Video']['Fs'])
+        helpers.create_nwb_ts(session['nwb'], 'FaceMap', 'projections', motSVD, config['Video']['Fs'])
+
+
+def ipca_workflow(config_filepath):
+    config = helpers.load_config(config_filepath)
+
+    sbin = config['Comps']['sbin']
+    ncomps = config['Comps']['ncomps']
+
+    for session in config['General']['sessions']:
+        video_paths = session['videos']
+        vid_lens = session['vid_lens_true']
+        nframes = session['numFrames_total']
+        mask = helpers.load_nwb_ts(session['nwb'], 'Original Points', 'mask_frame_displacement')
+        crop_limits = batch.get_crop_limits(mask)
+        Lyb, Lxb = batch.get_binned_limits(sbin, crop_limits)
+        print(f'y:{Lyb}, x:{Lxb}, t:{nframes}')
+
+        USV, U, ipca = ipca_fit(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb, ncomps)
+        motSVD = ipca_project(video_paths, vid_lens, nframes, mask, crop_limits, sbin, Lyb, Lxb,ipca, U)
+
+        variance_explained = get_variance_explained(USV, U)
+        display_eigenvectors(U, Lyb, Lxb, ncomps)
+
+        helpers.create_nwb_group(session['nwb'], 'FaceMap')
+        helpers.create_nwb_ts(session['nwb'], 'FaceMap', 'eigenvectors', U, config['Video']['Fs'])
+        helpers.create_nwb_ts(session['nwb'], 'FaceMap', 'projections', motSVD, config['Video']['Fs'])
+
+# def vis_stuff():
+#     if display_plots:
+#         display_averages(avgframe, avgmotion)
+#         display_variance_explained(USV, U)
+#         display_eigenvectors(U, Lyb, Lxb, ncomps)
 
 
 # def display_trace_video(to_plot, motSVD, jig, start, nframes):
@@ -240,42 +324,5 @@ def project_pcs_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmo
 #
 #     ani = matplotlib.animation.FuncAnimation(fig, animate, frames=nframes, interval=33)
 #     ani.save('output.mp4')
-
-
-def batched_pca_workflow(video_filepath, mask_path='', display_plots=False, display_video=False):
-    video = pims.Video(video_filepath)
-    Ly = video.frame_shape[0]
-    Lx = video.frame_shape[1]
-    nframes = len(video)
-    sbin = 4
-    ncomps = 500
-
-    if mask_path:
-        mask = np.load(mask_path)
-    else:
-        mask = select_mask(video_filepath)
-
-    crop_limits = get_crop_limits(mask)
-
-    Lyb, Lxb = get_binned_limits(sbin, crop_limits)
-
-    avgframe, avgmotion = mean_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb)
-
-    USV, U = svd_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmotion, ncomps)
-
-    motSVD = project_pcs_chunked(video, mask, crop_limits, nframes, sbin, Lyb, Lxb, avgmotion, U)
-
-    if display_plots:
-        display_averages(avgframe, avgmotion)
-        display_variance_explained(USV, U)
-        display_eigenvectors(U, Lyb, Lxb, ncomps)
-
-    # if display_video:
-    #     start = 7500
-    #     nframes = 1000
-    #     to_plot = prep_chunk(video, mask, crop_limits, t, nt0, sbin, Lyb, Lxb)
-    #     display_trace_video(to_plot, motSVD, jig, start, nframes)
-
-    return U, motSVD
 
 

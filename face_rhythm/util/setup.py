@@ -242,7 +242,7 @@ def get_video_data(config_filepath):
         for i, vid_path in enumerate(session['videos']):
             vid_reader = cv2.VideoCapture(vid_path)
             vid_lens[i] = int(vid_reader.get(cv2.CAP_PROP_FRAME_COUNT))
-        session['vid_lens'] = vid_lens.tolist()
+        session['vid_lens'] = vid_lens.astype(int).tolist()
         session['frames_total'] = int(sum(session['vid_lens']))
         session['frames_per_video'] = int(session['frames_total'] / session['num_vids'])
         print_session_report(session)
