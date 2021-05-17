@@ -1,7 +1,12 @@
+import sys
+
 import numpy as np
+if sys.platform == 'darwin':
+    import matplotlib
+    matplotlib.use('TKAgg')
 from matplotlib import pyplot as plt
 import matplotlib
-#matplotlib.use('TKAgg')
+
 from scipy.stats import norm
 import colorsys
 
@@ -514,7 +519,7 @@ class TemporalTrace(object):
 
 
 def fig_to_cv2_image(fig):
-    img = np.fromstring(fig.canvas.tostring_rgb(), dtype='uint8')
+    img = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
     img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
