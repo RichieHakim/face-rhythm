@@ -1,4 +1,5 @@
 import numpy as np
+import seaborn as sns
 
 # to make new colormap:
 # go to: http://jdherman.github.io/colormap/
@@ -280,3 +281,17 @@ def make_custom_cmap():
     )
 
     return cmap
+
+
+def custom_2d_cmap():
+    burd = np.array(sns.diverging_palette(240, 0, s=100, l=60, n=256))
+    puor = np.array(sns.diverging_palette(290, 30, s=100, l=60, n=256))
+    return np.int64(255*np.einsum('ij,kj->ikj',burd,puor))
+
+def custom_rb_cmap():
+    blues = np.linspace(0,1,100)
+    reds = np.linspace(0,1,100)
+    green_grid = np.zeros((100,100))
+    red_grid, blue_grid = np.meshgrid(reds,blues)
+    color_grid = np.stack((red_grid,green_grid, blue_grid),axis=-1)
+    return np.int64(255*color_grid)

@@ -1,0 +1,98 @@
+CDR:
+  display_points: false
+  dot_size: 1
+  frameNum: 1
+  kernel_alpha: 0.3
+  kernel_pixel: 10
+  num_components: 3
+  num_dots: 396
+  spacing: 16
+  vidNum: 0
+  width_cosKernel: 48
+CQT:
+  bins_per_octave: 11
+  fmax: 14.999997836475817
+  fmin: 1.65298336469954
+  fmin_rough: 1.8
+  hop_length: 16
+  n_bins: 35
+  pixelNum_toUse: 1
+  sr: 30.0
+Clean:
+  framesHalted_afterOutlier: 2
+  framesHalted_beforeOutlier: 4
+  outlier_threshold_displacements: 4
+  outlier_threshold_positions: 25
+  relaxation_factor: 0.005
+General:
+  overwrite_nwbs: false
+  remote: false
+  sessions:
+  - frames_per_video: 300
+    frames_total: 300
+    name: session1
+    numFrames_total: 299
+    num_vids: 1
+    nwb: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/data/session1.nwb
+    vid_lens:
+    - 300.0
+    videos:
+    - /n/groups/datta/akshay/face_projects/face-rhythm/test_data/single_session_single_video/session1/gmou06_082720_faceTrack_session1_ss.avi
+  trials: false
+Optic:
+  lk:
+    criteria:
+    - 3
+    - 3
+    - 0.001
+    maxLevel: 2
+    winSize:
+    - 15
+    - 15
+  multithread: false
+  recursive: false
+  recursive_relaxation_factor: 0.005
+  showVideo_pref: false
+  spacing: 16
+  vidNums_toUse:
+  - 0
+PCA: {}
+Paths:
+  color_tuples: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/data/color_tuples.npy
+  config: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/configs/config_single_session_single_video.yaml
+  data: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/data
+  freqs_Sxx: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/data/freqs_Sxx.npy
+  pointInds_toUse: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/data/pointInds_toUse.npy
+  project: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video
+  pts_all: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/data/pts_all.h5
+  pts_spaced_convDR: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/data/pts_spaced_convDR.npy
+  video: /n/groups/datta/akshay/face_projects/face-rhythm/test_data/single_session_single_video
+  viz: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/viz
+ROI:
+  frame_to_set: 1
+  load_from_file: true
+  session_to_set: 0
+  vid_to_set: 0
+TCA:
+  device: cpu
+  dir_positional: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/viz/positional
+  dir_spectral: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/viz/spectral
+  init: random
+  n_iters: 100
+  pref_concat_cartesian_dim: true
+  pref_useGPU: false
+  rank: 4
+  tolerance: 1.0e-06
+  verbosity: 0
+Video:
+  Fs: 30.0
+  demo_len: 10
+  demos: /n/groups/datta/akshay/face_projects/face-rhythm/test_runs/single_session_single_video/viz/demos
+  dot_size: 1
+  fps_counterPeriod: 10
+  height: 480
+  printFPS_pref: false
+  print_filenames: true
+  save_demo: false
+  session_prefix: session
+  width: 640

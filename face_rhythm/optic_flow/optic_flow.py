@@ -186,7 +186,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
                 pointInds_tracked = pointInds_tracked - (
                         pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term. this is just for display purposes. Relaxation term chosen during cleanup will be real
                 pointInds = [pointInds_tracked, pointInds_tracked_tuple]
-                counters = [iter_frame, vidNum_iter, ind_concat, fps]
+                counters = [iter_frame, vidNum_iter, fps, ind_concat, ind_concat]
                 if (remote and iter_frame < test_len) or not remote:
                     videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
 
@@ -331,7 +331,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
             if showVideo_pref:
 
                 pointInds = [pointInds_tracked, pointInds_tracked_tuple]
-                counters = [iter_frame, vidNum_iter, ind_concat, fps]
+                counters = [iter_frame, vidNum_iter, fps , ind_concat, ind_concat]
                 if (remote and iter_frame < test_len) or not remote:
                     videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
 

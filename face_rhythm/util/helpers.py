@@ -274,6 +274,7 @@ def dump_nwb(nwb_path):
         time_series_list = list(nwbfile.processing['Face Rhythm'][interface].time_series.keys())
         for ii, time_series in enumerate(time_series_list):
             print(f"     {time_series}:    {nwbfile.processing['Face Rhythm'][interface][time_series].data.shape}   ,  {nwbfile.processing['Face Rhythm'][interface][time_series].data.dtype}")
+    io.close()
 
 
 def absolute_index(session, vid_num, iter_frame):

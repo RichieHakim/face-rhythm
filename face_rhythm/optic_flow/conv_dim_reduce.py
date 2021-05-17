@@ -128,7 +128,7 @@ def points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
     kernel_example[...,2] = cosKernel[...,kernel_pixel]
     alpha = cdr['kernel_alpha']
 
-    color_tuples = helpers.load_data(config_filepath, 'color_tuples')
+    color_tuples = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'color_tuples')
 
     vid = imageio.get_reader(path_vid_allFiles[vidNum_toUse], 'ffmpeg')
     frame = vid.get_data(
