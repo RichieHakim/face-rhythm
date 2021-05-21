@@ -264,7 +264,7 @@ def interpolate_temporal_factor(y_input , numFrames):
     return y_new
 
 
-def full_tca_workflow(config_filepath, data_key):
+def full_tca_workflow(config_filepath, data_key_positionsTraceForInterpolation='positions_cleanup'):
     """
     sequences the steps for tca of the spectral decomposition of the optic flow data
 
