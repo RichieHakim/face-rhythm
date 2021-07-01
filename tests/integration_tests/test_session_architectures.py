@@ -248,7 +248,8 @@ def run_downstream(config_filepath):
 
     config = helpers.load_config(config_filepath)
     config['Video']['factor_category_to_display'] = 'TCA'
-    config['Video']['factor_to_display'] = 'factors_spectral_points'
+    config['Video']['face_factor_to_display'] = 'factors_spectral_points'
+    config['Video']['temporal_factor_to_display'] = 'factors_spectral_temporal_interp'
     config['Video']['points_to_display'] = 'positions_convDR_absolute'
     config['Video']['start_vid'] = 0
     config['Video']['start_frame'] = 0
