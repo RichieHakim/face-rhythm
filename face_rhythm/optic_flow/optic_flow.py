@@ -526,6 +526,7 @@ def optic_workflow(config_filepath):
             helpers.print_time('Displacements computed', time.time() - tic)
             session['numFrames_total'] = numFrames_total
             session['vid_lens_true'] = vid_lens
+            session['vid_locs'] = [sum(vid_lens[:i+1]) for i in range(len(vid_lens))]
             optic['num_dots'] = pointInds_toUse.shape[0]
             helpers.save_config(config, config_filepath)
 
