@@ -42,7 +42,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 ```
 git clone https://github.com/RichieHakim/face-rhythm/
 cd face-rhythm
-git checkout release
+git checkout dev
 ```
 
 2. Create a conda environment 
