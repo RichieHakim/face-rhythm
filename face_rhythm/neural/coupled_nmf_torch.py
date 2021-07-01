@@ -271,13 +271,15 @@ def coupled_nmf_wrapper(config_filepath):
     alpha = config['Neural']['alpha']
     max_iters = config['Neural']['max_iters']
     tol = config['Neural']['tol']
+    inner_iters = config['Neural']['inner_iters']
 
     for session in config['General']['sessions']:
         neural_tensor = helpers.load_nwb_ts(session['nwb'],'Neural', 'neural_tensor')
         face_tensor = helpers.load_nwb_ts(session['nwb'], 'Neural', 'face_tensor')
         losses, factors = coupled_nmf_model_torch(neural_tensor, face_tensor,
                                                   rank=rank, alpha=alpha,
-                                                  min_iters=3, max_iters=max_iters, tol=tol, inner_iters=3,
+                                                  min_iters=3, max_iters=max_iters, tol=tol,
+                                                  inner_iters=inner_iters,
                                                   verbose=False, outfileprefix=None)
         for key, value in factors:
             helpers.create_nwb_ts(session['nwb'], 'Neural', f'factors_{key}', value, 1.0)
