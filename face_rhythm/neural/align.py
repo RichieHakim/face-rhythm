@@ -54,8 +54,8 @@ def alignment_wrapper(config_filepath):
 def video_prep_wrapper(config_filepath):
     config = helpers.load_config(config_filepath)
 
-    joint_factor_path = config['Neural']['joint_factor_path']
     alignment_file_path = config['Neural']['alignment_file_path']
+    joint_factor_path = config['Neural']['joint_factor_path']
     alpha_ind = config['Neural']['alpha_ind']
 
     for session in config['General']['sessions']:
@@ -71,5 +71,5 @@ def video_prep_wrapper(config_filepath):
         cam_aligned_factors = align_jointInds_to_cameraInds(camTimes_aligned_wsTime, camTimes_wsInd, upsampled_factors, axis=1)
 
         helpers.create_nwb_group(session['nwb'], 'Neural')
-        helpers.create_nwb_ts(session['nwb'], 'Neural', f'factors_temporal', cam_aligned_factors, 1.0)
-        helpers.create_nwb_ts(session['nwb'], 'Neural', f'factors_spatial', face_factors, 1.0)
+        helpers.create_nwb_ts(session['nwb'], 'Neural', f'factors_temporal', cam_aligned_factors.T, 1.0)
+        helpers.create_nwb_ts(session['nwb'], 'Neural', f'factors_spatial', face_factors.T, 1.0)
