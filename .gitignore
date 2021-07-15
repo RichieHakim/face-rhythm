@@ -7,5 +7,6 @@ docs/_build
 *.egg-info/*
 **-checkpoint.ipynb
 .vscode
+*.pyc
 
 test_run/*
