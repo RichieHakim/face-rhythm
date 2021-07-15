@@ -86,7 +86,8 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
                     'CDR': {},
                     'PCA': {},
                     'CQT': {},
-                    'TCA': {}}
+                    'TCA': {},
+                    'Comps':{}}
     basic_config['Paths']['project'] = str(project_path)
     basic_config['Paths']['video'] = str(sessions_path)
     basic_config['Paths']['data'] = str(project_path / 'data')
@@ -152,14 +153,17 @@ def import_videos(config_filepath):
 
     session = {'name': 'session', 'videos': []}
     for vid in Path(paths['video']).iterdir():
+        # print(vid)
         if video['file_prefix'] in str(vid.name):
             if vid.suffix in ['.avi', '.mp4','.mov','.MOV']:
                 session['videos'].append(str(vid))
-            elif vid.suffix in ['.npy'] and general['trials']:
-                session['trial_inds'] = str(vid)
-                trial_inds = np.load(session['trial_inds'])
-                session['num_trials'] = trial_inds.shape[0]
-                session['trial_len'] = trial_inds.shape[1]
+        elif vid.name in ['trial_indices.npy'] and general['trials']:
+            session['trial_inds'] = str(vid)
+            trial_inds = np.load(session['trial_inds'])
+            session['num_trials'] = trial_inds.shape[0]
+            session['trial_len'] = trial_inds.shape[1]
+        elif vid.name in ['frames_to_ignore.npy']:
+            session['frames_to_ignore'] = str(vid)
     general['sessions'].append(session)
     helpers.save_config(config, config_filepath)
 
@@ -242,7 +246,7 @@ def get_video_data(config_filepath):
         for i, vid_path in enumerate(session['videos']):
             vid_reader = cv2.VideoCapture(vid_path)
             vid_lens[i] = int(vid_reader.get(cv2.CAP_PROP_FRAME_COUNT))
-        session['vid_lens'] = vid_lens.tolist()
+        session['vid_lens'] = vid_lens.astype(int).tolist()
         session['frames_total'] = int(sum(session['vid_lens']))
         session['frames_per_video'] = int(session['frames_total'] / session['num_vids'])
         print_session_report(session)

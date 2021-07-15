@@ -33,7 +33,7 @@ def clean_displacements(config_filepath, displacements, pointInds_toUse):
     ## Make a convolutional kernel for extending the outlier trace
     kernel = np.zeros(np.max(np.array([framesHalted_beforeOutlier, framesHalted_afterOutlier])) * 2 + 1)
     kernel_center = int(np.ceil(len(kernel) / 2))
-    kernel[kernel_center - framesHalted_beforeOutlier: kernel_center] = 1;
+    kernel[kernel_center - (framesHalted_beforeOutlier+1): kernel_center] = 1;
     kernel[kernel_center: kernel_center + framesHalted_afterOutlier] = 1
 
     ## Make integrated position traces from the displacement traces
