@@ -83,7 +83,13 @@ def setup(config, session, pts_all):
     pointInds_tracked = pointInds_toUse  ## set the first frame to have point locations be positions in the point cloud
     pointInds_tracked_tuple = list(np.arange(pointInds_toUse.shape[0]))
 
-    return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples , positions_recursive
+    if config['Video']['frames_to_ignore_pref']:
+        frames_to_ignore = np.load(session['frames_to_ignore'])
+        print(frames_to_ignore)
+    else:
+        frames_to_ignore = None
+
+    return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples , positions_recursive, frames_to_ignore
 
 
 
@@ -220,7 +226,7 @@ def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointIn
 
 
 def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, positions_recursive,
-                            pts_spaced, color_tuples, relaxation_factor, session):
+                            pts_spaced, color_tuples, relaxation_factor, session, frames_to_ignore):
     """
     the workhorse of the optic flow
     Opens each video in the list of videos
@@ -314,9 +320,12 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
             
             old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
             
-    #             pointInds_tracked = pointInds_tracked + (pointInds_new - pointInds_toUse)  # calculate integrated position
-            # pointInds_tracked = pointInds_tracked + diff[:,None,:]  # calculate integrated position
-            pointInds_tracked = pointInds_new - (pointInds_new -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
+            if frames_to_ignore[iter_frame]==0:
+        #             pointInds_tracked = pointInds_tracked + (pointInds_new - pointInds_toUse)  # calculate integrated position
+                # pointInds_tracked = pointInds_tracked + diff[:,None,:]  # calculate integrated position
+                pointInds_tracked = pointInds_new - (pointInds_new -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
+            else:
+                pointInds_tracked = pointInds_old
 
             ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
             if ind_concat ==0:
@@ -505,7 +514,7 @@ def optic_workflow(config_filepath):
             tic = tic_session
             pts_all = helpers.get_pts(session['nwb'])
 
-            pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples,positions_recursive = setup(config, session, pts_all)
+            pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples, positions_recursive, frames_to_ignore = setup(config, session, pts_all)
             helpers.print_time('Optic Flow Set Up', time.time() - tic)
 
             tic = time.time()
@@ -516,7 +525,9 @@ def optic_workflow(config_filepath):
                 displacements, numFrames_total , positions_recursive, vid_lens = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
                                                                          pointInds_tracked_tuple, positions_recursive, pts_spaced,
                                                                          color_tuples,
-                                                                         optic['recursive_relaxation_factor'], session)
+                                                                         optic['recursive_relaxation_factor'],
+                                                                         session,
+                                                                         frames_to_ignore)
             else:
                 displacements, numFrames_total, vid_lens = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
                                                                           pointInds_tracked_tuple, displacements, pts_spaced,
