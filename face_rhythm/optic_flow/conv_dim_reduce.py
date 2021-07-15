@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 from face_rhythm.util import helpers
 
 
-def make_distance_matrix(center_idx, vid_height, vid_width):
+def make_distance_image(center_idx, vid_height, vid_width):
     """
     creates a matrix of cartesian coordinate distances from the center
 
@@ -23,7 +23,7 @@ def make_distance_matrix(center_idx, vid_height, vid_width):
         vid_width (int): width of the video in pixels
 
     Returns:
-        distance_matrix (np.ndarray): array of distances to the center index
+        distance_image (np.ndarray): array of distances to the center index
 
     """
 
@@ -55,7 +55,7 @@ def create_kernel(config_filepath, point_idxs):
     cos_kernel = np.zeros((vid_height, vid_width, num_dots))
     cos_kernel_mean = np.zeros(num_dots)
     for ii in tqdm(range(num_dots),desc="creating kernel"):
-        x = make_distance_matrix(np.squeeze(point_idxs)[ii], vid_height, vid_width)
+        x = make_distance_image(np.squeeze(point_idxs)[ii], vid_height, vid_width)
         x_norm = x / width_cos_kernel
         x_clipped = np.minimum(x_norm, 1)
         cos_kernel[:, :, ii] = (np.cos(x_clipped * np.pi) + 1) / 2
