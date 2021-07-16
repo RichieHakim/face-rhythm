@@ -153,7 +153,6 @@ def import_videos(config_filepath):
 
     session = {'name': 'session', 'videos': []}
     for vid in Path(paths['video']).iterdir():
-        # print(vid)
         if video['file_prefix'] in str(vid.name):
             if vid.suffix in ['.avi', '.mp4','.mov','.MOV']:
                 session['videos'].append(str(vid))
@@ -240,7 +239,6 @@ def get_video_data(config_filepath):
     video = config['Video']
 
     for session in general['sessions']:
-        print(session)
         session['num_vids'] = len(session['videos'])
         vid_lens = np.ones(session['num_vids'])
         for i, vid_path in enumerate(session['videos']):

@@ -182,6 +182,8 @@ def get_q_filter_properties(sr,
     
     freqs_Sxx = librosa.cqt_frequencies(n_bins, fmin,
                             bins_per_octave=bins_per_octave)
+    print(n_bins, fmin, bins_per_octave)
+    print(freqs_Sxx)
 
     filters = np.real(librosa.filters.constant_q(sr=sr,
                                                 fmin=fmin,
@@ -233,14 +235,14 @@ def prepare_freqs(config_filepath, plot_pref=True):
 
 
         f_nyquist = sampling_rate / 2
-        n_octaves = np.log2(f_nyquist / fmin_rough)
-        bins_per_octave = int(np.round(n_bins / n_octaves))
+        n_octaves_rough = np.log2(f_nyquist / fmin_rough)
+        bins_per_octave_rough = n_bins / n_octaves_rough
 
         freqs_Sxx_all = get_q_filter_properties(
                                 sampling_rate,
                                 fmin=fmin_rough,
                                 n_bins=n_bins,
-                                bins_per_octave=bins_per_octave,
+                                bins_per_octave=bins_per_octave_rough,
                                 window='hann',
                                 filter_scale=filter_scale,
                                 pad_fft=False,
@@ -249,12 +251,17 @@ def prepare_freqs(config_filepath, plot_pref=True):
                                 gamma=gamma,
                                 plot_pref=plot_pref,
                            )
-        freq_idx_toUse = (freqs_Sxx_all < fmax_rough) * (freqs_Sxx_all > fmin_rough)
+        freq_idx_toUse = (freqs_Sxx_all <= fmax_rough) * (freqs_Sxx_all >= fmin_rough)
         freqs_Sxx_toUse = freqs_Sxx_all[freq_idx_toUse]
         fmin = freqs_Sxx_toUse[0]
         fmax = freqs_Sxx_toUse[-1]
+        n_octaves = np.log2((f_nyquist*1) / fmin)
+        # bins_per_octave = int(np.round(n_bins / n_octaves))
+        bins_per_octave = n_bins / n_octaves
+        print(fmin, fmax, n_octaves, bins_per_octave)
 
-        print(f'bins_per_octave: {round(bins_per_octave)} bins/octave')
+        print(f'octaves: {n_octaves} octaves')
+        print(f'bins_per_octave: {bins_per_octave} bins/octave')
         print(f'minimum frequency (fmin): {round(fmin, 4)} Hz')
         print(f'maximum frequency (fmax): {round(fmax, 8)} Hz')
         print(f'Nyquist                 : {sampling_rate / 2} Hz')

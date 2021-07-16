@@ -283,7 +283,7 @@ def full_tca_workflow(config_filepath, data_key_positionsTraceForInterpolation='
     general = config['General']
 
     for session in general['sessions']:
-        positions_toUse = helpers.load_nwb_ts(session['nwb'],'Optic Flow', data_key)
+        positions_toUse = helpers.load_nwb_ts(session['nwb'],'Optic Flow', data_key_positionsTraceForInterpolation)
         Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT','Sxx_allPixels_norm')
         if general['trials']:
             trial_inds = np.load(session['trial_inds'])

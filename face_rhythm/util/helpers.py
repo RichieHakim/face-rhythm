@@ -30,16 +30,19 @@ def load_config(config_filepath):
 def save_config(config, config_filepath):
     """
     Dumps config file to yaml
-    
     Args:
         config (dict): config dict
         config_filepath (str): path to config file
-    
     Returns:
-    
     """
-    with open(config_filepath, 'w') as f:
-        yaml.safe_dump(config, f)
+    serialized_object_string = ''
+    try:
+        serialized_object_string = yaml.safe_dump(config)
+    except yaml.YAMLError as ex:
+        print("An error has occurred while trying to save FR config:\n", ex)
+    if serialized_object_string:
+        with open(config_filepath, 'w') as f:
+            f.write(serialized_object_string)
 
 
 def create_nwb_group(nwb_path, group_name):
