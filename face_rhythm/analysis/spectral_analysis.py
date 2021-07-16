@@ -182,8 +182,6 @@ def get_q_filter_properties(sr,
     
     freqs_Sxx = librosa.cqt_frequencies(n_bins, fmin,
                             bins_per_octave=bins_per_octave)
-    print(n_bins, fmin, bins_per_octave)
-    print(freqs_Sxx)
 
     filters = np.real(librosa.filters.constant_q(sr=sr,
                                                 fmin=fmin,
@@ -236,7 +234,7 @@ def prepare_freqs(config_filepath, plot_pref=True):
 
         f_nyquist = sampling_rate / 2
         n_octaves_rough = np.log2(f_nyquist / fmin_rough)
-        bins_per_octave_rough = n_bins / n_octaves_rough
+        bins_per_octave_rough = np.ceil(n_bins / n_octaves_rough)
 
         freqs_Sxx_all = get_q_filter_properties(
                                 sampling_rate,
@@ -255,10 +253,9 @@ def prepare_freqs(config_filepath, plot_pref=True):
         freqs_Sxx_toUse = freqs_Sxx_all[freq_idx_toUse]
         fmin = freqs_Sxx_toUse[0]
         fmax = freqs_Sxx_toUse[-1]
-        n_octaves = np.log2((f_nyquist*1) / fmin)
+        n_octaves = np.log2(f_nyquist / fmin)
         # bins_per_octave = int(np.round(n_bins / n_octaves))
-        bins_per_octave = n_bins / n_octaves
-        print(fmin, fmax, n_octaves, bins_per_octave)
+        bins_per_octave = np.ceil(n_bins / n_octaves)
 
         print(f'octaves: {n_octaves} octaves')
         print(f'bins_per_octave: {bins_per_octave} bins/octave')
@@ -270,7 +267,7 @@ def prepare_freqs(config_filepath, plot_pref=True):
         # print(f'Frequencies: {np.round(freqs_Sxx, 3)}')
 
 
-        config['CQT']['bins_per_octave'] = bins_per_octave
+        config['CQT']['bins_per_octave'] = int(bins_per_octave)
         config['CQT']['n_octaves'] = float(n_octaves)
         config['CQT']['fmin'] = float(fmin)
         config['CQT']['fmax'] = float(fmax)
@@ -319,6 +316,7 @@ def show_demo_spectrogram(config_filepath,
         freqs_Sxx = np.array(nwbfile.processing['Face Rhythm']['CQT']['freqs_Sxx_toUse'].data)
         freq_idx_toUse = np.array(nwbfile.processing['Face Rhythm']['CQT']['freq_idx_toUse'].data)
 
+        print(test_timeSeries.shape)
         test_output = librosa.vqt(
                             test_timeSeries,
                             sr=sampling_rate,
@@ -425,23 +423,24 @@ def vqt_workflow(config_filepath, data_key, multicore_pref=True):
         ## define positions traces to use
         # input_sgram = np.single(np.squeeze(positions_new_sansOutliers))[:,:,:]
         input_sgram = (np.squeeze(positions_convDR_meanSub))[:,:,:]
-
+        
         ## make a single spectrogram to get some size parameters for preallocation
         Sxx = librosa.vqt(np.squeeze(input_sgram[0,0,:]),
-                          sr=sampling_rate,
-                          hop_length=hop_length,
-                          fmin=fmin,
-                          n_bins=n_bins,
-                          bins_per_octave=bins_per_octave,
-                          tuning=0.0,
-                          filter_scale=filter_scale,
-                        #   norm=1,
-                        #   sparsity=0.01,
-                        #   window='hann',
-                        #   scale=True,
-                        #   pad_mode='reflect',
-                        #   res_type=None,
-                        #   dtype=None
+                            sr=sampling_rate,
+                            hop_length=hop_length,
+                            fmin=fmin,
+                            n_bins=n_bins,
+                            bins_per_octave=bins_per_octave,
+                            gamma=gamma,
+                            filter_scale=filter_scale,
+                        #     tuning=0.0,
+                        #     norm=1,
+                            sparsity=0,
+                        #     window="hann",
+                        #     scale=True,
+                        #     pad_mode="reflect",
+                        #     res_type=None,
+                        #     dtype=None,
                           )
         Sxx_shape = Sxx.shape
 

@@ -96,7 +96,6 @@ def plot_cqt(config_filepath, Sxx_toUse, positions_toUse, xy_toUse='x', dot_toUs
     Returns:
 
     """
-    print('hi')
     config = helpers.load_config(config_filepath)
     # for session in config['General']['sessions']:
         # Sxx_allPixels_norm = helpers.load_nwb_ts(session['nwb'], 'CQT', 'Sxx_allPixels_norm')
@@ -133,7 +132,7 @@ def plot_cqt(config_filepath, Sxx_toUse, positions_toUse, xy_toUse='x', dot_toUs
             nwbfile = io.read()
             Sxx = np.array(nwbfile.processing['Face Rhythm']['CQT'][Sxx_toUse].data[dot_toUse, :,:, xy_toUse])
             positions = np.array(nwbfile.processing['Face Rhythm']['Optic Flow'][positions_toUse].data[dot_toUse, xy_toUse, :])
-            freqs_Sxx = np.array(nwbfile.processing['Face Rhythm']['CQT']['freqs_Sxx'].data)
+            freqs_Sxx = np.array(nwbfile.processing['Face Rhythm']['CQT']['freqs_Sxx_toUse'].data)
             Sxx_xAxis = np.array(nwbfile.processing['Face Rhythm']['CQT']['Sxx_xAxis'].data)
             # Sxx_xAxis = config['CQT']['Sxx_xAxis']
             
