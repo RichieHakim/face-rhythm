@@ -320,9 +320,11 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
             
             old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
             
-            if frames_to_ignore[iter_frame]==0:
-        #             pointInds_tracked = pointInds_tracked + (pointInds_new - pointInds_toUse)  # calculate integrated position
+            if frames_to_ignore is None:
+                #             pointInds_tracked = pointInds_tracked + (pointInds_new - pointInds_toUse)  # calculate integrated position
                 # pointInds_tracked = pointInds_tracked + diff[:,None,:]  # calculate integrated position
+                pointInds_tracked = pointInds_new - (pointInds_new -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
+            elif frames_to_ignore[iter_frame]==0:
                 pointInds_tracked = pointInds_new - (pointInds_new -pointInds_toUse)*relaxation_factor  # multiplied constant is the relaxation term
             else:
                 pointInds_tracked = pointInds_old
