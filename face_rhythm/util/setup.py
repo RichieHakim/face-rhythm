@@ -279,7 +279,7 @@ def create_nwbs(config_filepath):
     paths = config['Paths']
 
     for session in general['sessions']:
-        session['nwb'] = str(Path(paths['data']) / (session['name']+ '.nwb'))
+        session['nwb'] = str(Path(paths['data']) / (session['name'] + general['run_name'] + '.nwb'))
         if not general['overwrite_nwbs'] and Path(session['nwb']).exists():
             print(f'nwb for {session["name"]} already exists, not overwriting')
             print('set config["General"]["overwrite_nwbs"]=True for otherwise')
