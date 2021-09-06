@@ -110,7 +110,7 @@ def visualize_points(config_filepath):
 
     for session in general['sessions']:
         color_tuples = helpers.load_nwb_ts(session['nwb'],'Optic Flow', 'color_tuples')
-        save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_run{general['run_name']}_demo.avi')
+        save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_run{general["run_name"]}_demo.avi')
 
         if general['remote'] or video['save_demo']:
             fourcc = cv2.VideoWriter_fourcc(*'MJPG')
@@ -179,7 +179,7 @@ def visualize_factor(config_filepath):
 
         for factor_iter in range(rank):
             save_path = str(Path(config['Paths']['viz']) / (factor_category_name + '__' 
-            + factor_name + '__' + points_name + '__' + f'factor_{factor_iter+1}__run{general['run_name']}.avi'))
+            + factor_name + '__' + points_name + '__' + f'factor_{factor_iter+1}__run{general["run_name"]}.avi'))
 
             if general['remote'] or video['save_demo']:
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
@@ -330,7 +330,7 @@ def face_with_trace(config_filepath):
 
         for factor_iter in rank:
             save_path = str(Path(config['Paths']['viz']) / (factor_category_name + '__'
-                                                            + factor_name + '__' + points_name + '__' + f'factor_temporal_{factor_iter + 1}_run{general['run_name']}.avi'))
+                                                            + factor_name + '__' + points_name + '__' + f'factor_temporal_{factor_iter + 1}_run{general["run_name"]}.avi'))
 
             if general['remote'] or video['save_demo']:
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
