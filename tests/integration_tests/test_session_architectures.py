@@ -6,9 +6,11 @@ from face_rhythm.util import helpers, set_roi, setup
 from face_rhythm.optic_flow import optic_flow, clean_results, conv_dim_reduce
 from face_rhythm.analysis import pca, spectral_analysis, tca
 from face_rhythm.visualize import videos, plots
+from face_rhythm.comparisons import facemap, hog
 
 from pathlib import Path
 import shutil
+
 
 def run_basic(run_name):
     project_path = Path('test_runs').resolve() / run_name
@@ -30,6 +32,18 @@ def run_basic(run_name):
     setup.prepare_videos(config_filepath)
 
     run_downstream(config_filepath)
+
+def config_switch(run_name):
+    project_path = Path('test_runs').resolve() / run_name
+    video_path = Path('test_data').resolve() / run_name / 'session1'
+    overwrite_config = True
+    remote = True
+    trials = False
+    multisession = False
+
+    return setup.setup_project(project_path, video_path, run_name, overwrite_config, remote, trials,
+                                          multisession)
+
 
 def run_multi(run_name):
     project_path = Path('test_runs/' + run_name).resolve()
@@ -234,7 +248,8 @@ def run_downstream(config_filepath):
 
     config = helpers.load_config(config_filepath)
     config['Video']['factor_category_to_display'] = 'TCA'
-    config['Video']['factor_to_display'] = 'factors_spectral_points'
+    config['Video']['face_factor_to_display'] = 'factors_spectral_points'
+    config['Video']['temporal_factor_to_display'] = 'factors_spectral_temporal_interp'
     config['Video']['points_to_display'] = 'positions_convDR_absolute'
     config['Video']['start_vid'] = 0
     config['Video']['start_frame'] = 0
@@ -248,6 +263,22 @@ def run_downstream(config_filepath):
 
     videos.face_with_trace(config_filepath)
     plt.close('all')
+
+    # Comparisons
+    config = helpers.load_config(config_filepath)
+    config['Comps'] = {}
+    config['Comps']['sbin'] = 4
+    config['Comps']['ncomps'] = 100
+    helpers.save_config(config, config_filepath)
+
+    facemap.facemap_workflow(config_filepath)
+
+    config = helpers.load_config(config_filepath)
+    config['Comps']['sbin'] = 4
+    config['Comps']['cell_size'] = 8
+    helpers.save_config(config, config_filepath)
+
+    hog.hog_workflow(config_filepath)
 
     # Cleanup
     shutil.rmtree(config['Paths']['project'])
@@ -281,3 +312,21 @@ def test_basic_single_video():
 def test_basic_multi_video():
     run_name = 'single_session_multi_video'
     run_basic(run_name)
+
+def test_config_update():
+    run_name = 'single_session_single_video'
+    config_filepath = config_switch(run_name)
+    config = helpers.load_config(config_filepath)
+    old_project_path = config['Paths']['project']
+    new_project_path = str(Path(old_project_path).parent / 'test')
+    shutil.copytree(old_project_path, new_project_path)
+    config_filepath = helpers.update_config(new_project_path, run_name)
+
+    config = helpers.load_config(config_filepath)
+    config['Video']['file_prefix'] = 'gmou06'
+    config['Video']['print_filenames'] = True
+    config['General']['overwrite_nwbs'] = True
+    helpers.save_config(config, config_filepath)
+    setup.prepare_videos(config_filepath)
+
+    run_downstream(config_filepath)

@@ -311,12 +311,13 @@ def face_with_trace(config_filepath):
     pulse_ind = video['pulse_test_index']
 
     factor_category_name = video['factor_category_to_display']
-    factor_name = video['factor_to_display']
+    face_factor_name = video['face_factor_to_display']
+    temporal_factor_name = video['temporal_factor_to_display']
     points_name = video['points_to_display']
 
     for session in general['sessions']:
-        factor = helpers.load_nwb_ts(session['nwb'], factor_category_name, factor_name)
-        factor_temp = helpers.load_nwb_ts(session['nwb'], factor_category_name, 'factors_spectral_temporal_interp')
+        factor = helpers.load_nwb_ts(session['nwb'], factor_category_name, face_factor_name)
+        factor_temp = helpers.load_nwb_ts(session['nwb'], factor_category_name, temporal_factor_name)
         factor_x, factor_y = np.array_split(factor, 2, axis=0)
 
         points = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', points_name)

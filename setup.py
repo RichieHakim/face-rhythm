@@ -26,6 +26,7 @@ setup(
                       'pynwb',
                       'ipywidgets',
                       'pytest',
-                      'Pillow==7.2.0'
+                      'Pillow==7.2.0',
+                      'opt_einsum'
                       ]
 )
