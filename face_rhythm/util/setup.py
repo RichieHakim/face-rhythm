@@ -36,7 +36,7 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
     sessions_path.mkdir(parents=True, exist_ok=True)
     config_filepath = project_path / 'configs' / f'config_{run_name}.yaml'
     if not config_filepath.exists() or overwrite_config:
-        generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession)
+        generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession, run_name)
 
     version_check()
     return config_filepath
@@ -62,7 +62,7 @@ def version_check():
     print(f'Pytorch version: {torch.__version__}')
 
 
-def generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession):
+def generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession, run_name):
     """
     Generates bare config file with just basic info
 
@@ -73,6 +73,7 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
         remote (bool): whether running on remote
         trials (bool): whether using a trial structure for the recordings
         multisession (bool): whether we'll be handling multiple sessions
+        run_name (str): name for this current run of Face Rhythm
 
     Returns:
     """
@@ -96,6 +97,7 @@ def generate_config(config_filepath, project_path, sessions_path, remote, trials
     basic_config['General']['remote'] = remote
     basic_config['General']['trials'] = trials
     basic_config['General']['multisession'] = multisession
+    basic_config['General']['run_name'] = run_name
 
     demo_path = project_path / 'viz' / 'demos'
     demo_path.mkdir(parents=True, exist_ok=True)
@@ -279,7 +281,7 @@ def create_nwbs(config_filepath):
     paths = config['Paths']
 
     for session in general['sessions']:
-        session['nwb'] = str(Path(paths['data']) / (session['name']+ '.nwb'))
+        session['nwb'] = str(Path(paths['data']) / (session['name'] + general['run_name'] + '.nwb'))
         if not general['overwrite_nwbs'] and Path(session['nwb']).exists():
             print(f'nwb for {session["name"]} already exists, not overwriting')
             print('set config["General"]["overwrite_nwbs"]=True for otherwise')
