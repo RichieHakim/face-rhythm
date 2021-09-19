@@ -4,13 +4,15 @@ import numpy as np
 import skimage.draw
 
 import matplotlib.pyplot as plt
+import matplotlib.patches
+import matplotlib.path
 import IPython.display as Disp
 from ipywidgets import widgets
 
 from pathlib import Path
+import copy
 
-import h5py
-
+from face_rhythm.util import helpers
 
 def load_video(vid_to_set, frame_to_set, videos):
     """
@@ -57,6 +59,7 @@ class BBoxSelect:
         self.selected_points = []
         self.fig, ax = plt.subplots()
         self.img = ax.imshow(self.im.copy())
+        self.completed_status = False
         self.ka = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
         disconnect_button = widgets.Button(description="Confirm ROI")
         Disp.display(disconnect_button)
@@ -78,18 +81,26 @@ class BBoxSelect:
 
     def disconnect_mpl(self, _):
         self.fig.canvas.mpl_disconnect(self.ka)
+        self.completed_status = True
 
 
 def get_roi(config_filepath):
     """
-    loads a interactive tool to set the roi in the user's window
+    Loads a interactive tool to set the roi in the user's window
+    Update 20210919: New feature allows user to load an ROI from
+     a previous session .nwb file. In order to accomoate this,
+     the return of this function is either the BBoxSelect object
+     OR the pts_all dictionary
 
     Args:
         config_filepath (str): path to config file
 
     Returns:
         frame (cv2.image): frame read using cv2
-        BBoxSelect(frame) (BBoxSelect): a bounding box selection object
+        
+        EITHER 1 of the 2 following:
+            BBoxSelect(frame) (BBoxSelect): a bounding box selection object
+            pts_all (dict): dictionary of the point variables
     """
 
     config = helpers.load_config(config_filepath)
@@ -97,39 +108,68 @@ def get_roi(config_filepath):
     paths = config['Paths']
     general = config['General']
 
-    if roi['load_from_file']:
-        with h5py.File(Path(paths['data']) / 'pts_all.h5', 'r') as pt:
-            pts_all = helpers.h5_to_dict(pt)
-        helpers.save_pts(config_filepath, pts_all)
-        return None, None
-
     video_list = general['sessions'][roi['session_to_set']]['videos']
     frame = load_video(roi['vid_to_set'], roi['frame_to_set'], video_list)
-    return frame, BBoxSelect(frame)
+
+    if roi['load_from_file']:
+        bbox_subframe_displacement = helpers.load_nwb_ts(config['ROI']['path_to_oldNWB'], 'Original Points', 'bbox_subframe_displacement')
+        mask_frame_displacement = helpers.load_nwb_ts(config['ROI']['path_to_oldNWB'], 'Original Points', 'mask_frame_displacement')
+        pts_displacement = helpers.load_nwb_ts(config['ROI']['path_to_oldNWB'], 'Original Points', 'pts_displacement')
+        pts_x_displacement = helpers.load_nwb_ts(config['ROI']['path_to_oldNWB'], 'Original Points', 'pts_x_displacement')
+        pts_y_displacement = helpers.load_nwb_ts(config['ROI']['path_to_oldNWB'], 'Original Points', 'pts_y_displacement')
+        
+        pts_all = dict([
+                ('bbox_subframe_displacement', np.array(bbox_subframe_displacement)),
+                ('pts_displacement', np.array(pts_displacement)),
+                ('pts_x_displacement', np.array(pts_x_displacement)),
+                ('pts_y_displacement', np.array(pts_y_displacement)),
+                ('mask_frame_displacement', np.array(mask_frame_displacement))
+                ])
+        return frame, pts_all
+    else:
+        return frame, BBoxSelect(frame)
 
 
-def process_roi(config_filepath, frame, bs):
+def save_roi(config_filepath, frame, bs_OR_pts_all):
     """
     saves a set of points derived from a bounding box drawn by a user
 
     Args:
         config_filepath (str): path to config file
         frame (cv2.image) : current frame being analyzed
-        bs (BBoxSelect): a completed bbox select object
+        bs_OR_pts_all (dict): EITHER BBoxSelect(frame) OR pts_all
 
     Returns:
 
     """
-    pts = bs.selected_points
-    mask_frame = np.zeros((frame.shape[0], frame.shape[1]))
-    pts_y, pts_x = skimage.draw.polygon(np.array(pts)[:, 1], np.array(pts)[:, 0])
-    mask_frame[pts_y, pts_x] = 1
 
-    bbox = get_bbox(mask_frame)
-    bbox_subframe_displacement = bbox
-    pts_displacement, pts_x_displacement, pts_y_displacement = pts, pts_x, pts_y
-    mask_frame_displacement = mask_frame
-    cv2.destroyAllWindows()
+    if isinstance(bs_OR_pts_all, BBoxSelect):
+        bs = bs_OR_pts_all
+        pts = bs.selected_points
+        mask_frame = np.zeros((frame.shape[0], frame.shape[1]))
+        pts_y, pts_x = skimage.draw.polygon(np.array(pts)[:, 1], np.array(pts)[:, 0])
+        mask_frame[pts_y, pts_x] = 1
+
+        bbox = get_bbox(mask_frame)
+        bbox_subframe_displacement = bbox
+        pts_displacement, pts_x_displacement, pts_y_displacement = pts, pts_x, pts_y
+        mask_frame_displacement = mask_frame
+        cv2.destroyAllWindows()
+
+        pts_all = dict([
+                ('bbox_subframe_displacement', np.array(bbox_subframe_displacement)),
+                ('pts_displacement', np.array(pts_displacement)),
+                ('pts_x_displacement', np.array(pts_x_displacement)),
+                ('pts_y_displacement', np.array(pts_y_displacement)),
+                ('mask_frame_displacement', np.array(mask_frame_displacement))
+                ])
+    else:
+        pts_all = bs_OR_pts_all
+        bbox_subframe_displacement = pts_all['bbox_subframe_displacement']
+        pts_displacement = pts_all['pts_displacement']
+        pts_x_displacement = pts_all['pts_x_displacement']
+        pts_y_displacement = pts_all['pts_y_displacement']
+        mask_frame_displacement = pts_all['mask_frame_displacement']
 
     config = helpers.load_config(config_filepath)
     general = config['General']
@@ -137,11 +177,13 @@ def process_roi(config_filepath, frame, bs):
     video = config['Video']
     session = general['sessions'][roi['session_to_set']]
 
-    pts_all = dict([
-        ('bbox_subframe_displacement', np.array(bbox_subframe_displacement)),
-        ('pts_displacement', np.array(pts_displacement)),
-        ('pts_x_displacement', np.array(pts_x_displacement)),
-        ('pts_y_displacement', np.array(pts_y_displacement)),
-        ('mask_frame_displacement', np.array(mask_frame_displacement))
-    ])
+    fig, ax = plt.subplots()
+    verts = [(ii[0], ii[1]) for ii in pts_displacement]
+    codes = [matplotlib.path.Path.MOVETO] + [matplotlib.path.Path.LINETO] * (len(verts) - 2) + [matplotlib.path.Path.CLOSEPOLY]
+    path = matplotlib.path.Path(verts, codes)
+    patch = matplotlib.patches.PathPatch(path, facecolor='none', edgecolor='c', lw=2)
+    ax.add_patch(patch)
+    ax.imshow(frame)
+
+
     helpers.save_pts(session['nwb'], pts_all)
