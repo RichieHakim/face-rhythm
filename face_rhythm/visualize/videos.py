@@ -17,9 +17,12 @@ from tqdm.notebook import trange
 from face_rhythm.util import helpers
 from face_rhythm.visualize.make_custom_cmap import make_custom_cmap
 
+import PIL 
+from PIL import Image 
 
 
-def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, factor_num = 0):
+
+def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, factor_num = 0, show_text=True):
     """
     creates a single frame of points overlayed on a video 
     returns that frame to be displayed or saved in a higher level function
@@ -47,22 +50,23 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
         point_inds_tracked_tuple[ii] = tuple(np.int64(np.squeeze(point_inds_tracked[ii, 0, :])))
         cv2.circle(frame, point_inds_tracked_tuple[ii], dot_size, color_tuples[ii], -1)
 
-    cv2.putText(frame, f'frame #: {iter_frame}/~{numFrames_rough}', org=(10, 20), fontFace=1, fontScale=1,
-                color=(255, 255, 255), thickness=1)
-    cv2.putText(frame, f'vid #: {vidNum_iter + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
-                color=(255, 255, 255), thickness=1)
-    cv2.putText(frame, f'total frame #: {ind_concat + 1}/~{numFrames_total_rough}', org=(10, 60), fontFace=1,
-                fontScale=1, color=(255, 255, 255), thickness=1)
-    cv2.putText(frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1, color=(255, 255, 255),
-                thickness=1)
-    if factor_num:
-        cv2.putText(frame, f'factor: {factor_num}', org=(10, 100), fontFace=1, fontScale=1, color=(255, 255, 255),
-                thickness=1)
+    if show_text:
+        cv2.putText(frame, f'frame #: {iter_frame}/~{numFrames_rough}', org=(10, 20), fontFace=1, fontScale=1,
+                    color=(255, 255, 255), thickness=1)
+        cv2.putText(frame, f'vid #: {vidNum_iter + 1}/{len(vidNums_toUse)}', org=(10, 40), fontFace=1, fontScale=1,
+                    color=(255, 255, 255), thickness=1)
+        cv2.putText(frame, f'total frame #: {ind_concat + 1}/~{numFrames_total_rough}', org=(10, 60), fontFace=1,
+                    fontScale=1, color=(255, 255, 255), thickness=1)
+        cv2.putText(frame, f'fps: {np.uint32(fps)}', org=(10, 80), fontFace=1, fontScale=1, color=(255, 255, 255),
+                    thickness=1)
+        if factor_num:
+            cv2.putText(frame, f'factor: {factor_num}', org=(10, 100), fontFace=1, fontScale=1, color=(255, 255, 255),
+                    thickness=1)
 
     return frame
         
 
-def visualize_progress(config, session, frame, point_inds_tracked_list, color_tuples, counters, out):
+def visualize_progress(config, session, frame, point_inds_tracked_list, color_tuples, counters, out, show_text=True):
     """
     gets frame and then saves ior displays it
 
@@ -79,7 +83,7 @@ def visualize_progress(config, session, frame, point_inds_tracked_list, color_tu
 
     """
 
-    frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters)
+    frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, show_text=show_text)
 
     if config['General']['remote'] or (config['Video']['save_demo'] and counters[2] < config['Video']['demo_len']):
         out.write(frame_labeled)
@@ -165,6 +169,8 @@ def visualize_factor(config_filepath):
     factor_name = video['factor_to_display']
     points_name = video['points_to_display']
 
+    show_text = video['show_text']
+
 
     for session in general['sessions']:
         factor = helpers.load_nwb_ts(session['nwb'], factor_category_name, factor_name)
@@ -177,11 +183,12 @@ def visualize_factor(config_filepath):
         else:
             rank = factor.shape[1]
 
+        imgs_all = []
         for factor_iter in range(rank):
             save_path = str(Path(config['Paths']['viz']) / (factor_category_name + '__' 
             + factor_name + '__' + points_name + '__' + f'factor_{factor_iter+1}__run{general["run_name"]}.avi'))
 
-            if general['remote'] or video['save_demo']:
+            if general['remote'] or video['save_video']:
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
                 print(f'saving to file {save_path}')
                 out = cv2.VideoWriter(save_path, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
@@ -203,8 +210,6 @@ def visualize_factor(config_filepath):
             numColors = 256
             # cmap = matplotlib.cm.get_cmap('brg', numColors)
             cmap = make_custom_cmap()
-            print(cmap.shape)
-
 
             color_tuples = list(np.arange(points.shape[0]))
             for ii in range(points.shape[0]):
@@ -220,7 +225,9 @@ def visualize_factor(config_filepath):
                     # new_frame = vid.get_data(iter_frame)
                     points_tracked = [points[:, np.newaxis, :, ind_concat], points_tuples]
                     counters = [iter_frame, vid_num, ind_concat, Fs]
-                    visualize_progress(config, session, new_frame, points_tracked, color_tuples, counters, out)
+                    visualize_progress(config, session, new_frame, points_tracked, color_tuples, counters, out, show_text=show_text)
+                    if iter_frame == 0:
+                        imgs_all.append(new_frame)
 
                     k = cv2.waitKey(1) & 0xff
                     if k == 27: break
@@ -231,12 +238,36 @@ def visualize_factor(config_filepath):
                         break
                 if ind_concat >= demo_len:
                     break
+        fig, axs = plt.subplots(len(imgs_all), 1, figsize=(5,25))
+        for ii, img in enumerate(imgs_all):
+            img = BGR_to_RGB(img)
+            img = np.fliplr(img.transpose(1,0,2))
+            axs[ii].imshow(img)
+            axs[ii].axis('off')
+            if video['save_images']:
+                path_save_img = str(Path(config['Paths']['viz']) / ('Img_' + factor_category_name + '__' +
+                    factor_name + '__' + points_name + '__' + f'factor_{ii+1}__run{general["run_name"]}.png'))
+                print(path_save_img)
+                Image.fromarray(img).save(path_save_img)
 
-            if general['remote'] or video['save_demo']:
+            if general['remote'] or video['save_video']:
                 out.release()
 
     cv2.destroyAllWindows()
 
+
+
+def BGR_to_RGB(img):
+    """
+    converts BGR to RGB
+
+    Args:
+        img (np.array): image to convert
+
+    Returns:
+        np.array: converted image
+    """
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 class TemporalTrace(object):
     def __init__(self, factor_temporal, start, end, width, fps, fig_width, fig_height):
@@ -331,7 +362,7 @@ def face_with_trace(config_filepath):
 
         for factor_iter in rank:
             save_path = str(Path(config['Paths']['viz']) / (factor_category_name + '__'
-                                                            + factor_name + '__' + points_name + '__' + f'factor_temporal_{factor_iter + 1}_run{general["run_name"]}.avi'))
+                                                            + face_factor_name + '__' + points_name + '__' + f'factor_temporal_{factor_iter + 1}_run{general["run_name"]}.avi'))
 
             if general['remote'] or video['save_demo']:
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
