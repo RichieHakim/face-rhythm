@@ -140,7 +140,7 @@ def visualize_points(config_filepath):
 
                 ind_concat += 1
 
-        if general['remote'] or video['save_demo']:
+        if general['remote'] or video['save_video']:
             out.release()
 
 
@@ -364,7 +364,7 @@ def face_with_trace(config_filepath):
             save_path = str(Path(config['Paths']['viz']) / (factor_category_name + '__'
                                                             + face_factor_name + '__' + points_name + '__' + 'face_with_trace__' + f'factor_temporal_{factor_iter + 1}_run{general["run_name"]}.avi'))
 
-            if general['remote'] or video['save_demo']:
+            if general['remote'] or video['save_video']:
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
                 print(f'saving to file {save_path}')
                 out = cv2.VideoWriter(save_path, fourcc, Fs, (np.int64(2 * vid_width), np.int64(vid_height)))
@@ -424,7 +424,7 @@ def face_with_trace(config_filepath):
 
                     to_write = np.concatenate((frame_labeled, trace_im), axis=1)
                     if config['General']['remote'] or (
-                            config['Video']['save_demo'] and ind_loop < config['Video']['demo_len']):
+                            config['Video']['save_video'] and ind_loop < config['Video']['demo_len']):
                         out.write(to_write)
 
                     k = cv2.waitKey(1) & 0xff
@@ -439,7 +439,7 @@ def face_with_trace(config_filepath):
                 if ind_loop >= demo_len or ind_concat >= current_trace.shape[0]:
                     break
 
-            if general['remote'] or video['save_demo']:
+            if general['remote'] or video['save_video']:
                 out.release()
     cv2.destroyAllWindows()
 
