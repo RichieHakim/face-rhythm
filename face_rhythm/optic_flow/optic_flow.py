@@ -264,7 +264,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     fps_counterPeriod = video['fps_counterPeriod']
     printFPS_pref = video['printFPS_pref']
     remote = config['General']['remote']
-    save_vid = video['save_demo']
+    save_vid = video['save_video']
 
 
     Fs = video['Fs']

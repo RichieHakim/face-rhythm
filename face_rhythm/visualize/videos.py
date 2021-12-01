@@ -85,7 +85,7 @@ def visualize_progress(config, session, frame, point_inds_tracked_list, color_tu
 
     frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, show_text=show_text)
 
-    if config['General']['remote'] or (config['Video']['save_demo'] and counters[2] < config['Video']['demo_len']):
+    if config['General']['remote'] or (config['Video']['save_video'] and counters[2] < config['Video']['demo_len']):
         out.write(frame_labeled)
     if not config['General']['remote']:
         cv2.imshow('Display Factors', frame_labeled)
@@ -116,7 +116,7 @@ def visualize_points(config_filepath):
         color_tuples = helpers.load_nwb_ts(session['nwb'],'Optic Flow', 'color_tuples')
         save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_run{general["run_name"]}_demo.avi')
 
-        if general['remote'] or video['save_demo']:
+        if general['remote'] or video['save_video']:
             fourcc = cv2.VideoWriter_fourcc(*'MJPG')
             print(f'saving to file {save_pathFull}')
             out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
@@ -241,7 +241,7 @@ def visualize_factor(config_filepath):
         fig, axs = plt.subplots(len(imgs_all), 1, figsize=(5,25))
         for ii, img in enumerate(imgs_all):
             img = BGR_to_RGB(img)
-            img = np.fliplr(img.transpose(1,0,2))
+            # img = np.fliplr(img.transpose(1,0,2))
             axs[ii].imshow(img)
             axs[ii].axis('off')
             if video['save_images']:
@@ -362,7 +362,7 @@ def face_with_trace(config_filepath):
 
         for factor_iter in rank:
             save_path = str(Path(config['Paths']['viz']) / (factor_category_name + '__'
-                                                            + face_factor_name + '__' + points_name + '__' + f'factor_temporal_{factor_iter + 1}_run{general["run_name"]}.avi'))
+                                                            + face_factor_name + '__' + points_name + '__' + 'face_with_trace__' + f'factor_temporal_{factor_iter + 1}_run{general["run_name"]}.avi'))
 
             if general['remote'] or video['save_demo']:
                 fourcc = cv2.VideoWriter_fourcc(*'MJPG')
