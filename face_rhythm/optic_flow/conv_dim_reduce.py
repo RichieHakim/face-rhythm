@@ -12,28 +12,35 @@ from matplotlib import pyplot as plt
 
 from face_rhythm.util import helpers
 
-
-def make_distance_image(center_idx, vid_height, vid_width):
+def cosine_kernel_2D(center=(5,5), image_size=(11,11), width=5):
     """
-    creates a matrix of cartesian coordinate distances from the center
-
+    Generate a 2D cosine kernel
+    RH 2021
+    
     Args:
-        center_idx (list): chosen center index
-        vid_height (int): height of the video in pixels
-        vid_width (int): width of the video in pixels
-
-    Returns:
-        distance_image (np.ndarray): array of distances to the center index
-
+        center (tuple):  
+            The mean position (X, Y) - where high value expected. 0-indexed. Make second value 0 to make 1D
+        image_size (tuple): 
+            The total image size (width, height). Make second value 0 to make 1D
+        width (scalar): 
+            The full width of one cycle of the cosine
+    
+    Return:
+        k_cos (np.ndarray): 
+            2D or 1D array of the cosine kernel
     """
-
-    x, y = np.meshgrid(range(vid_width), range(vid_height))  # note dim 1:X and dim 2:Y
-    return np.sqrt((y - int(center_idx[1])) ** 2 + (x - int(center_idx[0])) ** 2)
+    x, y = np.meshgrid(range(image_size[1]), range(image_size[0]))  # note dim 1:X and dim 2:Y
+    dist = np.sqrt((y - int(center[1])) ** 2 + (x - int(center[0])) ** 2)
+    dist_scaled = (dist/(width/2))*np.pi
+    dist_scaled[np.abs(dist_scaled > np.pi)] = np.pi
+    k_cos = (np.cos(dist_scaled) + 1)/2
+    return k_cos
 
 
 def create_kernel(config_filepath, point_idxs):
     """
     creates convolutional kernel
+    RH 2021
 
     Args:
         config_filepath (Path): path to the config file
@@ -52,13 +59,29 @@ def create_kernel(config_filepath, point_idxs):
     num_dots = cdr['num_dots']
     vid_height = video['height']
     vid_width = video['width']
+
+    point_idxs_squeeze = np.fliplr(point_idxs.squeeze()) # flip so that the first index is the y-axis
+
+    k_width = copy.copy(width_cos_kernel)
+    k_center = k_width//2
+
+    k_cos = cosine_kernel_2D(center=(k_center, k_center), image_size=(k_width, k_width), width=k_width)
     cos_kernel = np.zeros((vid_height, vid_width, num_dots))
     cos_kernel_mean = np.zeros(num_dots)
     for ii in tqdm(range(num_dots),desc="creating kernel"):
-        x = make_distance_image(np.squeeze(point_idxs)[ii], vid_height, vid_width)
-        x_norm = x / width_cos_kernel
-        x_clipped = np.minimum(x_norm, 1)
-        cos_kernel[:, :, ii] = (np.cos(x_clipped * np.pi) + 1) / 2
+        # The following code block deals with clipping the edges
+        fi = point_idxs_squeeze[ii] - np.floor(k_width/2) # 'first index'
+        fis = -np.minimum(fi, 0) # 'first index shift'
+        fi_im = fi + fis # 'first index image'
+        fi_k = fis # 'first index kernel'
+        li = point_idxs_squeeze[ii] + np.ceil(k_width/2) # 'last index'
+        li_im = np.minimum(li, np.array([vid_height, vid_width])) # 'last index image'
+        lis = -(li - li_im) # 'last index shift'
+        li_k = k_width + lis # 'last index kernel'
+        fi_im, fi_k, li_im, li_k = np.int64(fi_im), np.int64(fi_k), np.int64(li_im), np.int64(li_k)
+
+        cos_kernel[fi_im[0]:li_im[0], fi_im[1]:li_im[1], ii] = k_cos[fi_k[0]:li_k[0], fi_k[1]:li_k[1]]
+        
         tmp = copy.deepcopy(cos_kernel[:, :, ii])
         tmp[tmp == 0] = np.nan
         cos_kernel_mean[ii] = np.nanmean(tmp)
@@ -218,8 +241,8 @@ def compute_influence(config_filepath, pointInds_toUse, pts_spaced_convDR, cosKe
     positions_convDR_meanSub = np.zeros((dots_new.shape[0] , 2 , input_traces.shape[2]))
     output_PCA_loadings = np.zeros((dots_new.shape[0] , 2 , input_traces.shape[2] , num_components))
     output_PCA_scores = list(np.zeros(dots_new.shape[0]))
+
     for ii in trange(dots_new.shape[0] , mininterval=1):
-    #     print(ii)
         influence_weightings = cosKernel[int(dots_new[ii][0][1]) , int(dots_new[ii][0][0]) , :]
         
         idx_nonZero = np.array(np.where(influence_weightings !=0))[0,:]
