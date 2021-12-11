@@ -12,7 +12,7 @@ import cv2
 import imageio
 
 from pathlib import Path
-from tqdm.notebook import trange
+from tqdm.notebook import trange, tqdm
 
 from face_rhythm.util import helpers
 from face_rhythm.visualize.make_custom_cmap import make_custom_cmap
@@ -22,7 +22,7 @@ from PIL import Image
 
 
 
-def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, factor_num = 0, show_text=True):
+def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, dot_size, factor_num = 0, show_text=True):
     """
     creates a single frame of points overlayed on a video 
     returns that frame to be displayed or saved in a higher level function
@@ -39,7 +39,7 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
         frame (cv2.image): labeled and processed image with points
     """
 
-    dot_size = config['Video']['dot_size']
+    # dot_size = config['Video']['dot_size']
     vidNums_toUse = config['Optic']['vidNums_toUse']
     numFrames_total_rough = session['frames_total']
     iter_frame, vidNum_iter, ind_concat, fps = counters
@@ -66,7 +66,17 @@ def create_frame(config, session, frame, point_inds_tracked_list, color_tuples, 
     return frame
         
 
-def visualize_progress(config, session, frame, point_inds_tracked_list, color_tuples, counters, out, show_text=True):
+def visualize_progress(config,
+                        session,
+                        frame,
+                        point_inds_tracked_list,
+                        color_tuples,
+                        counters,
+                        out,
+                        save_video,
+                        demo_len,
+                        dot_size,
+                        show_text=True):
     """
     gets frame and then saves ior displays it
 
@@ -83,15 +93,15 @@ def visualize_progress(config, session, frame, point_inds_tracked_list, color_tu
 
     """
 
-    frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, show_text=show_text)
+    frame_labeled = create_frame(config, session, frame, point_inds_tracked_list, color_tuples, counters, dot_size, show_text=show_text)
 
-    if config['General']['remote'] or (config['Video']['save_video'] and counters[2] < config['Video']['demo_len']):
+    if config['General']['remote'] or (save_video and counters[2] < demo_len):
         out.write(frame_labeled)
     if not config['General']['remote']:
         cv2.imshow('Display Factors', frame_labeled)
 
 
-def visualize_points(config_filepath):
+def visualize_points(config_filepath, demo_len, start_frame=0, dot_size=2, save_video=False):
     """
     loops over all sessions and creates a short demo video from each session
 
@@ -107,16 +117,17 @@ def visualize_points(config_filepath):
     video = config['Video']
     optic = config['Optic']
 
-    demo_len = video['demo_len']
     vid_width = video['width']
     vid_height = video['height']
     Fs = video['Fs']
+
+    frames_toShow = np.arange(start_frame, start_frame + demo_len, dtype=np.int64)
 
     for session in general['sessions']:
         color_tuples = helpers.load_nwb_ts(session['nwb'],'Optic Flow', 'color_tuples')
         save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_run{general["run_name"]}_demo.avi')
 
-        if general['remote'] or video['save_video']:
+        if general['remote'] or save_video:
             fourcc = cv2.VideoWriter_fourcc(*'MJPG')
             print(f'saving to file {save_pathFull}')
             out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
@@ -128,19 +139,28 @@ def visualize_points(config_filepath):
         ind_concat = 0
         for vid_num in optic['vidNums_toUse']:
             vid = imageio.get_reader(session['videos'][vid_num], 'ffmpeg')
-            for iter_frame in trange(demo_len):
+            for iter_frame in tqdm(frames_toShow):
                 new_frame = vid.get_data(iter_frame)
                 absolute_ind = helpers.absolute_index(session, vid_num, iter_frame)
                 points = [positions[:,np.newaxis,:,absolute_ind],position_tuples]
                 counters = [iter_frame, vid_num, ind_concat, Fs]
-                visualize_progress(config, session, new_frame, points, color_tuples, counters, out)
+                visualize_progress(config, 
+                                    session, 
+                                    new_frame, 
+                                    points, 
+                                    color_tuples, 
+                                    counters, 
+                                    out, 
+                                    save_video=save_video, 
+                                    demo_len=demo_len, 
+                                    dot_size=dot_size)
 
                 k = cv2.waitKey(1) & 0xff
                 if k == 27 : break
 
                 ind_concat += 1
 
-        if general['remote'] or video['save_video']:
+        if general['remote'] or save_video:
             out.release()
 
 
@@ -170,6 +190,7 @@ def visualize_factor(config_filepath):
     points_name = video['points_to_display']
 
     show_text = video['show_text']
+    dot_size = video['dot_size']
 
 
     for session in general['sessions']:
@@ -225,7 +246,16 @@ def visualize_factor(config_filepath):
                     # new_frame = vid.get_data(iter_frame)
                     points_tracked = [points[:, np.newaxis, :, ind_concat], points_tuples]
                     counters = [iter_frame, vid_num, ind_concat, Fs]
-                    visualize_progress(config, session, new_frame, points_tracked, color_tuples, counters, out, show_text=show_text)
+                    visualize_progress(config, 
+                                        session, 
+                                        new_frame, 
+                                        points_tracked, 
+                                        color_tuples, 
+                                        counters, 
+                                        out, 
+                                        save_video=False, 
+                                        demo_len=demo_len, 
+                                        dot_size=dot_size)
                     if iter_frame == 0:
                         imgs_all.append(new_frame)
 
@@ -346,6 +376,8 @@ def face_with_trace(config_filepath):
     temporal_factor_name = video['temporal_factor_to_display']
     points_name = video['points_to_display']
 
+    dot_size = video['dot_size']
+
     for session in general['sessions']:
         factor = helpers.load_nwb_ts(session['nwb'], factor_category_name, face_factor_name)
         factor_temp = helpers.load_nwb_ts(session['nwb'], factor_category_name, temporal_factor_name)
@@ -419,7 +451,7 @@ def face_with_trace(config_filepath):
                     color_tuples_brightened = brighten_colors(color_tuples,
                                                               alphas[ind_concat]) if show_alpha else color_tuples
                     frame_labeled = create_frame(config, session, new_frame, points_tracked, color_tuples_brightened,
-                                                 counters, factor_iter+1)
+                                                 counters, dot_size, factor_iter+1)
                     trace_im = fig_to_cv2_image(trace_plot.fig)
 
                     to_write = np.concatenate((frame_labeled, trace_im), axis=1)
