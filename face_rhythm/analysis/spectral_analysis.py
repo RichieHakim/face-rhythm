@@ -521,6 +521,8 @@ def vqt_workflow(config_filepath, data_key, multicore_pref=True):
             #         tmp = scipy.stats.zscore(tmp , axis=1)
             #         tmp = tmp - np.min(tmp , axis=1)[:,None]
 
+                    ## RH: I think we should get rid of the first dimension in the indexing below
+                    ## per the conversation with Jonah
                     Sxx_allPixels[ii,:,:,jj] = tmp[:, freq_idx_toUse, :]
             # Sxx_allPixels = Sxx_allPixels / np.std(Sxx_allPixels , axis=1)[:,None,:,:]
 

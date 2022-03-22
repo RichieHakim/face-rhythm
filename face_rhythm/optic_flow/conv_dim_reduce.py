@@ -151,14 +151,18 @@ def points_show(config_filepath, session, pts_all, pts_spaced_convDR, cosKernel)
     kernel_example[...,2] = cosKernel[...,kernel_pixel]
     alpha = cdr['kernel_alpha']
 
-    color_tuples = helpers.load_data(config_filepath, 'color_tuples')
+    color_tuples = list(np.arange(len(pts_spaced_convDR)))
+    for ii in range(len(pts_spaced_convDR)):
+        color_tuples[ii] = tuple([int(np.random.rand(1)[0] * 255), int(np.random.rand(1)[0] * 255), int(np.random.rand(1)[0] * 255)])
+    
+    # color_tuples = helpers.load_data(config_filepath, 'color_tuples')
 
     vid = imageio.get_reader(path_vid_allFiles[vidNum_toUse], 'ffmpeg')
     frame = vid.get_data(
         frameNum_toUse)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
     pointInds_tuple = list(np.arange(pts_spaced_convDR.shape[0]))
     for ii in range(pts_spaced_convDR.shape[0]):
-        pointInds_tuple[ii] = tuple(np.squeeze(pts_spaced_convDR[ii, 0, :]))
+        pointInds_tuple[ii] = tuple(np.squeeze(pts_spaced_convDR[ii, 0, :]).astype('int64'))
         cv2.circle(frame, pointInds_tuple[ii], dot_size, color_tuples[ii], -1)
     plt.imshow(cv2.cvtColor(np.float32((frame*(1-alpha)+255*kernel_example*alpha)/255), cv2.COLOR_BGR2RGB))
     plt.show()
@@ -288,16 +292,16 @@ def conv_dim_reduce_workflow(config_filepath):
         pointInds_toUse = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'pointInds_toUse')
         pts_all = helpers.get_pts(session['nwb'])
 
-        # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
-        tic = time.time()
-        cosKernel, cosKernel_mean = create_kernel(config_filepath, pointInds_toUse)
-        helpers.print_time('Kernel created', time.time() - tic)
-
         # let's make new dots with wider spacing
         tic = time.time()
         pts_spaced_convDR = space_points(config_filepath, pts_all)
         print(f'number of points: {pts_spaced_convDR.shape[0]}')
         helpers.print_time('Points spaced out', time.time() - tic)
+        
+        # first let's make the convolutional kernel. I like the cosine kernel because it goes to zero.
+        tic = time.time()
+        cosKernel, cosKernel_mean = create_kernel(config_filepath, pointInds_toUse)
+        helpers.print_time('Kernel created', time.time() - tic)
 
         tic_session = time.time()
         if config['CDR']['display_points']:

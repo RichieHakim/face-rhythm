@@ -265,6 +265,8 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     printFPS_pref = video['printFPS_pref']
     remote = config['General']['remote']
     save_vid = video['save_video']
+    dot_size = video['dot_size']
+    demo_len = video['demo_len']
 
 
     Fs = video['Fs']
@@ -344,7 +346,15 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
                 pointInds = [pointInds_tracked, pointInds_tracked_tuple]
                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
                 if (remote and iter_frame < test_len) or not remote:
-                    videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
+                    videos.visualize_progress(config,
+                                                session,
+                                                new_frame,
+                                                pointInds, 
+                                                color_tuples, 
+                                                counters, out,
+                                                save_video=save_vid, 
+                                                dot_size=dot_size, 
+                                                demo_len=demo_len)
 
                 if (save_vid or remote) and iter_frame == test_len:
                     out.release()
