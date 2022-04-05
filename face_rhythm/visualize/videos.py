@@ -255,7 +255,9 @@ def visualize_factor(config_filepath):
                                         out, 
                                         save_video=False, 
                                         demo_len=demo_len, 
-                                        dot_size=dot_size)
+                                        dot_size=dot_size,
+                                        show_text=show_text
+                                        )
                     if iter_frame == 0:
                         imgs_all.append(new_frame)
 
