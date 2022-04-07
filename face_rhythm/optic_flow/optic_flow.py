@@ -7,7 +7,8 @@ from face_rhythm.util import helpers
 from face_rhythm.visualize import videos
 
 import cv2
-import imageio
+# import imageio
+import decord
 
 import multiprocessing
 from multiprocessing import Pool, RLock, freeze_support
@@ -93,135 +94,135 @@ def setup(config, session, pts_all):
 
 
 
-def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
-                             pts_spaced, color_tuples, session):
-    """
-    the workhorse of the optic flow
-    Opens each video in the list of videos
-    Iterates through the frames of the video
-    Computes the optic flow between frames
-    Saves this to displacements frame
+# def displacements_monothread(config, pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements,
+#                              pts_spaced, color_tuples, session):
+#     """
+#     the workhorse of the optic flow
+#     Opens each video in the list of videos
+#     Iterates through the frames of the video
+#     Computes the optic flow between frames
+#     Saves this to displacements frame
 
-    Args:
-        config (dict): dictionary of config parameters
-        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
-        pointInds_tracked (np.ndarray): points for plotting
-        pointInds_tracked_tuple (list of tuples): points for plotting
-        displacements (np.ndarray): array of displacements
-        pts_spaced (np.ndarray): spaced out point locations
-        color_tuples (list of tuples): colors for plotting
-        session (dict): dict of session parameters
+#     Args:
+#         config (dict): dictionary of config parameters
+#         pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+#         pointInds_tracked (np.ndarray): points for plotting
+#         pointInds_tracked_tuple (list of tuples): points for plotting
+#         displacements (np.ndarray): array of displacements
+#         pts_spaced (np.ndarray): spaced out point locations
+#         color_tuples (list of tuples): colors for plotting
+#         session (dict): dict of session parameters
 
-    Returns:
-        displacements (np.ndarray): array of displacements
-        numFrames_total (int): number of frames
-    """
+#     Returns:
+#         displacements (np.ndarray): array of displacements
+#         numFrames_total (int): number of frames
+#     """
 
-    ## Main loop to pull out displacements in each video
-    ind_concat = 0
-    fps = 0
-    tic_fps = time.time()
-    tic_all = time.time()
+#     ## Main loop to pull out displacements in each video
+#     ind_concat = 0
+#     fps = 0
+#     tic_fps = time.time()
+#     tic_all = time.time()
 
-    optic = config['Optic']
-    video = config['Video']
+#     optic = config['Optic']
+#     video = config['Video']
 
-    vidNums_toUse = optic['vidNums_toUse']
-    showVideo_pref = optic['showVideo_pref']
-    fps_counterPeriod = video['fps_counterPeriod']
-    printFPS_pref = video['printFPS_pref']
-    remote = config['General']['remote']
-    save_vid = video['save_demo']
+#     vidNums_toUse = optic['vidNums_toUse']
+#     showVideo_pref = optic['showVideo_pref']
+#     fps_counterPeriod = video['fps_counterPeriod']
+#     printFPS_pref = video['printFPS_pref']
+#     remote = config['General']['remote']
+#     save_vid = video['save_demo']
 
-    Fs = video['Fs']
-    vid_width = video['width']
-    vid_height = video['height']
-    test_len = video['demo_len']
-    save_pathFull = str(Path(config['Paths']['viz']) / 'optic_test.avi')
+#     Fs = video['Fs']
+#     vid_width = video['width']
+#     vid_height = video['height']
+#     test_len = video['demo_len']
+#     save_pathFull = str(Path(config['Paths']['viz']) / 'optic_test.avi')
 
-    numVids = session['num_vids']
-    path_vid_allFiles = session['videos']
-    lk_names = [key for key in optic.keys() if 'lk_' in key]
-    lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
-                 for k in lk_names}
+#     numVids = session['num_vids']
+#     path_vid_allFiles = session['videos']
+#     lk_names = [key for key in optic.keys() if 'lk_' in key]
+#     lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
+#                  for k in lk_names}
 
-    # Define the codec and create VideoWriter object
-    if showVideo_pref and (save_vid or remote):
-        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-        print(f'saving to file {save_pathFull}')
-        out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
-    else:
-        out = None
-    vid_lens = []
-    for vidNum_iter in vidNums_toUse:
-        vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
-        #     metadata = vid.get_meta_data()
+#     # Define the codec and create VideoWriter object
+#     if showVideo_pref and (save_vid or remote):
+#         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+#         print(f'saving to file {save_pathFull}')
+#         out = cv2.VideoWriter(save_pathFull, fourcc, Fs, (np.int64(vid_width), np.int64(vid_height)))
+#     else:
+#         out = None
+#     vid_lens = []
+#     for vidNum_iter in vidNums_toUse:
+#         # vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
+#         vid = decord.VideoReader(path_vid_allFiles[vidNum_iter], ctx=decord.cpu())
+#         #     metadata = vid.get_meta_data()
 
-        path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
-        video = cv2.VideoCapture(path_vid)  # open the video object with openCV
-        numFrames_rough = int(video.get(
-            cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
+#         path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
+#         video = cv2.VideoCapture(path_vid)  # open the video object with openCV
+#         # numFrames_rough = int(video.get(cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
 
-        frameToSet = 0
-        frame = vid.get_data(0)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
-        new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        old_frame = new_frame_gray
+#         frameToSet = 0
+#         frame = vid.get_data(0)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+#         new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#         old_frame = new_frame_gray
 
-        print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
-        #     while True:
-        for iter_frame, new_frame in enumerate(tqdm(vid, total=numFrames_rough)):
-            new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
+#         print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
+#         #     while True:
+#         for iter_frame, new_frame in enumerate(tqdm(vid)):
+#             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
-            ##calculate optical flow
-            pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
-                                                                    **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+#             ##calculate optical flow
+#             pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
+#                                                                     **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
-            ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
-            if iter_frame == 0:
-                displacements[:, :, ind_concat] = np.zeros((pts_spaced.shape[0], 2))
-            else:
-                displacements[:, :, ind_concat] = np.single(np.squeeze((
-                        pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+#             ## Calculate displacement and place into variable 'displacements' (changes in size every iter)         
+#             if iter_frame == 0:
+#                 displacements[:, :, ind_concat] = np.zeros((pts_spaced.shape[0], 2))
+#             else:
+#                 displacements[:, :, ind_concat] = np.single(np.squeeze((
+#                         pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
-            old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
+#             old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
-            ## below is just for visualization. Nothing calculated is maintained
-            if showVideo_pref:
-                pointInds_tracked = pointInds_tracked + (
-                        pointInds_new - pointInds_toUse)  # calculate integrated position
-                pointInds_tracked = pointInds_tracked - (
-                        pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term. this is just for display purposes. Relaxation term chosen during cleanup will be real
-                pointInds = [pointInds_tracked, pointInds_tracked_tuple]
-                counters = [iter_frame, vidNum_iter, ind_concat, fps]
-                if (remote and iter_frame < test_len) or not remote:
-                    videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
+#             ## below is just for visualization. Nothing calculated is maintained
+#             if showVideo_pref:
+#                 pointInds_tracked = pointInds_tracked + (
+#                         pointInds_new - pointInds_toUse)  # calculate integrated position
+#                 pointInds_tracked = pointInds_tracked - (
+#                         pointInds_tracked - pointInds_toUse) * 0.01  # multiplied constant is the relaxation term. this is just for display purposes. Relaxation term chosen during cleanup will be real
+#                 pointInds = [pointInds_tracked, pointInds_tracked_tuple]
+#                 counters = [iter_frame, vidNum_iter, ind_concat, fps]
+#                 if (remote and iter_frame < test_len) or not remote:
+#                     videos.visualize_progress(config, session, new_frame, pointInds, color_tuples, counters, out)
 
-                if (save_vid or remote) and iter_frame == test_len:
-                    out.release()
+#                 if (save_vid or remote) and iter_frame == test_len:
+#                     out.release()
 
-                k = cv2.waitKey(1) & 0xff
-                if k == 27: break
+#                 k = cv2.waitKey(1) & 0xff
+#                 if k == 27: break
 
-            ind_concat = ind_concat + 1
+#             ind_concat = ind_concat + 1
 
-            if ind_concat % fps_counterPeriod == 0:
-                elapsed = time.time() - tic_fps
-                fps = fps_counterPeriod / elapsed
-                if printFPS_pref:
-                    print(fps)
-                tic_fps = time.time()
-        vid_lens.append(iter_frame+1)
-        ## Calculate how long calculation took
-        elapsed = time.time() - tic_all
-        helpers.print_time('video time elapsed:', elapsed)
-        print(f'Capture rate: {round(ind_concat / elapsed, 3)} fps')
+#             if ind_concat % fps_counterPeriod == 0:
+#                 elapsed = time.time() - tic_fps
+#                 fps = fps_counterPeriod / elapsed
+#                 if printFPS_pref:
+#                     print(fps)
+#                 tic_fps = time.time()
+#         vid_lens.append(iter_frame+1)
+#         ## Calculate how long calculation took
+#         elapsed = time.time() - tic_all
+#         helpers.print_time('video time elapsed:', elapsed)
+#         print(f'Capture rate: {round(ind_concat / elapsed, 3)} fps')
 
-    numFrames_total = ind_concat - 1
-    cv2.destroyAllWindows()
+#     numFrames_total = ind_concat - 1
+#     cv2.destroyAllWindows()
 
-    displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
+#     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
 
-    return displacements, numFrames_total, vid_lens
+#     return displacements, numFrames_total, vid_lens
 
 
 
@@ -294,23 +295,24 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     vid_lens = []
     pointInds_old = pointInds_toUse
     for vidNum_iter in vidNums_toUse:
-        vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
+        # vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
+        vid = decord.VideoReader(path_vid_allFiles[vidNum_iter], ctx=decord.cpu())
         #     metadata = vid.get_meta_data()
 
         path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
         video = cv2.VideoCapture(path_vid)  # open the video object with openCV
-        numFrames_rough = int(video.get(
-            cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
+        # numFrames_rough = int(video.get(cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
 
         frameToSet = 0
-        frame = vid.get_data(0)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+        # frame = vid.get_data(0)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+        frame = vid[frameToSet].asnumpy()
         new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         old_frame = new_frame_gray
 
         print(f'\n Calculating displacement field: video # {vidNum_iter+1}/{numVids}')
-        for iter_frame , new_frame in enumerate(tqdm(vid, total=numFrames_rough)):
+        for iter_frame , new_frame in enumerate(tqdm(vid)):
+            new_frame_gray = cv2.cvtColor(new_frame.asnumpy(), cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
-            new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
             ##calculate optical flow
             #         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None, **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
@@ -348,7 +350,7 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
                 if (remote and iter_frame < test_len) or not remote:
                     videos.visualize_progress(config,
                                                 session,
-                                                new_frame,
+                                                new_frame.asnumpy(),
                                                 pointInds, 
                                                 color_tuples, 
                                                 counters, out,
@@ -387,114 +389,115 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     return displacements, numFrames_total , positions_recursive, vid_lens
 
 
-def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced, session):  # function needed for multiprocessing
-    """
-    computes optic flow for a single video within the multithread command
-    similar to displacements monothread
-    eventually refactor / recombine with displacements monothread
+# def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced, session):  # function needed for multiprocessing
+#     """
+#     computes optic flow for a single video within the multithread command
+#     similar to displacements monothread
+#     eventually refactor / recombine with displacements monothread
 
-    Args:
-        vidNum_iter (int): current video of analysis
-        config (dict): dictionary of config parameters
-        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
-        displacements (np.ndarray): displacement of each point for each time step
-        pts_spaced (np.ndarray): spaced out points (similar to pointInds_toUse)
+#     Args:
+#         vidNum_iter (int): current video of analysis
+#         config (dict): dictionary of config parameters
+#         pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+#         displacements (np.ndarray): displacement of each point for each time step
+#         pts_spaced (np.ndarray): spaced out points (similar to pointInds_toUse)
 
-    Returns:
-        displacements_tmp (np.ndarray): array of displacements
-    """
+#     Returns:
+#         displacements_tmp (np.ndarray): array of displacements
+#     """
 
-    optic = config['Optic']
+#     optic = config['Optic']
 
-    numVids = session['num_vids']
-    path_vid_allFiles = session['videos']
-    lk_names = [key for key in optic.keys() if 'lk_' in key]
-    lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
-                 for k in lk_names}
+#     numVids = session['num_vids']
+#     path_vid_allFiles = session['videos']
+#     lk_names = [key for key in optic.keys() if 'lk_' in key]
+#     lk_params = {k.split('lk_')[1]: (tuple(optic[k]) if type(optic[k]) is list else optic[k]) \
+#                  for k in lk_names}
 
-    vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
-    #     metadata = vid.get_meta_data()
+#     # vid = imageio.get_reader(path_vid_allFiles[vidNum_iter], 'ffmpeg')
+#     vid = decord.VideoReader(path_vid_allFiles[vidNum_iter], ctx=decord.cpu())
+#     #     metadata = vid.get_meta_data()
 
-    path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
-    video = cv2.VideoCapture(path_vid)  # open the video object with openCV
-    numFrames = int(video.get(
-        cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
+#     path_vid = path_vid_allFiles[vidNum_iter]  # get path of the current vid
+#     video = cv2.VideoCapture(path_vid)  # open the video object with openCV
+#     numFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))  # get frame count of this vid GENERALLY INACCURATE. OFF BY AROUND -25 frames
+#     # numFrames = len(vid)
 
-    frameToSet = 0
-    frame = vid.get_data(
-        frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
-    new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    old_frame = new_frame_gray
+#     frameToSet = 0
+#     frame = vid.get_data(
+#         frameToSet)  # Get a single frame to use as the first 'previous frame' in calculating optic flow
+#     new_frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#     old_frame = new_frame_gray
 
-    displacements_tmp = np.zeros((pts_spaced.shape[0], 2, np.uint64(numFrames + (numVids * 1000)))) * np.nan
+#     displacements_tmp = np.zeros((pts_spaced.shape[0], 2, np.uint64(numFrames + (numVids * 1000)))) * np.nan
 
-    print(' ', end='', flush=True)
-    text = "progresser #{}".format(vidNum_iter)
-    print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
+#     print(' ', end='', flush=True)
+#     text = "progresser #{}".format(vidNum_iter)
+#     print(f'\n Calculating displacement field: video # {vidNum_iter + 1}/{numVids}')
 
-    for iter_frame, new_frame in enumerate(tqdm(vid, total=numFrames, desc=text, position=vidNum_iter)):
-        new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
+#     for iter_frame, new_frame in enumerate(tqdm(vid, total=numFrames, desc=text, position=vidNum_iter)):
+#         new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)  # convert to grayscale
 
-        ##calculate optical flow
-        pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
-                                                                **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
+#         ##calculate optical flow
+#         pointInds_new, status, error = cv2.calcOpticalFlowPyrLK(old_frame, new_frame_gray, pointInds_toUse, None,
+#                                                                 **lk_params)  # Calculate displacement distance between STATIC/ANCHORED points and the calculated new points. Also note the excluded 'NextPts' parameter. Could be used for fancier tracking
 
-        ## Calculate displacement and place into variable 'displacements' (changes in size every iter)
-        if iter_frame == 0:
-            displacements_tmp[:, :, iter_frame] = np.zeros((pts_spaced.shape[0], 2))
-        else:
-            displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((
-                    pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
+#         ## Calculate displacement and place into variable 'displacements' (changes in size every iter)
+#         if iter_frame == 0:
+#             displacements_tmp[:, :, iter_frame] = np.zeros((pts_spaced.shape[0], 2))
+#         else:
+#             displacements_tmp[:, :, iter_frame] = np.single(np.squeeze((
+#                     pointInds_new - pointInds_toUse)))  # this is the important variable. Simply the difference in the estimate
 
-        old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
+#         old_frame = new_frame_gray  # make current frame the 'old_frame' for the next iteration
 
-    return displacements_tmp
+#     return displacements_tmp
 
 
-def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session):
-    """
-    wrapper for multithreaded optic flow computation
-    operates on multiple videos at once
+# def displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session):
+#     """
+#     wrapper for multithreaded optic flow computation
+#     operates on multiple videos at once
 
-    Args:
-        config (dict): dictionary of config parameters
-        pointInds_toUse (np.ndarray): points indices to use for displacement calculations
-        displacements (np.ndarray): displacement of each point for each time step
-        pts_spaced (np.ndarray): spaced out point locations
-        session (dict): dictionary of session level information
+#     Args:
+#         config (dict): dictionary of config parameters
+#         pointInds_toUse (np.ndarray): points indices to use for displacement calculations
+#         displacements (np.ndarray): displacement of each point for each time step
+#         pts_spaced (np.ndarray): spaced out point locations
+#         session (dict): dictionary of session level information
 
-    Returns:
-        displacements (np.ndarray): array of displacements
-        numFrames_total (int): number of frames
-    """
+#     Returns:
+#         displacements (np.ndarray): array of displacements
+#         numFrames_total (int): number of frames
+#     """
 
-    numVids = session['num_vids']
-    cv2.setNumThreads(0)
-    freeze_support()
-    tqdm.set_lock(RLock())
-    p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
-    displacements_list = p.map(
-        partial(analyze_video, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced, session=session),
-        list(np.arange(numVids)))
+#     numVids = session['num_vids']
+#     cv2.setNumThreads(0)
+#     freeze_support()
+#     tqdm.set_lock(RLock())
+#     p = Pool(multiprocessing.cpu_count(), initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),))
+#     displacements_list = p.map(
+#         partial(analyze_video, config=config, pointInds_toUse=pointInds_toUse, pts_spaced=pts_spaced, session=session),
+#         list(np.arange(numVids)))
 
-    ## all of the below called for safety.
-    p.close()
-    p.terminate()
-    p.join()
+#     ## all of the below called for safety.
+#     p.close()
+#     p.terminate()
+#     p.join()
 
-    cv2.destroyAllWindows()
-    vid_lens = []
-    for ii in range(len(displacements_list)):
-        vid_lens.append(displacements_list[ii].shape[-1])
-        if ii == 0:
-            displacements = displacements_list[ii]
-        else:
-            displacements = np.concatenate((displacements, displacements_list[ii]), axis=2)
+#     cv2.destroyAllWindows()
+#     vid_lens = []
+#     for ii in range(len(displacements_list)):
+#         vid_lens.append(displacements_list[ii].shape[-1])
+#         if ii == 0:
+#             displacements = displacements_list[ii]
+#         else:
+#             displacements = np.concatenate((displacements, displacements_list[ii]), axis=2)
 
-    displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
-    numFrames_total = displacements.shape[-1]
+#     displacements = displacements[:, :, ~np.isnan(displacements[0, 0, :])]
+#     numFrames_total = displacements.shape[-1]
 
-    return displacements, numFrames_total, vid_lens
+#     return displacements, numFrames_total, vid_lens
 
 
 
