@@ -39,6 +39,27 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
         generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession, run_name)
 
     version_check()
+
+    if not remote:  ## forgive me father for I have sinned. This hack is necessary to make the code work on servers.
+        ###############################################################################
+        ## This block of code is used to initialize cv2.imshow
+        ## This is necessary because importing av and decord 
+        ##  will cause cv2.imshow to fail unless it is initialized.
+        ## Obviously, this should be commented out when running on
+        ##  systems that do not support cv2.imshow like servers.
+        ## Also be sure to import BNPM before importing most other
+        ##  modules.
+        test = np.zeros((1,300,400,3))
+        for frame in test:
+            cv2.putText(frame, "Prepping CV2", (10,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+            cv2.putText(frame, "Calling this figure allows cv2.imshow ", (10,100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+            cv2.putText(frame, "to run after importing av and decord", (10,120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+            cv2.imshow('test', frame)
+            cv2.waitKey(100)
+        cv2.destroyAllWindows()
+        ###############################################################################
+
+
     return config_filepath
 
 
@@ -153,11 +174,13 @@ def import_videos(config_filepath):
     general = config['General']
     general['sessions'] = []
 
+    path_vids = []
     session = {'name': 'session', 'videos': []}
     for vid in Path(paths['video']).iterdir():
         if video['file_prefix'] in str(vid.name):
             if vid.suffix in ['.avi', '.mp4','.mov','.MOV', '.m4v']:
-                session['videos'].append(str(vid))
+                # session['videos'].append(str(vid))
+                path_vids.append(str(vid))
         elif vid.name in ['trial_indices.npy'] and general['trials']:
             session['trial_inds'] = str(vid)
             trial_inds = np.load(session['trial_inds'])
@@ -165,6 +188,12 @@ def import_videos(config_filepath):
             session['trial_len'] = trial_inds.shape[1]
         elif vid.name in ['frames_to_ignore.npy']:
             session['frames_to_ignore'] = str(vid)
+    
+    if video['sort_filenames']:
+        path_vids.sort()
+    
+    session['videos'] = path_vids
+
     general['sessions'].append(session)
     helpers.save_config(config, config_filepath)
 
