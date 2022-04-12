@@ -185,5 +185,5 @@ def save_roi(config_filepath, frame, bs_OR_pts_all):
     ax.add_patch(patch)
     ax.imshow(frame)
 
-
+    print(session.keys())
     helpers.save_pts(session['nwb'], pts_all)

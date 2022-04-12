@@ -12,7 +12,7 @@ from pynwb import NWBFile, NWBHDF5IO
 from face_rhythm.util import helpers
 
 
-def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials, multisession):
+def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials, multisession, update_paths):
     """
     Creates the project folder and data folder (if they don't exist)
     Creates the config file (if it doesn't exist or overwrite requested)
@@ -37,6 +37,18 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
     config_filepath = project_path / 'configs' / f'config_{run_name}.yaml'
     if not config_filepath.exists() or overwrite_config:
         generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession, run_name)
+    elif update_paths:
+        config = helpers.load_config(config_filepath)
+        config['Paths']['project'] = str(project_path)
+        config['Paths']['video'] = str(sessions_path)
+        config['Paths']['data'] = str(project_path / 'data')
+        config['Paths']['viz'] = str(project_path / 'viz')
+        config['Paths']['config'] = str(config_filepath)
+        with open(str(config_filepath), 'w') as f:
+            yaml.safe_dump(config, f)
+        
+        print(f'Updated paths in config file: {config_filepath}')
+    return config_filepath
 
     version_check()
 
