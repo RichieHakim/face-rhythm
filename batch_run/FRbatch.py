@@ -47,6 +47,13 @@ shutil.copy2(path_script, str(Path(dir_save) / Path(path_script).name));
 #     'path_oldNWB'         : '/media/rich/bigSSD/analysis_data/face_rhythm_paper/fig_4/2pRAM_motor_mapping/AEG21/2022_05_13/face_rhythm_20220513_movie3/data/sessionrun.nwb',
 # }
 
+dir_FRproject = str(Path(dir_save) / params['name_FRproject'])
+path_configTemplate = params['path_configTemplate']
+dir_videos = params['dir_videos']
+fileName_strMatch = params['fileName_strMatch']
+path_oldNWB = params['path_oldNWB']
+
+
 import sys
 dir_face_rhythm = params['dir_face_rhythm']
 sys.path.append(dir_face_rhythm)
