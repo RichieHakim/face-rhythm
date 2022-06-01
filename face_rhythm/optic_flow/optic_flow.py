@@ -14,7 +14,7 @@ import multiprocessing
 from multiprocessing import Pool, RLock, freeze_support
 from functools import partial
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 from pathlib import Path
 

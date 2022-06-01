@@ -1,3 +1,4 @@
+from distutils.command.config import config
 import cv2
 import torch
 import numpy as np
@@ -12,7 +13,7 @@ from pynwb import NWBFile, NWBHDF5IO
 from face_rhythm.util import helpers
 
 
-def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials, multisession, update_paths):
+def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials, multisession, update_paths=False):
     """
     Creates the project folder and data folder (if they don't exist)
     Creates the config file (if it doesn't exist or overwrite requested)
@@ -44,13 +45,22 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
         config['Paths']['data'] = str(project_path / 'data')
         config['Paths']['viz'] = str(project_path / 'viz')
         config['Paths']['config'] = str(config_filepath)
+
+        for i_sesh, session in enumerate(config['General']['sessions']):
+            path_nwb = str(project_path / 'data' / (session['name'] + config['General']['run_name'] + '.nwb'))
+            config['General']['sessions'][i_sesh]['nwb'] = path_nwb
+            print(f'Updated path to nwb file: {path_nwb}')
         with open(str(config_filepath), 'w') as f:
             yaml.safe_dump(config, f)
         
-        print(f'Updated paths in config file: {config_filepath}')
-    return config_filepath
+        # display(config)
+        
+        print(f'Updated path to config file: {config_filepath}')
 
     version_check()
+
+    # return config_filepath
+
 
     if not remote:  ## forgive me father for I have sinned. This hack is necessary to make the code work on servers.
         ###############################################################################
@@ -189,7 +199,7 @@ def import_videos(config_filepath):
     path_vids = []
     session = {'name': 'session', 'videos': []}
     for vid in Path(paths['video']).iterdir():
-        if video['file_prefix'] in str(vid.name):
+        if video['file_strMatch'] in str(vid.name):
             if vid.suffix in ['.avi', '.mp4','.mov','.MOV', '.m4v']:
                 # session['videos'].append(str(vid))
                 path_vids.append(str(vid))
@@ -210,7 +220,7 @@ def import_videos(config_filepath):
     helpers.save_config(config, config_filepath)
 
     if len(session['videos']) == 0:
-        raise NoFilesError(paths['video'], video['file_prefix'])
+        raise NoFilesError(paths['video'], video['file_strMatch'])
 
 
 def import_videos_multisession(config_filepath):

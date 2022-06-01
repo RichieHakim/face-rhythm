@@ -64,9 +64,7 @@ def clean_displacements(config_filepath, displacements, pointInds_toUse):
             tmp = positions_new_sansOutliers[:, :, ii - 1] + displacements_sansOutliers[:, :, ii]
         positions_new_sansOutliers[:, :, ii] = tmp - (tmp) * relaxation_factor
 
-    positions_new_absolute_sansOutliers = positions_new_sansOutliers + np.squeeze(pointInds_toUse)[:, :, None]
-
-    return positions_new_sansOutliers, positions_new_absolute_sansOutliers
+    return positions_new_sansOutliers
 
 
 def clean_workflow(config_filepath):
@@ -89,16 +87,16 @@ def clean_workflow(config_filepath):
 
     for session in general['sessions']:
         tic_session = time.time()
+        print(f'== Loading displacements ==')
         displacements = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'displacements')
         pointInds_toUse = helpers.load_nwb_ts(session['nwb'], 'Optic Flow', 'pointInds_toUse')
-        positions_new_sansOutliers, positions_new_absolute_sansOutliers = clean_displacements(config_filepath, displacements, pointInds_toUse)
+        print(f'== Cleaning displacements ==')
+        positions_new_sansOutliers = clean_displacements(config_filepath, displacements, pointInds_toUse)
 
         helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_cleanup', positions_new_sansOutliers, video['Fs'])
-        helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_cleanup_absolute', positions_new_absolute_sansOutliers,
-                              video['Fs'])
         helpers.print_time(f'Session {session["name"]} completed', time.time() - tic_session)
 
-        del displacements, positions_new_sansOutliers, positions_new_absolute_sansOutliers
+        del displacements, positions_new_sansOutliers
 
     helpers.print_time('total elapsed time', time.time() - tic_all)
     print(f'== End outlier removal ==')

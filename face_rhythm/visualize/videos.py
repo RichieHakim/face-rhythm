@@ -120,6 +120,7 @@ def visualize_points(config_filepath, demo_len, start_frame=0, dot_size=2, save_
     vid_width = video['width']
     vid_height = video['height']
     Fs = video['Fs']
+    period = int(1000 / Fs)
 
     frames_toShow = np.arange(start_frame, start_frame + demo_len, dtype=np.int64)
 
@@ -155,7 +156,7 @@ def visualize_points(config_filepath, demo_len, start_frame=0, dot_size=2, save_
                                     demo_len=demo_len, 
                                     dot_size=dot_size)
 
-                k = cv2.waitKey(1) & 0xff
+                k = cv2.waitKey(period) & 0xff
                 if k == 27 : break
 
                 ind_concat += 1
