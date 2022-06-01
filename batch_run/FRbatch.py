@@ -54,8 +54,8 @@ sys.path.append(dir_face_rhythm)
 # from face_rhythm import ca2p_preprocessing, path_helpers, similarity, pickle_helpers, misc, featurization
 
 
-path_self, dir_FRproject, dir_videos, fileName_strMatch, path_oldNWB, path_configTemplate = sys.argv
-path_dispatcher_remote, dir_saveOutputs, path_script_remote, name_job, name_slurm, dir_videos = sys.argv
+# path_self, dir_FRproject, dir_videos, fileName_strMatch, path_oldNWB, path_configTemplate = sys.argv
+# path_dispatcher_remote, dir_saveOutputs, path_script_remote, name_job, name_slurm, dir_videos = sys.argv
 
 nameRun = '_batch'
 

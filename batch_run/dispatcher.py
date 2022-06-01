@@ -45,7 +45,7 @@ from basic_neural_processing_modules import container_helpers, server
 # name_slurm = args[4]
 # dir_data = args[5]
 
-path_self, path_script, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate = sys.argv
+path_self, path_script, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate, name_job, name_slurm = sys.argv
 
 
 print(path_self, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate)
