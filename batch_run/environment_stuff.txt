@@ -1,0 +1,4 @@
+conda create -n fr_env python=3.8
+pip install numpy==1.18.3 jupyter tensorly opencv-contrib-python imageio==2.9.0 matplotlib scikit-learn scikit-image librosa pyyaml imageio-ffmpeg tqdm h5py==2.10.0 pynwb ipywidgets pytest Pillow==7.2.0 opt_einsum
+
+pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
