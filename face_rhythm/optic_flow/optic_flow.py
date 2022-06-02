@@ -74,15 +74,11 @@ def setup(config, session, pts_all):
     ## Preallocate output variables
 
     # I add a bunch of NaNs to the end because the openCV estimate is usually less than the actual number of frames
-    # displacements = np.ones((pts_spaced.shape[0], 2, np.uint64(
-    #     numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
-    # positions_recursive = np.ones((pts_spaced.shape[0], 2, np.uint64(
-    #     numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
+    positions_recursive = np.ones((pts_spaced.shape[0], 2, np.uint64(
+        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
 
-    displacements = np.random.rand(pts_spaced.shape[0], 2, np.uint64(
-        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000))) 
-    positions_recursive = np.random.rand(pts_spaced.shape[0], 2, np.uint64(
-        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000))) 
+    # positions_recursive = np.random.rand(pts_spaced.shape[0], 2, np.uint64(
+    #     numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000))) 
 
     ## Preset point tracking variables
     pointInds_toUse = copy.deepcopy(pts_spaced)
@@ -95,7 +91,7 @@ def setup(config, session, pts_all):
     else:
         frames_to_ignore = None
 
-    return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples , positions_recursive, frames_to_ignore
+    return pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, pts_spaced, color_tuples , positions_recursive, frames_to_ignore
 
 
 
@@ -378,8 +374,8 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
                     print(fps)
                 tic_fps = time.time()
 
-            if iter_frame > 10:
-                break
+            # if iter_frame > 10:
+            #     break
         vid_lens.append(iter_frame+1)
 
         ## Calculate how long calculation took
@@ -391,10 +387,10 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
     cv2.destroyAllWindows()
 
     positions_recursive = positions_recursive[:, :, ~np.isnan(positions_recursive[0, 0, :])]
-    displacements = np.zeros_like(positions_recursive)
-    displacements[:,:,1:] = np.diff(positions_recursive , axis=2)
+    # displacements = np.zeros_like(positions_recursive)
+    # displacements[:,:,1:] = np.diff(positions_recursive , axis=2)
 
-    return displacements, numFrames_total , positions_recursive, vid_lens
+    return numFrames_total , positions_recursive, vid_lens
 
 
 # def analyze_video(vidNum_iter, config, pointInds_toUse, pts_spaced, session):  # function needed for multiprocessing
@@ -537,24 +533,24 @@ def optic_workflow(config_filepath):
             tic = tic_session
             pts_all = helpers.get_pts(session['nwb'])
 
-            pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, displacements, pts_spaced, color_tuples, positions_recursive, frames_to_ignore = setup(config, session, pts_all)
+            pointInds_toUse, pointInds_tracked, pointInds_tracked_tuple, pts_spaced, color_tuples, positions_recursive, frames_to_ignore = setup(config, session, pts_all)
             helpers.print_time('Optic Flow Set Up', time.time() - tic)
 
             tic = time.time()
 
-            if optic['multithread']:
-                displacements, numFrames_total, vid_lens = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
-            elif optic['recursive']:
-                displacements, numFrames_total , positions_recursive, vid_lens = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
+            # if optic['multithread']:
+            #     displacements, numFrames_total, vid_lens = displacements_multithread(config, pointInds_toUse, displacements, pts_spaced, session)
+            # elif optic['recursive']:
+            numFrames_total , positions_recursive, vid_lens = displacements_recursive(config, pointInds_toUse, pointInds_tracked,
                                                                          pointInds_tracked_tuple, positions_recursive, pts_spaced,
                                                                          color_tuples,
                                                                          optic['recursive_relaxation_factor'],
                                                                          session,
                                                                          frames_to_ignore)
-            else:
-                displacements, numFrames_total, vid_lens = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
-                                                                          pointInds_tracked_tuple, displacements, pts_spaced,
-                                                                          color_tuples, session)
+            # else:
+            #     displacements, numFrames_total, vid_lens = displacements_monothread(config, pointInds_toUse, pointInds_tracked,
+            #                                                               pointInds_tracked_tuple, displacements, pts_spaced,
+            #                                                               color_tuples, session)
 
 
             helpers.print_time('Displacements computed', time.time() - tic)
@@ -565,6 +561,8 @@ def optic_workflow(config_filepath):
             helpers.save_config(config, config_filepath)
 
             helpers.create_nwb_group(session['nwb'], 'Optic Flow')
+            displacements = np.zeros_like(positions_recursive)
+            displacements[:,:,1:] = np.diff(positions_recursive , axis=2)
             helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'displacements', displacements, video['Fs'])
             helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'positions_recursive', positions_recursive,video['Fs'])
             helpers.create_nwb_ts(session['nwb'], 'Optic Flow', 'color_tuples', np.array(color_tuples),video['Fs'])
