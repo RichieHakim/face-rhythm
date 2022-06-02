@@ -134,11 +134,11 @@ sbatch_config_list = \
 [f"""#!/usr/bin/bash
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
-#SBATCH --partition=priority
+#SBATCH --partition=short
 #SBATCH -c 20
 #SBATCH -n 1
-#SBATCH --mem=128GB
-#SBATCH --time=0-03:30:00
+#SBATCH --mem=170GB
+#SBATCH --time=0-06:30:00
 
 unset XDG_RUNTIME_DIR
 
