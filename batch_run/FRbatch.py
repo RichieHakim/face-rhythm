@@ -153,6 +153,7 @@ config['Optic'] = configTemplate['Optic']
 config['Optic']['showVideo_pref'] = True ## USE THIS TO TUNE PARAMETERS! Much faster when video is off. If 'remote' option chosen (from first cell block), video will be saved as file in project folder.
 
 config['Video']['save_video'] = False # Whether to save the demo video (true for remote users when showvideo is true)
+config['Video']['frames_to_ignore_pref'] = False 
 # config['Video']['demo_len'] = 1000 # used when remote users when show_video==True
 
 helpers.save_config(config, config_filepath)
