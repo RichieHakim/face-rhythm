@@ -74,10 +74,15 @@ def setup(config, session, pts_all):
     ## Preallocate output variables
 
     # I add a bunch of NaNs to the end because the openCV estimate is usually less than the actual number of frames
-    displacements = np.ones((pts_spaced.shape[0], 2, np.uint64(
-        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
-    positions_recursive = np.ones((pts_spaced.shape[0], 2, np.uint64(
-        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
+    # displacements = np.ones((pts_spaced.shape[0], 2, np.uint64(
+    #     numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
+    # positions_recursive = np.ones((pts_spaced.shape[0], 2, np.uint64(
+    #     numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000)))) * np.nan
+
+    displacements = np.random.rand(pts_spaced.shape[0], 2, np.uint64(
+        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000))) 
+    positions_recursive = np.random.rand(pts_spaced.shape[0], 2, np.uint64(
+        numFrames_total_rough + numFrames_total_rough * 0.1 + (numVids * 1000))) 
 
     ## Preset point tracking variables
     pointInds_toUse = copy.deepcopy(pts_spaced)
@@ -372,6 +377,9 @@ def displacements_recursive(config, pointInds_toUse, pointInds_tracked, pointInd
                 if printFPS_pref:
                     print(fps)
                 tic_fps = time.time()
+
+            if iter_frame > 10:
+                break
         vid_lens.append(iter_frame+1)
 
         ## Calculate how long calculation took

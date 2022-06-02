@@ -28,34 +28,46 @@ def clean_displacements(config_filepath, displacements, pointInds_toUse):
     relaxation_factor = clean['relaxation_factor']
 
     ## Remove flagrant outliers from displacements
+    print('removing flagrant outliers')
     displacements_simpleOutliersRemoved = displacements * (np.abs(displacements) < outlier_threshold_displacements)
-
-    ## Make a convolutional kernel for extending the outlier trace
-    kernel = np.zeros(np.max(np.array([framesHalted_beforeOutlier, framesHalted_afterOutlier])) * 2 + 1)
-    kernel_center = int(np.ceil(len(kernel) / 2))
-    kernel[kernel_center - (framesHalted_beforeOutlier+1): kernel_center] = 1;
-    kernel[kernel_center: kernel_center + framesHalted_afterOutlier] = 1
+    del displacements;    gc.collect()
 
     ## Make integrated position traces from the displacement traces
-    positions_new = np.zeros_like(displacements)  # preallocation
+    print('making integrated position traces')
+    positions_new = np.zeros_like(displacements_simpleOutliersRemoved)  # preallocation
     for ii in range(displacements_simpleOutliersRemoved.shape[2]):
         if ii == 0:
             tmp = np.squeeze(pointInds_toUse) * 0
         else:
             tmp = positions_new[:, :, ii - 1] + displacements_simpleOutliersRemoved[:, :, ii]  # heres the integration
         positions_new[:, :, ii] = tmp - (tmp) * relaxation_factor  # and the relaxation
+        
+    ## Make a convolutional kernel for extending the outlier trace
+    kernel = np.zeros(np.max(np.array([framesHalted_beforeOutlier, framesHalted_afterOutlier])) * 2 + 1)
+    kernel_center = int(np.ceil(len(kernel) / 2))
+    kernel[kernel_center - (framesHalted_beforeOutlier+1): kernel_center] = 1;
+    kernel[kernel_center: kernel_center + framesHalted_afterOutlier] = 1
 
     ## Define outliers, then extend the outlier trace to include the outlier kernel (before and after a threshold event)
     tic = time.time()
-    positions_tracked_outliers = (np.abs(positions_new) > outlier_threshold_positions)
+    print('defining outliers')
+    positions_new_abs = np.abs(positions_new)
+    del positions_new;    gc.collect()
+    positions_tracked_outliers = (positions_new_abs > outlier_threshold_positions)
+    del positions_new_abs;    gc.collect()
+    print('extending outliers')
     positions_tracked_outliers_extended = np.apply_along_axis(lambda m: scipy.signal.convolve(m, kernel, mode='same'),
                                                               axis=2, arr=positions_tracked_outliers)
+    del positions_tracked_outliers;    gc.collect()
     positions_tracked_outliers_extended = positions_tracked_outliers_extended > 0
 
     ## Make outlier timepoints zero in 'displacements'
+    print('making outlier displacements zero')
     displacements_sansOutliers = displacements_simpleOutliersRemoved * (~positions_tracked_outliers_extended)
+    del positions_tracked_outliers_extended, displacements_simpleOutliersRemoved;    gc.collect()
 
     ## Make a new integrated position traces array the displacement traces, but now with the outliers set to zero
+    print('making new integrated position traces')
     positions_new_sansOutliers = np.zeros_like(displacements_sansOutliers)
     for ii in range(displacements_sansOutliers.shape[2]):
         if ii == 0:
