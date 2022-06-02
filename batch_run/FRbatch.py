@@ -152,9 +152,14 @@ config['Optic'] = configTemplate['Optic']
 # config['Optic']['spacing'] = 99 ## This is the distance between points in the grid (both in x and y dims)
 config['Optic']['showVideo_pref'] = True ## USE THIS TO TUNE PARAMETERS! Much faster when video is off. If 'remote' option chosen (from first cell block), video will be saved as file in project folder.
 
+
+config['Video']['dot_size'] = 4 # for viewing purposes
 config['Video']['save_video'] = False # Whether to save the demo video (true for remote users when showvideo is true)
-config['Video']['frames_to_ignore_pref'] = False 
-# config['Video']['demo_len'] = 1000 # used when remote users when show_video==True
+config['Video']['demo_len'] = 1000 # used when remote users when show_video==True
+config['Video']['fps_counterPeriod'] = 10 # number of frames between fps averaging calculation
+config['Video']['printFPS_pref'] = False # option for whether fps should be printed in notebook
+config['Video']['frames_to_ignore_pref'] = False # optional. If True, then a 'frames_to_ignore.npy' file must be in the video path. It must contain a boolean array of same length as the video
+
 
 helpers.save_config(config, config_filepath)
 
