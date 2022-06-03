@@ -11,7 +11,7 @@ import tensorly.decomposition
 import sklearn.decomposition
 import sklearn.manifold
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from pynwb import NWBHDF5IO
 
 from face_rhythm.util import helpers

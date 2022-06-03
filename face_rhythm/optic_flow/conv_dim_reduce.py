@@ -6,7 +6,7 @@ import cv2
 import imageio
 import copy
 import time
-from tqdm.notebook import tqdm, trange
+from tqdm import tqdm, trange
 
 from matplotlib import pyplot as plt
 

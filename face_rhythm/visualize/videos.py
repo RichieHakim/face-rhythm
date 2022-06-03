@@ -12,7 +12,7 @@ import cv2
 import imageio
 
 from pathlib import Path
-from tqdm.notebook import trange, tqdm
+from tqdm import trange, tqdm
 
 from face_rhythm.util import helpers
 from face_rhythm.visualize.make_custom_cmap import make_custom_cmap

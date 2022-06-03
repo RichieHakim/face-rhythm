@@ -5,7 +5,7 @@ import numpy as np
 import scipy.stats
 import librosa
 from matplotlib import pyplot as plt
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import gc
 
 import pynwb
