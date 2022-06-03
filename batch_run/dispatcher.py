@@ -22,8 +22,7 @@ import os
 import sys
 import copy
 
-import itertools
-import glob
+print(f"dispatcher environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
 ### Import personal libraries
 # dir_github = '/media/rich/Home_Linux_partition/github_repos'

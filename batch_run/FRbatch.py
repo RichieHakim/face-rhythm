@@ -16,7 +16,6 @@ This script will:
 """
 
 
-
 from pathlib import Path
 
 
@@ -26,6 +25,9 @@ from pathlib import Path
 # dir_FRproject       = '/media/rich/bigSSD/analysis_data/face_rhythm_paper/fig_4/2pRAM_motor_mapping/AEG21/2022_05_13/batchRun'
 # dir_videos          = '/media/rich/bigSSD/analysis_data/face_rhythm_paper/fig_4/2pRAM_motor_mapping/AEG21/2022_05_13/camera/'
 # fileName_strMatch   = 'movie3'
+
+import os
+print(f"script environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
 import sys
 path_script, path_params, dir_save = sys.argv
