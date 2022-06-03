@@ -179,6 +179,7 @@ from face_rhythm.optic_flow import conv_dim_reduce
 
 config = helpers.load_config(config_filepath)
 config['CDR'] = configTemplate['CDR']
+config['CDR']['num_dots'] = config['Optic']['num_dots']
 config['CDR']['display_points'] = False # checkout the dots and overlayed filter
 
 helpers.save_config(config, config_filepath)
