@@ -45,7 +45,7 @@ from basic_neural_processing_modules import container_helpers, server
 # name_slurm = args[4]
 # dir_data = args[5]
 
-path_self, path_script, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate, name_job, name_slurm = sys.argv
+path_self, path_script, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate, name_job, name_slurm, name_env = sys.argv
 
 
 print(path_self, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate)
@@ -135,10 +135,10 @@ sbatch_config_list = \
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
 #SBATCH --partition=short
-#SBATCH -c 20
+#SBATCH -c 1
 #SBATCH -n 1
-#SBATCH --mem=180GB
-#SBATCH --time=0-06:30:00
+#SBATCH --mem=1GB
+#SBATCH --time=0-00:01:00
 
 unset XDG_RUNTIME_DIR
 
@@ -150,7 +150,7 @@ echo "loading modules"
 module load gcc/9.2.0
 
 echo "activating environment"
-source activate fr_env
+source activate {name_env}
 
 echo "starting job"
 python "$@"
