@@ -106,6 +106,7 @@ configTemplate = load_configFile(path_configTemplate)
 
 config = helpers.load_config(config_filepath)
 config['CQT'] = configTemplate['CQT']
+helpers.save_config(config, config_filepath)
 
 spectral_analysis.vqt_workflow(config_filepath, 
                                data_key='positions_convDR_meanSub',
