@@ -102,7 +102,10 @@ config_filepath = path_configNew
 from face_rhythm.util import helpers
 from face_rhythm.analysis import spectral_analysis
 
+configTemplate = load_configFile(path_configTemplate)
+
 config = helpers.load_config(config_filepath)
+config['CQT'] = configTemplate['CQT']
 
 spectral_analysis.vqt_workflow(config_filepath, 
                                data_key='positions_convDR_meanSub',
