@@ -107,7 +107,7 @@ configTemplate = load_configFile(path_configTemplate)
 config = helpers.load_config(config_filepath)
 config['CQT'] = configTemplate['CQT']
 print(config_filepath)
-dump_nwb(config_filepath)
+dump_nwb(config['General']['sessions'][0]['nwb'])
 helpers.save_config(config, config_filepath)
 
 spectral_analysis.vqt_workflow(config_filepath, 
