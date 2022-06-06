@@ -95,9 +95,9 @@ with open(str(Path(dir_save) / 'notes.txt'), mode='a') as f:
 
 ## copy script .py file to dir_save
 import shutil
-Path(dir_save).mkdir(parents=True, exist_ok=True)
-print(f'Copying {path_script} to {str(Path(dir_save) / Path(path_script).name)}')
-shutil.copy2(path_script, str(Path(dir_save) / Path(path_script).name));
+# Path(dir_save).mkdir(parents=True, exist_ok=True)
+# print(f'Copying {path_script} to {str(Path(dir_save) / Path(path_script).name)}')
+# shutil.copy2(path_script, str(Path(dir_save) / Path(path_script).name));
 
 
 
@@ -108,8 +108,8 @@ parameters_batch = {
     # 'params_changing': params_changing
 }
 import json
-with open(str(Path(dir_save) / 'parameters_batch.json'), 'w') as f:
-    json.dump(parameters_batch, f)
+# with open(str(Path(dir_save) / 'parameters_batch.json'), 'w') as f:
+#     json.dump(parameters_batch, f)
 
 # with open(str(Path(dir_save) / 'parameters_batch.json')) as f:
 #     test = json.load(f)
@@ -135,8 +135,8 @@ sbatch_config_list = \
 #SBATCH --partition=short
 #SBATCH -c 20
 #SBATCH -n 1
-#SBATCH --mem=180GB
-#SBATCH --time=0-07:00:00
+#SBATCH --mem=100GB
+#SBATCH --time=0-00:01:00
 
 unset XDG_RUNTIME_DIR
 
