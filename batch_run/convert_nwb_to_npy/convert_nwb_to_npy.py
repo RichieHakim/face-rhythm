@@ -41,7 +41,7 @@ with pynwb.NWBHDF5IO(params['path_FRNWB'], 'r') as io:
         for key_inner in keys_inner:
             data = nwbfile.fields['processing']['Face Rhythm'].data_interfaces[key_outer].time_series[key_inner].data[:]
             
-            path_save = str(Path(dir_save) / key_outer / (key_inner+'.npy'))
+            path_save = str(Path(dir_save) / 'output_data' / key_outer / (key_inner+'.npy'))
             Path(path_save).parent.mkdir(parents=True, exist_ok=True)
             
             if params['verbose']:
