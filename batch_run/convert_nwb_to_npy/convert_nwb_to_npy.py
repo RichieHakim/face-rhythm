@@ -18,11 +18,11 @@ import numpy as np
 from pathlib import Path
 import time
 
-params = {
-    'path_FRNWB': '/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/AEG21/2022_05_13/jobNum_0/batchRun/data/session_batch.nwb',
-    'fields_toSave': ['Sxx_allPixels', 'pts_spaced_convDR'],
-    'verbose': True,
-}
+# params = {
+#     'path_FRNWB': '/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/AEG21/2022_05_13/jobNum_0/batchRun/data/session_batch.nwb',
+#     'fields_toSave': ['Sxx_allPixels', 'pts_spaced_convDR'],
+#     'verbose': True,
+# }
 
 # dir_save = '/media/rich/bigSSD/analysis_data/face_rhythm_paper/fig_4/2pRAM_motor_mapping/AEG22/2022_05_16/faceRhythm_npy'
 # fields_toSave = ['Sxx_allPixels', 'pts_spaced_convDR']

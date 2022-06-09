@@ -1,18 +1,3 @@
-"""
-In the google drive folder, there needs to be files called:
-- model.py
-    - this should contain a function called 'make_model'
-- params.json
-    - this should contain the params dictionary used to make the model
-- classifier.pkl
-    - this should contain an item called 'classifier' that contains
-       the classifier used to make the model
-- ['fileName_state_dict'].pth
-    - this should contain the state_dict of the model
-    - name should be specified below
-"""
-
-
 # from IPython.core.display import display, HTML
 # display(HTML("<style>.container { width:95% !important; }</style>"))
 
@@ -43,10 +28,8 @@ from basic_neural_processing_modules import container_helpers, server
 # name_slurm = args[4]
 # dir_data = args[5]
 
-path_self, path_script, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate, name_job, name_slurm, name_env = sys.argv
+path_self, path_script, dir_save, path_FRNWB, name_job, name_slurm, name_env = sys.argv
 
-
-print(path_self, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate)
 
 ## set paths
 # dir_save = '/n/data1/hms/neurobio/sabatini/rich/analysis/suite2p_output/'
@@ -63,14 +46,11 @@ Path(dir_save).mkdir(parents=True, exist_ok=True)
 
 
 
+# '/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/AEG21/2022_05_13/jobNum_0/batchRun/data/session_batch.nwb'
 params_template = {
-    'dir_face_rhythm': '/n/data1/hms/neurobio/sabatini/rich/github_repos/face-rhythm',
-    'dir_videos': dir_videos,  ## directory containing the video(s) matching the fileName_strMatch
-    'fileName_strMatch' : vidName_strMatch,
-    'name_FRproject': name_FRproject,
-
-    'path_configTemplate' : path_configTemplate,
-    'path_oldNWB'         : path_oldNWB,
+    'path_FRNWB': path_FRNWB,
+    'fields_toSave': ['Sxx_allPixels', 'pts_spaced_convDR'],
+    'verbose': True,
 }
 
 ## make params dicts with grid swept values
