@@ -9,6 +9,7 @@ with open(path_params, 'r') as f:
     params = json.load(f)
 
 import shutil
+from pathlib import Path
 shutil.copy2(path_script, str(Path(dir_save) / Path(path_script).name));
 
 

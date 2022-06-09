@@ -49,7 +49,7 @@ Path(dir_save).mkdir(parents=True, exist_ok=True)
 # '/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/AEG21/2022_05_13/jobNum_0/batchRun/data/session_batch.nwb'
 params_template = {
     'path_FRNWB': path_FRNWB,
-    'fields_toSave': ['Sxx_allPixels', 'pts_spaced_convDR'],
+    'fields_toSave': ['pts_spaced_convDR'],
     'verbose': True,
 }
 
@@ -113,10 +113,10 @@ sbatch_config_list = \
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
 #SBATCH --partition=short
-#SBATCH -c 20
+#SBATCH -c 2
 #SBATCH -n 1
-#SBATCH --mem=180GB
-#SBATCH --time=0-08:00:00
+#SBATCH --mem=2GB
+#SBATCH --time=0-00:01:00
 
 unset XDG_RUNTIME_DIR
 
