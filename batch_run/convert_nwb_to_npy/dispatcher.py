@@ -49,7 +49,7 @@ Path(dir_save).mkdir(parents=True, exist_ok=True)
 # '/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/AEG21/2022_05_13/jobNum_0/batchRun/data/session_batch.nwb'
 params_template = {
     'path_FRNWB': path_FRNWB,
-    'fields_toSave': ['pts_spaced_convDR'],
+    'fields_toSave': ['pts_spaced_convDR', 'freqs_Sxx_all'],
     'verbose': True,
 }
 

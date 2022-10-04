@@ -16,7 +16,6 @@ This script will:
 """
 
 
-from pathlib import Path
 
 
 # path_configTemplate = '/media/rich/bigSSD/analysis_data/face_rhythm_paper/fig_4/2pRAM_motor_mapping/AEG21/2022_05_13/face_rhythm_20220513_movie3/configs/config_run.yaml'
@@ -37,6 +36,7 @@ with open(path_params, 'r') as f:
     params = json.load(f)
 
 import shutil
+from pathlib import Path
 shutil.copy2(path_script, str(Path(dir_save) / Path(path_script).name));
 
 # params_template = {

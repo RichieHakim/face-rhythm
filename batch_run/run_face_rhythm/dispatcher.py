@@ -1,6 +1,3 @@
-# from IPython.core.display import display, HTML
-# display(HTML("<style>.container { width:95% !important; }</style>"))
-
 ## Import general libraries
 from pathlib import Path
 import os
@@ -15,18 +12,7 @@ dir_github = '/n/data1/hms/neurobio/sabatini/rich/github_repos'
 
 import sys
 sys.path.append(dir_github)
-# %load_ext autoreload
-# %autoreload 2
 from basic_neural_processing_modules import container_helpers, server
-
-
-# args = sys.argv
-# path_selfScript = args[0]
-# dir_save = args[1]
-# path_script = args[2]
-# name_job = args[3]
-# name_slurm = args[4]
-# dir_data = args[5]
 
 path_self, path_script, dir_save, name_FRproject, dir_videos, vidName_strMatch, path_oldNWB, path_configTemplate, name_job, name_slurm, name_env = sys.argv
 

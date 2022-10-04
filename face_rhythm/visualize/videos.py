@@ -75,7 +75,8 @@ def visualize_progress(config,
                         out,
                         save_video,
                         demo_len,
-                        dot_size,
+                        dot_size=2,
+                        show_video=True,
                         show_text=True):
     """
     gets frame and then saves ior displays it
@@ -97,11 +98,11 @@ def visualize_progress(config,
 
     if config['General']['remote'] or (save_video and counters[2] < demo_len):
         out.write(frame_labeled)
-    if not config['General']['remote']:
+    if (not config['General']['remote']) and show_video:
         cv2.imshow('Display Factors', frame_labeled)
 
 
-def visualize_points(config_filepath, demo_len, start_frame=0, dot_size=2, save_video=False):
+def visualize_points(config_filepath, positions_to_display, offset_positions=False, demo_len=10000, start_frame=0, dot_size=2, show_video=True, save_video=False):
     """
     loops over all sessions and creates a short demo video from each session
 
@@ -126,7 +127,7 @@ def visualize_points(config_filepath, demo_len, start_frame=0, dot_size=2, save_
 
     for session in general['sessions']:
         color_tuples = helpers.load_nwb_ts(session['nwb'],'Optic Flow', 'color_tuples')
-        save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{video["data_to_display"]}_run{general["run_name"]}_demo.avi')
+        save_pathFull = str(Path(video['demos']) / f'{session["name"]}_{positions_to_display}_run{general["run_name"]}_demo.avi')
 
         if general['remote'] or save_video:
             fourcc = cv2.VideoWriter_fourcc(*'MJPG')
@@ -135,7 +136,9 @@ def visualize_points(config_filepath, demo_len, start_frame=0, dot_size=2, save_
         else:
             out = None
 
-        positions = helpers.load_nwb_ts(session['nwb'],'Optic Flow',video['data_to_display'])
+        positions_raw = helpers.load_nwb_ts(session['nwb'],'Optic Flow', positions_to_display)
+        offsets = helpers.load_nwb_ts(session['nwb'],'Optic Flow', 'pointInds_toUse')[:,0,:][:,:,None] if offset_positions else 0
+        positions = positions_raw + offsets
         position_tuples = list(np.arange(positions.shape[0]))
         ind_concat = 0
         for vid_num in optic['vidNums_toUse']:
@@ -152,6 +155,7 @@ def visualize_points(config_filepath, demo_len, start_frame=0, dot_size=2, save_
                                     color_tuples, 
                                     counters, 
                                     out, 
+                                    show_video=show_video,
                                     save_video=save_video, 
                                     demo_len=demo_len, 
                                     dot_size=dot_size)
