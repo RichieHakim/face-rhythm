@@ -57,7 +57,7 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
         
         print(f'Updated path to config file: {config_filepath}')
 
-    version_check()
+    print_important_versions()
 
     # return config_filepath
 
@@ -85,7 +85,7 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
     return config_filepath
 
 
-def version_check():
+def print_important_versions():
     """
     Checks the versions of various important softwares.
     Prints those versions
@@ -95,14 +95,32 @@ def version_check():
     Returns:
 
     """
-    ### find version of openCV
-    # script currently works with v4.4.0
-    (major_ver, minor_ver, subminor_ver) = (cv2.__version__).split('.')
+    ## Conda Environment
+    import os
+    print(f'Conda Environment: ' + os.environ['CONDA_DEFAULT_ENV'])
+
+    ## Python
+    import sys
+    print(f'Python Version: ' + sys.version.split('|')[0])
+
+    ## GCC
+    import subprocess
+    print(f'GCC Version: ' + subprocess.check_output(['gcc', '--version']).decode('utf-8').split('\n')[0])
+    
+    ## PyTorch
+    print(f'PyTorch Version: ' + torch.__version__)
+
+    ## Numpy
+    print(f'Numpy Version: ' + np.__version__)
+
+    ## OpenCV
+    (major_ver, minor_ver, subminor_ver) = (cv2.__version__).split('.') # script currently works with v4.4.0
     print(f'OpenCV version: {major_ver}.{minor_ver}.{subminor_ver}')
     # print(cv2.getBuildInformation())
 
-    ### find version of pytorch
-    print(f'Pytorch version: {torch.__version__}')
+    ## Decord
+    import decord
+    print(f'Decord Version: ' + decord.__version__)
 
 
 def generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession, run_name):
