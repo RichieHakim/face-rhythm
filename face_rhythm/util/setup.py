@@ -12,6 +12,18 @@ from pynwb import NWBFile, NWBHDF5IO
 
 from face_rhythm.util import helpers
 
+def prepare_cv2_imshow():
+    import cv2
+    test = np.zeros((1,300,400,3))
+    for frame in test:
+        cv2.putText(frame, "Prepping CV2", (10,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+        cv2.putText(frame, "Calling this figure allows cv2.imshow ", (10,100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "to work without crashing if this function", (10,120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "is called before importing av and decord", (10,140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.imshow('startup', frame)
+        cv2.waitKey(100)
+    cv2.destroyWindow('startup')
+
 
 def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials, multisession, update_paths=False):
     """
@@ -89,6 +101,7 @@ def print_important_versions():
     """
     Checks the versions of various important softwares.
     Prints those versions
+    RH 2022
 
     Args:
 
