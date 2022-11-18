@@ -1,8 +1,9 @@
-__all__ = [
+__all__=[
     'analysis',
     'comparisons',
     'neural',
     'optic_flow',
+    'tests',
     'util',
     'visualize',
 ]

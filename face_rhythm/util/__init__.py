@@ -5,3 +5,5 @@ __all__ = [ basename(f)[:-3] for f in modules if isfile(f) and not f.endswith('_
 
 for pkg in __all__:
     exec('from . import ' + pkg)
+
+del dirname, basename, isfile, join, glob, modules, pkg

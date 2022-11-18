@@ -14,9 +14,9 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-with open('requirements.txt', 'r') as f:
-    requirements = f.read().splitlines()
-print(requirements)
+# with open('requirements.txt', 'r') as f:
+#     requirements = f.read().splitlines()
+# print(requirements)
 
 setuptools.setup(
     name='face_rhythm',
@@ -78,7 +78,7 @@ setuptools.setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=requirements,
+    # install_requires=requirements,
 
     include_package_data=True,
 )
