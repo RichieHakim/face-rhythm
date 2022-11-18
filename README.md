@@ -1,55 +1,21 @@
 face-rhythm
-==============================
-
-Project structure for Rich Hakim's Face Rhythms
+# Face-Rhythm
 
 Learn more at https://face-rhythm.readthedocs.io/
 
-Project Organization
-------------
-
-    ├── LICENSE
-    ├── Makefile           <- Makefile with commands like `make data` or `make train`
-    ├── README.md          <- The top-level README for developers using this project.
-    │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    │
-    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
-    ├── face-rhythm        <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
-    │   │
-    │   ├── util           <- Utility scripts for data loading, tracking, saving
-    │   │   
-    │   │
-    │   ├── optic_flow     <- Main library of functions for optic flow computations
-    │   │   
-    │   │
-    │   ├── analysis       <- PCA, TCA, and spectral decomposition                
-    │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
-
-
 --------
 
-Installation
-------------
-I prefer to use conda for package management, so I'll explain set up using conda
+# Installation
 
 1. Clone this repo to a good location 
 ```
 git clone https://github.com/RichieHakim/face-rhythm/
 cd face-rhythm
-git checkout dev
 ```
 
 2. Create a conda environment 
 ```
-conda create -n face-rhythm python=3.8
+conda create -n face-rhythm python=3.9
 conda activate face-rhythm
 ```
 3. Run the set up script
@@ -81,3 +47,33 @@ If you run into a kernel error at this stage and are a Windows user, check out:
 https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-issues
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+
+
+# Project Organization
+------------
+
+    ├── LICENSE
+    ├── Makefile           <- Makefile with commands like `make data` or `make train`
+    ├── README.md          <- The top-level README for developers using this project.
+    │
+    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
+    │
+    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
+    │                         the creator's initials, and a short `-` delimited description, e.g.
+    │                         `1.0-jqp-initial-data-exploration`.
+    │
+    │
+    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
+    ├── face-rhythm        <- Source code for use in this project.
+    │   ├── __init__.py    <- Makes src a Python module
+    │   │
+    │   ├── util           <- Utility scripts for data loading, tracking, saving
+    │   │   
+    │   │
+    │   ├── optic_flow     <- Main library of functions for optic flow computations
+    │   │   
+    │   │
+    │   ├── analysis       <- PCA, TCA, and spectral decomposition                
+    │
+    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
+
