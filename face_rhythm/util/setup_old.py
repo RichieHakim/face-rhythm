@@ -7,6 +7,7 @@ import yaml
 from pathlib import Path
 
 from datetime import datetime
+from dateutil.tz import tzlocal
 from pynwb import NWBFile, NWBHDF5IO
 
 from face_rhythm.util import helpers
@@ -29,64 +30,6 @@ def prepare_cv2_imshow():
         cv2.waitKey(100)
     cv2.destroyWindow('startup')
 
-def prepare_project(
-    directory_project='./',
-    overwrite_config=False,
-    verbose=1,
-):
-    """
-    Prepares the project folder and data folder (if they don't exist)
-    Creates the config file (if it doesn't exist or overwrite requested)
-    Returns path to the config file
-
-    Args:
-        directory_project (str): 
-            Path to the project. 
-            If './' is passed, the current working directory is used
-        overwrite_config (bool): 
-            whether to overwrite the config
-
-    Returns:
-        config_filepath (str):
-            path to the current config
-    """
-    def _create_config_file(path):
-        """
-        Creates a config.yaml file.
-        """
-        contents_basic = {
-            'general': {
-                'date_created': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'date_modified': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'system_versions': get_system_versions(),
-                'path_created': path,
-            },
-            'paths': {
-                'project': directory_project,
-                'config': path,
-            },
-        }
-
-        ## Write to file with overwriting
-        with open(path, 'w') as f:
-            yaml.dump(contents_basic, f)
-
-    path_config = str(Path(directory_project) / 'config.yaml')
-    ## Check if project exists
-    if (Path(directory_project) / 'config.yaml').exists():
-        print(f'FR: Found config.yaml file in {directory_project}') if verbose > 1 else None
-        if overwrite_config:
-            print(f'FR: Overwriting config.yaml file in {directory_project}') if verbose > 0 else None
-            _create_config_file(path=path_config)
-    else:
-        _create_config_file(path=path_config)
-        print(f'FR: No existing config.yaml file found in {directory_project}. \n Creating new config.yaml at {Path(directory_project) / "config.yaml"}')
-        
-
-    ## Make sure project folders exist
-    (Path(directory_project) / 'analysis_files').mkdir(parents=True, exist_ok=True)
-    (Path(directory_project) / 'visualizations').mkdir(parents=True, exist_ok=True)
-    
 
 def setup_project(project_path, sessions_path, run_name, overwrite_config, remote, trials, multisession, update_paths=False):
     """
@@ -132,7 +75,7 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
         
         print(f'Updated path to config file: {config_filepath}')
 
-    get_system_versions(verbose=True)
+    print_important_versions()
 
     # return config_filepath
 
@@ -160,73 +103,44 @@ def setup_project(project_path, sessions_path, run_name, overwrite_config, remot
     return config_filepath
 
 
-def get_system_versions(verbose=False):
+def print_important_versions():
     """
     Checks the versions of various important softwares.
     Prints those versions
     RH 2022
 
     Args:
-        verbose (bool): 
-            Whether to print the versions
 
     Returns:
-        versions (dict):
-            Dictionary of versions
-    """
-    ## Operating system and version
-    import platform
-    operating_system = str(platform.system()) + ': ' + str(platform.release()) + ', ' + str(platform.version()) + ', ' + str(platform.machine()) + ', node: ' + str(platform.node()) 
-    print(f'Operating System: {operating_system}') if verbose else None
 
+    """
     ## Conda Environment
     import os
-    conda_env = os.environ['CONDA_DEFAULT_ENV']
-    print(f'Conda Environment: {conda_env}') if verbose else None
+    print(f'Conda Environment: ' + os.environ['CONDA_DEFAULT_ENV'])
 
     ## Python
     import sys
-    python_version = sys.version.split(' ')[0]
-    print(f'Python Version: {python_version}') if verbose else None
+    print(f'Python Version: ' + sys.version.split('|')[0])
 
     ## GCC
     import subprocess
-    gcc_version = subprocess.check_output(['gcc', '--version']).decode('utf-8').split('\n')[0].split(' ')[-1]
-    print(f'GCC Version: {gcc_version}') if verbose else None
+    print(f'GCC Version: ' + subprocess.check_output(['gcc', '--version']).decode('utf-8').split('\n')[0])
     
     ## PyTorch
-    import torch
-    torch_version = str(torch.__version__)
-    print(f'PyTorch Version: {torch_version}') if verbose else None
+    print(f'PyTorch Version: ' + torch.__version__)
 
     ## Numpy
-    import numpy
-    numpy_version = numpy.__version__
-    print(f'Numpy Version: {numpy_version}') if verbose else None
+    print(f'Numpy Version: ' + np.__version__)
 
     ## OpenCV
-    import cv2
-    opencv_version = cv2.__version__
-    print(f'OpenCV Version: {opencv_version}') if verbose else None
+    (major_ver, minor_ver, subminor_ver) = (cv2.__version__).split('.') # script currently works with v4.4.0
+    print(f'OpenCV version: {major_ver}.{minor_ver}.{subminor_ver}')
     # print(cv2.getBuildInformation())
 
-    ## face-rhythm
-    import face_rhythm
-    faceRhythm_version = face_rhythm.__version__
-    print(f'face-rhythm Version: {faceRhythm_version}') if verbose else None
+    ## Decord
+    import decord
+    print(f'Decord Version: ' + decord.__version__)
 
-    versions = {
-        'face-rhythm_version': faceRhythm_version,
-        'operating_system': operating_system,
-        'conda_env': conda_env,
-        'python_version': python_version,
-        'gcc_version': gcc_version,
-        'torch_version': torch_version,
-        'numpy_version': numpy_version,
-        'opencv_version': opencv_version,
-    }
-
-    return versions
 
 def generate_config(config_filepath, project_path, sessions_path, remote, trials, multisession, run_name):
     """
