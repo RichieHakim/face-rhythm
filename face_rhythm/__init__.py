@@ -2,6 +2,7 @@
 __all__=[
     'analysis',
     'comparisons',
+    'h5_handling',
     'helpers',
     'neural',
     'optic_flow',

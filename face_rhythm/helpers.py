@@ -89,8 +89,14 @@ def get_system_versions(verbose=False):
     return versions
 
 
+
+###########################################################
+######################## FROM BNPM ########################
+###########################################################
+
+
 ###########################
-######## FROM BNPM ########
+###### PATH HELPERS #######
 ###########################
 
 def find_paths(
@@ -165,3 +171,4 @@ def find_paths(
         paths = natsort.natsorted(paths, alg=alg_ns)
     return paths
         
+

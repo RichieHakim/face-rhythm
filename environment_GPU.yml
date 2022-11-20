@@ -14,7 +14,7 @@ dependencies:
     - scikit-learn
     - scikit-image
     - librosa
-    - pyyaml
+    - pyyaml==5.4.1
     - imageio-ffmpeg
     - tqdm
     - h5py
@@ -25,6 +25,7 @@ dependencies:
     - opt_einsum   
     - decord
     - natsort
+    - hdfdict==0.3.1
     - torch==1.12.0+cu113
     - torchvision==0.13.0+cu113
     - torchaudio==0.12.0
