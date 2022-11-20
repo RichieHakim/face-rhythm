@@ -6,6 +6,7 @@ __all__=[
     'neural',
     'optic_flow',
     'project',
+    'rois',
     'tests',
     'util',
     'visualize',

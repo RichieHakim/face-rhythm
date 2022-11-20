@@ -42,16 +42,31 @@ class Dataset_videos(FR_Module):
 
         ## Load videos
         print("FR: Loading lazy video reader objects...") if self.verbose > 1 else None
-        self.videos = [VideoReaderWrapper(path_video, ctx=decord.cpu(0)) for path_video in tqdm(self.paths_videos, disable=(self.verbose < 2))]
+        self.videos = [_VideoReaderWrapper(path_video, ctx=decord.cpu(0)) for path_video in tqdm(self.paths_videos, disable=(self.verbose < 2))]
+
 
         ## make video metadata dataframe
-        self.metadata = {
-            "paths_videos": [str(s) for s in self.paths_videos],
-            "num_frames": [int(len(v)) for v in self.videos],
-            "frame_rate": [float(v.get_avg_fps()) for v in self.videos],
-        }
+        print("FR: Collecting video metadata...") if self.verbose > 1 else None
+        self.metadata = {"paths_videos": self.paths_videos}
+        self.num_frames, self.frame_rate, self.frame_height_width, self.num_channels = [], [], [], []
+        for v in tqdm(self.videos):
+            self.num_frames.append(int(len(v)))
+            self.frame_rate.append(float(v.get_avg_fps()))
+            frame_tmp = v[0].asnumpy()
+            self.frame_height_width.append([int(n) for n in frame_tmp.shape[:2]])
+            self.num_channels.append(int(frame_tmp.shape[2]))
+        self.metadata["num_frames"] = self.num_frames
+        self.metadata["frame_rate"] = self.frame_rate
+        self.metadata["frame_height_width"] = self.frame_height_width
+        self.metadata["num_channels"] = self.num_channels
+            
+
         ## Assert that all videos must have at least one frame
         assert all([n > 0 for n in self.metadata["num_frames"]]), "FR ERROR: All videos must have at least one frame"
+        ## Assert that all videos must have the same shape
+        assert all([n == self.metadata["frame_height_width"][0] for n in self.metadata["frame_height_width"]]), "FR ERROR: All videos must have the same shape"
+        ## Assert that all videos must have the same number of channels
+        assert all([n == self.metadata["num_channels"][0] for n in self.metadata["num_channels"]]), "FR ERROR: All videos must have the same number of channels"
 
         ## set frame rate
         if frame_rate_clamp is None:
@@ -63,6 +78,10 @@ class Dataset_videos(FR_Module):
         else:
             self.frame_rate = float(frame_rate_clamp)
 
+        self.num_frames_total = int(np.sum(self.metadata["num_frames"]))
+        self.frame_height_width = self.metadata["frame_height_width"][0]
+        self.num_channels = self.metadata["num_channels"][0]
+
         ## For FR_Module compatibility
         self.config = {
             "paths_videos": paths_videos,
@@ -71,13 +90,16 @@ class Dataset_videos(FR_Module):
             "verbose": verbose,
         }
         self.run_info = {
-            "exists_paths_videos": exists_paths_videos,
-            "max_diff": max_diff,
+            "frame_rate": self.frame_rate,
+            "num_frames_total": self.num_frames_total,
+            "frame_height_width": self.frame_height_width,
+            "num_channels": self.num_channels,
         }
         self.run_data = {
-            "frame_rate": self.frame_rate,
             "metadata": self.metadata,  ## this should be a lazy reference to the self.metadata 
         }
+        ## Append the self.run_info data to self.run_data
+        self.run_data.update(self.run_info)
 
     def __repr__(self):
         return f"Dataset_videos, frame_rate={self.frame_rate}"
@@ -89,7 +111,7 @@ class Dataset_videos(FR_Module):
     def __next__(self): return next(self.videos)
 
 
-class VideoReaderWrapper(decord.VideoReader):
+class _VideoReaderWrapper(decord.VideoReader):
     """
     Used to fix a memory leak bug in decord.VideoReader
     Taken from here.
