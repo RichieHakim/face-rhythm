@@ -3,7 +3,7 @@ import torch
 from opt_einsum import contract
 from time import time
 
-from ..util import helpers
+from ..util_old import helpers
 
 def iprd(X, Y):
     """Inner product between two tensors."""

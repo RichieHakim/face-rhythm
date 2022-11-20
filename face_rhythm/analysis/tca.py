@@ -14,7 +14,7 @@ import sklearn.manifold
 from tqdm import tqdm
 from pynwb import NWBHDF5IO
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 
 
 FACTOR_NAMES = {'positional': ['points','temporal'],

@@ -2,7 +2,7 @@ import cv2
 import h5py
 from matplotlib import  pyplot as plt
 
-from face_rhythm.util import helpers, set_roi, setup
+from face_rhythm.util_old import helpers, set_roi, setup
 from face_rhythm.optic_flow import optic_flow, clean_results, conv_dim_reduce
 from face_rhythm.analysis import pca, spectral_analysis, tca
 from face_rhythm.visualize import videos, plots

@@ -4,7 +4,7 @@ import scipy.signal
 import copy
 import h5py
 
-from ..util import helpers
+from ..util_old import helpers
 
 def align_jointInds_to_cameraInds(xAxis_jointInds_absoluteTime, xAxis_cameraInds_absoluteTime, cameraSignal_jointInds, interpolation_kind='cubic', axis=0):
     '''

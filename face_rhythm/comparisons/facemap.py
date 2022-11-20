@@ -10,7 +10,7 @@ import imageio
 
 from tqdm.auto import tqdm
 
-from face_rhythm.util import helpers, batch
+from face_rhythm.util_old import helpers, batch
 import pdb
 
 def svdecon(X, k=100):

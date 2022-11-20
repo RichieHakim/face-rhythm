@@ -2,11 +2,12 @@
 __all__=[
     'analysis',
     'comparisons',
+    'helpers',
     'neural',
     'optic_flow',
     'project',
     'tests',
-    'utils',
+    'util',
     'visualize',
     'data_importing',
 ]

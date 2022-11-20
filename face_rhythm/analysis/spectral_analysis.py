@@ -13,7 +13,7 @@ from numpy.linalg import norm
 
 
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 
 
 # def prepare_freqs(config_filepath):

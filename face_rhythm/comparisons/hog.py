@@ -7,7 +7,7 @@ from skimage.feature import hog
 from joblib import Parallel, delayed
 from tqdm.auto import tqdm
 
-from face_rhythm.util import helpers, batch
+from face_rhythm.util_old import helpers, batch
 from .facemap import ChunkedAnalyzer
 
 

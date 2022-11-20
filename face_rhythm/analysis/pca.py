@@ -2,7 +2,7 @@ import numpy as np
 import sklearn.decomposition
 import time
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 import gc
 
 def pca_workflow(config_filepath, data_key):

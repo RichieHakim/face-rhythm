@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 import numpy as np
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 from face_rhythm.analysis import tca
 
 import pynwb

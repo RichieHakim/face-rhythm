@@ -10,7 +10,7 @@ from tqdm import tqdm, trange
 
 from matplotlib import pyplot as plt
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 
 def cosine_kernel_2D(center=(5,5), image_size=(11,11), width=5):
     """
