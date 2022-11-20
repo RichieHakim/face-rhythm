@@ -45,7 +45,7 @@ class FR_Module:
             assert Path(path_config).name == "config.yaml", "FR ERROR: path_config must be named config.yaml"
 
         ## Set path_run_info. Get from config if path_run_info is None
-        path_run_info = load_config_file(path_config)["paths"]["run_info"] if path_run_info is None else path_run_info
+        path_run_info = load_yaml_safe(path_config)["paths"]["run_info"] if path_run_info is None else path_run_info
 
         ## Get module name
         module_name = self.__class__.__name__
@@ -58,13 +58,7 @@ class FR_Module:
             run_info = {}
         else:
             print(f'FR: Loading file {path_run_info}') if verbose > 1 else None
-            try:
-                with open(path_run_info, 'r') as f:
-                    run_info = yaml.load(f, Loader=yaml.FullLoader)
-            except:
-                print(f'FR Warning: Failed to load {path_run_info} with Loader=yaml.FullLoader. A field is likely not yaml compatible. Trying with yaml.Loader.')
-                with open(path_run_info, 'r') as f:
-                    run_info = yaml.load(f, Loader=yaml.Loader)
+            run_info = load_yaml_safe(path_run_info)
             
         ## Append self.run_info to module_name key in run_info.yaml
         if (module_name in run_info.keys()) and not overwrite:
@@ -84,19 +78,54 @@ class FR_Module:
 
 
 
-def load_config_file(path_config):
+def load_yaml_safe(path, verbose=0):
     """
-    loads config file
+    loads yaml file
 
     Args:
-        path_config (str): 
-            path to config.yaml file
+        path (str): 
+            path to .yaml file
 
     Returns:
-        config (dict): 
-            config file as a dictionary
+        (dict): 
+            yaml file as a dictionary
 
     """
     import yaml
-    with open(path_config, 'r') as f:
-        return yaml.load(f, Loader=yaml.FullLoader)
+    print(f'FR: Loading file {path}') if verbose > 1 else None
+    try:
+        with open(path, 'r') as f:
+            return yaml.load(f, Loader=yaml.FullLoader)
+    except:
+        print(f'FR Warning: Failed to load {path} with Loader=yaml.FullLoader. A field is likely not yaml compatible. Trying with yaml.Loader.')
+        with open(path, 'r') as f:
+            return yaml.load(f, Loader=yaml.Loader)
+
+def load_config_file(path, verbose=0):
+    """
+    Loads config.yaml file
+
+    Args:
+        path (str): 
+            path to config.yaml file
+
+    Returns:
+        (dict): 
+            config.yaml file as a dictionary
+
+    """
+    return load_yaml_safe(path, verbose=verbose)
+def load_run_info_file(path, verbose=0):
+    """
+    Loads run_info.yaml file
+
+    Args:
+        path (str): 
+            path to run_info.yaml file
+
+    Returns:
+        (dict): 
+            run_info.yaml file as a dictionary
+
+    """
+    return load_yaml_safe(path, verbose=verbose)

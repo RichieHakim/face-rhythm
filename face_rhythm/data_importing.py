@@ -42,18 +42,20 @@ class Dataset_videos(FR_Module):
 
         ## Load videos
         print("FR: Loading lazy video reader objects...") if self.verbose > 1 else None
-        self.videos = [decord.VideoReader(path_video, ctx=decord.cpu(0)) for path_video in tqdm(paths_videos, disable=(self.verbose < 2))]
+        self.videos = [decord.VideoReader(path_video, ctx=decord.cpu(0)) for path_video in tqdm(self.paths_videos, disable=(self.verbose < 2))]
 
-        ## get video metadata
-        self.metadata = [{
-            "path_video": str(path_video),
-            "num_frames": int(len(vr)),
-            "frame_rate": float(vr.get_avg_fps()),
-        } for path_video, vr in zip(paths_videos, self.videos)]
+        ## make video metadata dataframe
+        self.metadata = {
+            "paths_videos": [str(s) for s in self.paths_videos],
+            "num_frames": [int(len(v)) for v in self.videos],
+            "frame_rate": [float(v.get_avg_fps()) for v in self.videos],
+        }
+        ## Assert that all videos must have at least one frame
+        assert all([n > 0 for n in self.metadata["num_frames"]]), "FR ERROR: All videos must have at least one frame"
 
         ## set frame rate
         if frame_rate_clamp is None:
-            frame_rates = [m["frame_rate"] for m in self.metadata]
+            frame_rates = self.metadata["frame_rate"]
             ## warn if any video's frame rate is very different from others
             max_diff = (np.max(frame_rates) - np.min(frame_rates)) / np.mean(frame_rates)
             print(f"FR WARNING: max frame rate difference is large: {max_diff*100:.2f}%") if ((max_diff > 0.1) and (self.verbose > 0)) else None
@@ -65,10 +67,11 @@ class Dataset_videos(FR_Module):
         self.run_info = {
             "paths_videos": self.paths_videos,
             "contiguous": contiguous,
-            "frame_rate": self.frame_rate,
+            "frame_rate_clamp": frame_rate_clamp,
         }
         self.run_data = {
-            "metadata": self.metadata,  ## this should be a lazy reference to self.metadata
+            "frame_rate": self.frame_rate,
+            "metadata": self.metadata,  ## this should be a lazy reference to the self.metadata 
         }
 
     def __repr__(self):
