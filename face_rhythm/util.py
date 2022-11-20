@@ -204,12 +204,12 @@ class FR_Module:
         ## Try to save run_data to .h5 file. If we get an error that it failed because the ile is already open, then search for all open h5py.File objects and close them.
         print(f'FR: Saving run_data to {path_run_data}') if verbose > 1 else None
         try:
-            h5_handling.simple_save(dict_to_save=self.run_data, path=path_run_data, write_mode=('w' if overwrite else 'w-'), verbose=False)
+            h5_handling.simple_save(dict_to_save=self.run_data, path=path_run_data, write_mode=('w' if overwrite else 'w-'), verbose=verbose>1)
         except OSError as e:
             if re.search('Unable.*already open', str(e)):
                 print(f'FR Warning: {path_run_data} is already open. Closing all open h5py.File objects and trying again.') if verbose > 0 else None
                 h5_handling.close_all_h5()
-                h5_handling.simple_save(dict_to_save=self.run_data, path=path_run_data, write_mode=('w' if overwrite else 'w-'), verbose=False)
+                h5_handling.simple_save(dict_to_save=self.run_data, path=path_run_data, write_mode=('w' if overwrite else 'w-'), verbose=verbose>1)
             else:
                 raise e
         

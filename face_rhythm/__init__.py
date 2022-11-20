@@ -8,7 +8,6 @@ __all__=[
     'optic_flow',
     'project',
     'rois',
-    'roi_gui',
     'tests',
     'util',
     'visualize',
