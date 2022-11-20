@@ -1,0 +1,38 @@
+11/18/2022 21:12:06 - INFO: Created a temporary directory at /tmp/tmpzro6gwtc
+11/18/2022 21:12:06 - INFO: Writing /tmp/tmpzro6gwtc/_remote_module_non_sriptable.py
+11/18/2022 21:26:59 - INFO: Created a temporary directory at /tmp/tmpyx_ovcn7
+11/18/2022 21:26:59 - INFO: Writing /tmp/tmpyx_ovcn7/_remote_module_non_scriptable.py
+11/18/2022 21:40:14 - INFO: Created a temporary directory at /tmp/tmp4c0xql94
+11/18/2022 21:40:14 - INFO: Writing /tmp/tmp4c0xql94/_remote_module_non_scriptable.py
+11/18/2022 21:41:21 - INFO: Created a temporary directory at /tmp/tmp7e33upfn
+11/18/2022 21:41:21 - INFO: Writing /tmp/tmp7e33upfn/_remote_module_non_scriptable.py
+11/18/2022 21:44:05 - INFO: Created a temporary directory at /tmp/tmppsw3blxs
+11/18/2022 21:44:05 - INFO: Writing /tmp/tmppsw3blxs/_remote_module_non_scriptable.py
+11/18/2022 21:55:28 - INFO: Created a temporary directory at /tmp/tmpotzekjro
+11/18/2022 21:55:28 - INFO: Writing /tmp/tmpotzekjro/_remote_module_non_scriptable.py
+11/18/2022 21:55:47 - INFO: Created a temporary directory at /tmp/tmpu2pf8vfc
+11/18/2022 21:55:47 - INFO: Writing /tmp/tmpu2pf8vfc/_remote_module_non_scriptable.py
+11/18/2022 22:05:36 - INFO: Created a temporary directory at /tmp/tmpgw8wvntr
+11/18/2022 22:05:36 - INFO: Writing /tmp/tmpgw8wvntr/_remote_module_non_scriptable.py
+11/18/2022 22:32:35 - INFO: Created a temporary directory at /tmp/tmpyf60g1_j
+11/18/2022 22:32:35 - INFO: Writing /tmp/tmpyf60g1_j/_remote_module_non_scriptable.py
+11/18/2022 22:35:51 - INFO: Created a temporary directory at /tmp/tmp_820m9tz
+11/18/2022 22:35:51 - INFO: Writing /tmp/tmp_820m9tz/_remote_module_non_scriptable.py
+11/18/2022 22:44:33 - INFO: Created a temporary directory at /tmp/tmpt4ja3171
+11/18/2022 22:44:33 - INFO: Writing /tmp/tmpt4ja3171/_remote_module_non_scriptable.py
+11/18/2022 22:50:13 - INFO: Created a temporary directory at /tmp/tmp5sbqlv88
+11/18/2022 22:50:13 - INFO: Writing /tmp/tmp5sbqlv88/_remote_module_non_scriptable.py
+11/18/2022 22:54:04 - INFO: Initializing MSRA
+11/18/2022 22:54:17 - INFO: Created a temporary directory at /tmp/tmpaf10piu_
+11/18/2022 22:54:17 - INFO: Writing /tmp/tmpaf10piu_/_remote_module_non_scriptable.py
+11/18/2022 22:54:17 - INFO: Initializing MSRA
+11/18/2022 22:59:34 - INFO: Created a temporary directory at /tmp/tmp5zq8fjjl
+11/18/2022 22:59:34 - INFO: Writing /tmp/tmp5zq8fjjl/_remote_module_non_scriptable.py
+11/18/2022 23:00:21 - ERROR: Task was destroyed but it is pending!
+task: <Task pending name='Task-2' coro=<Kernel.poll_control_queue() running at /media/rich/OS/Users/Richard/Linux_stuff_on_OS/conda_envs/envs/FR/lib/python3.9/site-packages/ipykernel/kernelbase.py:279> wait_for=<Future finished result=<Future at 0x...state=pending>> cb=[_chain_future.<locals>._call_set_state() at /media/rich/OS/Users/Richard/Linux_stuff_on_OS/conda_envs/envs/FR/lib/python3.9/asyncio/futures.py:391]>
+11/18/2022 23:00:26 - INFO: Created a temporary directory at /tmp/tmpvcl02pc9
+11/18/2022 23:00:26 - INFO: Writing /tmp/tmpvcl02pc9/_remote_module_non_scriptable.py
+11/18/2022 23:02:10 - INFO: Created a temporary directory at /tmp/tmp3kxrf_6p
+11/18/2022 23:02:10 - INFO: Writing /tmp/tmp3kxrf_6p/_remote_module_non_scriptable.py
+11/18/2022 23:12:13 - INFO: Created a temporary directory at /tmp/tmpzcetpv2m
+11/18/2022 23:12:13 - INFO: Writing /tmp/tmpzcetpv2m/_remote_module_non_scriptable.py
