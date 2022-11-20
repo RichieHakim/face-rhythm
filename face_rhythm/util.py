@@ -3,7 +3,6 @@ import re
 import time
 
 import yaml
-import h5py
 
 from . import h5_handling
 
@@ -75,12 +74,12 @@ class FR_Module:
             
         ## Append self.run_info to module_name key in run_info.yaml
         if (self.module_name in run_info.keys()) and not overwrite:
-            print(f'FR Warning: {self.module_name} already in run_info.yaml. Not overwriting.') if verbose > 0 else None
+            print(f"FR Warning: Not saving anything. Field exists in dictionary and overwrite==False. '{self.module_name}' is already a field in run_info.yaml.") if verbose > 0 else None
         elif (self.module_name in run_info.keys()) and overwrite:
-            print(f'FR Warning: {self.module_name} already in run_info.yaml. Overwriting.') if verbose > 0 else None
+            print(f"FR Warning: Overwriting field. '{self.module_name}' is already a field in the run_info.yaml dictionary.") if verbose > 0 else None
             run_info[self.module_name] = self.run_info
         else:
-            print(f'FR: Adding {self.module_name} to run_info.yaml') if verbose > 1 else None
+            print(f"FR: Adding '{self.module_name}' field to run_info.yaml") if verbose > 1 else None
             run_info[self.module_name] = self.run_info
 
         ## Save run_info.yaml file
@@ -123,12 +122,13 @@ class FR_Module:
             
         ## Append self.config to module_name key in config.yaml
         if (self.module_name in config.keys()) and not overwrite:
-            print(f'FR Warning: {self.module_name} already in config.yaml. Not overwriting.') if verbose > 0 else None
+            print(f"FR Warning: Not saving anything. Field exists in dictionary and overwrite==False. '{self.module_name}' is already a field in config.yaml.") if verbose > 0 else None
+            return None
         elif (self.module_name in config.keys()) and overwrite:
-            print(f'FR Warning: {self.module_name} already in config.yaml. Overwriting.') if verbose > 0 else None
+            print(f"FR Warning: Overwriting field. '{self.module_name}' already in config.yaml.") if verbose > 0 else None
             config[self.module_name] = self.config
         else:
-            print(f'FR: Adding {self.module_name} to config.yaml') if verbose > 1 else None
+            print(f"FR: Adding '{self.module_name}' to config.yaml") if verbose > 1 else None
             config[self.module_name] = self.config
 
         ## Save config.yaml file
@@ -179,15 +179,21 @@ class FR_Module:
             assert Path(path_config).suffix == ".yaml", "FR ERROR: path_config must be a yaml file"
             config = load_yaml_safe(path_config)
             assert 'project' in config['paths'].keys(), "FR ERROR: config['paths']['project'] must exist in path_config"
-            print(f"FR: Using project directory (config['paths']['project']) from config.yaml to make run_data path: {config['paths']['project']}") if verbose > 1 else None
             path_run_data = str(Path(config['paths']['project']) / 'analysis_files' / f'{self.module_name}.h5')
+            print(f"FR: Using project directory (config['paths']['project']) from config.yaml to make run_data path: {path_run_data}") if verbose > 1 else None
 
-        ## Assert path_run_data is a string, and does not exist if overwrite is False
+        ## Assert path_run_data is a string
         assert isinstance(path_run_data, str), "FR ERROR: path_run_data must be a string"
         if path_run_data is not None:
             assert Path(path_run_data).name == self.module_name+'.h5', f"FR ERROR: path_run_data must be named {self.module_name+'.h5'}"
-        if overwrite == False:
-            assert Path(path_run_data).exists() == False, "FR ERROR: path_run_data must not exist if overwrite==False"
+        ## If a file exists and overwrite is False, then print a warning and cancel out
+        ## If a file exists and overwrite is True, then print a warning and continue
+        if Path(path_run_data).exists():
+            if not overwrite:
+                print(f'FR Warning: Not saving anything. File exists and overwrite==False. {path_run_data} already exists.') if verbose > 0 else None
+                return None
+            else:
+                print(f'FR Warning: Overwriting file. File: {path_run_data} already exists.') if verbose > 0 else None
 
 
         ## Create directory if it does not exist
