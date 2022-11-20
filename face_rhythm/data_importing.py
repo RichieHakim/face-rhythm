@@ -38,12 +38,12 @@ class Dataset_videos(FR_Module):
             self.frame_rate = frame_rate_clamp
 
         ## For FR_Module compatibility
-        self.runInfo = {
-            "paths_videos": paths_videos,
-            "contiguous": contiguous,
-            "frame_rate": self.frame_rate,
-        }
-        self.runData = {
+        self.run_info = {
+            "paths_videos": [str(p) for p in paths_videos],
+            "contiguous": bool(contiguous),
+            "frame_rate": float(self.frame_rate),
+}
+        self.run_data = {
             "metadata": self.metadata,
         }
 

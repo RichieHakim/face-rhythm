@@ -26,7 +26,7 @@ def prepare_project(
         config_filepath (str):
             path to the current config
     """
-    def _create_config_file(path):
+    def _create_config_file():
         """
         Creates a config.yaml file.
         """
@@ -35,27 +35,29 @@ def prepare_project(
                 'date_created': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'date_modified': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'system_versions': get_system_versions(),
-                'path_created': path,
+                'path_created': path_config,
             },
             'paths': {
                 'project': directory_project,
-                'config': path,
+                'config': path_config,
+                'run_info': path_run_info,
             },
         }
 
         ## Write to file with overwriting
-        with open(path, 'w') as f:
-            yaml.dump(contents_basic, f)
+        with open(path_config, 'w') as f:
+            yaml.dump(contents_basic, f, sort_keys=False)
 
     path_config = str(Path(directory_project) / 'config.yaml')
+    path_run_info = str(Path(directory_project) / 'run_info.yaml')
     ## Check if project exists
     if (Path(path_config)).exists():
         print(f'FR: Found config.yaml file at {path_config}') if verbose > 1 else None
         if overwrite_config:
             print(f'FR: Overwriting config.yaml file at {path_config}') if verbose > 0 else None
-            _create_config_file(path=path_config)
+            _create_config_file()
     else:
-        _create_config_file(path=path_config)
+        _create_config_file()
         print(f'FR: No existing config.yaml file found in {directory_project}. \n Creating new config.yaml at {Path(directory_project) / "config.yaml"}')
         
 
@@ -63,4 +65,4 @@ def prepare_project(
     (Path(directory_project) / 'analysis_files').mkdir(parents=True, exist_ok=True)
     (Path(directory_project) / 'visualizations').mkdir(parents=True, exist_ok=True)
 
-    return path_config
+    return path_config, path_run_info

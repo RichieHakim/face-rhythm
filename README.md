@@ -56,7 +56,7 @@ https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-i
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
 
 
-# Project Organization
+# Repository Organization
 ------------
 
     ├── LICENSE
@@ -84,3 +84,20 @@ https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-i
     │
     └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
 
+# Project Directory Organization
+------------
+
+    Project Directory
+    ├── config.yaml           <- Configuration parameters to run each module in the pipeline. Dictionary.
+    ├── run_info.yaml         <- Output information from each module. Dictionary.
+    │
+    ├── run_data              <- Output data from each module.
+    │   ├── point_tracking.h5 <- Output data from optic flow module.
+    │   ├── spectral.h5       <- Output data from spectral decomposition module.
+    │   └── decomposition.h5  <- Output data from PCA/TCA modules.
+    │   
+    └── visualizations        <- Output visualizations.
+        ├── example_plot.png  <- Example plot.
+        └── example_video.mp4 <- Example video.
+
+    
