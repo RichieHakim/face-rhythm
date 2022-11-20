@@ -164,6 +164,41 @@ class ROIs(FR_Module):
     def __iter__(self): return iter(self.mask_images)
     def __next__(self): return next(self.mask_images)
 
+    def plot_masks(self, image=None, **kwargs_imshow):
+        """
+        Plot the masks.
+        If an image exists, it makes polygons of the masks on top of 
+         the image in different colors.
+        If no image exists, it plots the masks on a black background.
+
+        Args:
+            image (np.ndarray):
+                Image to plot the masks on top of.
+                If None, the masks are plotted on a black background.
+            **kwargs_imshow:
+                Keyword arguments for plt.imshow().
+
+        Returns:
+            fig (plt.figure):
+                Figure object.
+            ax (plt.axis):
+                Axis object.
+        """
+        import matplotlib.pyplot as plt
+        if image is None:
+            image = np.zeros((self.img_hw[0], self.img_hw[1]), dtype=np.uint8)
+
+        ## set backend to non-interactive
+        fig, ax = plt.subplots(1, 1)
+        ax.imshow(image, **kwargs_imshow)
+        ## Make mask polygons
+        for ii, mask in enumerate(self.mask_images):
+            ax.contour(mask, colors=[plt.cm.tab20(ii)], linewidths=2, alpha=0.5)
+        ## show figure
+        plt.show()
+        return fig, ax
+
+
 
 class _Select_ROI:
     """
