@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime
 from pynwb import NWBFile, NWBHDF5IO
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 
 def prepare_cv2_imshow():
     """

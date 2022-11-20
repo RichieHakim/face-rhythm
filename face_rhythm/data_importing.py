@@ -5,7 +5,7 @@ from typing import List
 import numpy as np
 from tqdm import tqdm
 
-from .utils import FR_Module
+from .util import FR_Module
 
 ## Define Dataset class as a subclass of utils.FR_Module
 class Dataset_videos(FR_Module):
@@ -24,6 +24,7 @@ class Dataset_videos(FR_Module):
         self.contiguous = bool(contiguous)
         self.verbose = int(verbose)
 
+
         ## Assert that paths_videos is either a list of strings or a string
         assert paths_videos is not None, "FR ERROR: paths_videos must be specified as a list of strings to paths of videos"
         if isinstance(paths_videos, list): 
@@ -38,6 +39,8 @@ class Dataset_videos(FR_Module):
         exists_paths_videos = [Path(path).exists() for path in self.paths_videos]
         assert all(exists_paths_videos), f"FR ERROR: paths_videos must exist. The following paths do not exist: {[path for path, exists in zip(self.paths_videos, exists_paths_videos) if not exists]}"
 
+
+        ## Load videos
         print("FR: Loading lazy video reader objects...") if self.verbose > 1 else None
         self.videos = [decord.VideoReader(path_video, ctx=decord.cpu(0)) for path_video in tqdm(paths_videos, disable=(self.verbose < 2))]
 

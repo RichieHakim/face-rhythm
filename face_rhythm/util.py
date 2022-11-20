@@ -6,7 +6,8 @@ class FR_Module:
 
     def save_run_info(
         self, 
-        path_run_info, 
+        path_run_info=None, 
+        path_config=None,
         overwrite=True, 
         verbose=1
     ):
@@ -24,9 +25,27 @@ class FR_Module:
         import yaml
         from pathlib import Path
 
-        ## Check if self.run_info and self.run_data are not None
+        ## Assert if self.run_info and self.run_data are not None
         assert self.run_info is not None, 'FR: self.run_info is None. Module likely did not run properly. Please set self.run_info before saving.'
         assert self.run_data is not None, 'FR: self.run_data is None. Module likely did not run properly. Please set self.run_data before saving.'
+
+        ## Assert that either path_run_info or path_config must be a string, but not both
+        assert (path_run_info is not None) and (path_config is None) or (path_run_info is None) and (path_config is not None), "FR ERROR: Either path_run_info or path_config must be specified as a string, but not both"
+        ## Get the one that is not None
+        path = path_run_info if path_run_info is not None else path_config
+
+        ## Assert that path is a string, exists, is a file, is a yaml file, and is named properly
+        assert isinstance(path, str), "FR ERROR: path_run_info must be a string"
+        assert Path(path).exists(), "FR ERROR: path_run_info must exist"
+        assert Path(path).is_file(), "FR ERROR: path_run_info must be a file"
+        assert Path(path).suffix == ".yaml", "FR ERROR: path_run_info must be a yaml file"
+        if path_run_info is not None:
+            assert Path(path_run_info).name == "run_info.yaml", "FR ERROR: path_run_info must be named run_info.yaml"
+        if path_config is not None:
+            assert Path(path_config).name == "config.yaml", "FR ERROR: path_config must be named config.yaml"
+
+        ## Set path_run_info. Get from config if path_run_info is None
+        path_run_info = load_config_file(path_config)["paths"]["run_info"] if path_run_info is None else path_run_info
 
         ## Get module name
         module_name = self.__class__.__name__
@@ -38,7 +57,7 @@ class FR_Module:
             Path(path_run_info).parent.mkdir(parents=True, exist_ok=True)
             run_info = {}
         else:
-            print(f'FR: {path_run_info} exists. Loading file.') if verbose > 1 else None
+            print(f'FR: Loading file {path_run_info}') if verbose > 1 else None
             try:
                 with open(path_run_info, 'r') as f:
                     run_info = yaml.load(f, Loader=yaml.FullLoader)
@@ -58,6 +77,7 @@ class FR_Module:
             run_info[module_name] = self.run_info
 
         ## Save run_info.yaml file
+        print(f'FR: Saving run_info.yaml to {path_run_info}') if verbose > 1 else None
         with open(path_run_info, 'w') as f:
             yaml.dump(run_info, f, Dumper=yaml.Dumper, sort_keys=False)
 

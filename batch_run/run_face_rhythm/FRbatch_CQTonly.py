@@ -99,7 +99,7 @@ path_configNew = str(Path(dir_FRproject) / 'configs' / ('config_'+nameRun+'.yaml
 config_filepath = path_configNew
 
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 from face_rhythm.analysis import spectral_analysis
 
 configTemplate = load_configFile(path_configTemplate)

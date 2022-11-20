@@ -3,7 +3,7 @@ import numpy as np
 import copy
 import gc
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 from face_rhythm.visualize import videos
 
 import cv2

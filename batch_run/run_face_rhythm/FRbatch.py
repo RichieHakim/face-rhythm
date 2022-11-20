@@ -101,7 +101,7 @@ configTemplate = load_configFile(path_configTemplate)
 
 
 
-from face_rhythm.util import helpers, setup
+from face_rhythm.util_old import helpers, setup
 
 config_filepath = setup.setup_project(
     Path(dir_FRproject),
@@ -115,7 +115,7 @@ config_filepath = setup.setup_project(
 )
 
 
-from face_rhythm.util import helpers, setup
+from face_rhythm.util_old import helpers, setup
 
 config = helpers.load_config(config_filepath)
 config['Video']['file_strMatch'] = fileName_strMatch # Set to '' to grab all vids in video_path. Set to 'session_prefix' if multisession.
@@ -127,7 +127,7 @@ helpers.save_config(config, config_filepath)
 setup.prepare_videos(config_filepath)
 
 
-from face_rhythm.util import helpers, set_roi
+from face_rhythm.util_old import helpers, set_roi
 
 config = helpers.load_config(config_filepath)
 config['ROI']['session_to_set'] = 0 # 0 indexed. Chooses the session to use

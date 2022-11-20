@@ -14,7 +14,7 @@ import imageio
 from pathlib import Path
 from tqdm import trange, tqdm
 
-from face_rhythm.util import helpers
+from face_rhythm.util_old import helpers
 from face_rhythm.visualize.make_custom_cmap import make_custom_cmap
 
 import PIL 
