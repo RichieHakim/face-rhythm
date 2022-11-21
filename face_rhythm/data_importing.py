@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Union
 from typing import List
+import multiprocessing as mp
 
 import numpy as np
 from tqdm import tqdm
@@ -42,7 +43,7 @@ class Dataset_videos(FR_Module):
 
         ## Load videos
         print("FR: Loading lazy video reader objects...") if self.verbose > 1 else None
-        self.videos = [_VideoReaderWrapper(path_video, ctx=decord.cpu(0)) for path_video in tqdm(self.paths_videos, disable=(self.verbose < 2))]
+        self.videos = [_VideoReaderWrapper(path_video, ctx=decord.cpu(0), num_threads=mp.cpu_count()) for path_video in tqdm(self.paths_videos, disable=(self.verbose < 2))]
 
 
         ## make video metadata dataframe
@@ -120,6 +121,8 @@ class _VideoReaderWrapper(decord.VideoReader):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.seek(0)
+        
+        self.path = args[0]
 
     def __getitem__(self, key):
         frames = super().__getitem__(key)

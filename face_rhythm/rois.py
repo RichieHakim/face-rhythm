@@ -130,8 +130,7 @@ class ROIs(FR_Module):
             assert "mask_images" in file, "FR ERROR: 'mask_images' not found in file."
             self.mask_images = file["mask_images"]
             ## Check that the mask images have the correct format
-            assert isinstance(self.mask_images, list), "FR ERROR: 'mask_images' must be a list of 2D boolean np.ndarray."
-            assert all([isinstance(mask, np.ndarray) for mask in self.mask_images]), "FR ERROR: 'mask_images' must be a list of 2D boolean np.ndarray."
+            assert all([isinstance(mask, np.ndarray) for mask in self.mask_images]), "FR ERROR: 'mask_images' from file is expected to be a 3D or list of 2D boolean np.ndarray."
             assert all([mask.shape == self.mask_images[0].shape for mask in self.mask_images]), "FR ERROR: 'mask_images' must all have the same shape."
         elif select_mode == "mask":
             print(f"FR: Initializing ROIs from mask images...") if self.verbose > 1 else None

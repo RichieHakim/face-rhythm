@@ -1,16 +1,17 @@
 ## Import packages
 __all__=[
-    'analysis',
-    'comparisons',
+    # 'analysis',
+    # 'comparisons',
     'h5_handling',
     'helpers',
-    'neural',
-    'optic_flow',
+    # 'neural',
+    # 'optic_flow',
+    'point_tracking',
     'project',
     'rois',
     'tests',
     'util',
-    'visualize',
+    # 'visualize',
     'data_importing',
 ]
 

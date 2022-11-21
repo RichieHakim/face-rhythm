@@ -23,8 +23,12 @@ def prepare_project(
             whether to overwrite the config
 
     Returns:
-        config_filepath (str):
-            path to the current config
+        path_config (str):
+            path to the config file
+        path_run_info (str):
+            path to the run info file
+        directory_project (str):
+            path to the project directory
     """
     def _create_config_file():
         """
@@ -65,4 +69,4 @@ def prepare_project(
     (Path(directory_project) / 'analysis_files').mkdir(parents=True, exist_ok=True)
     (Path(directory_project) / 'visualizations').mkdir(parents=True, exist_ok=True)
 
-    return path_config, path_run_info
+    return path_config, path_run_info, directory_project
