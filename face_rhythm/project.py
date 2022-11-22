@@ -3,11 +3,12 @@ from pathlib import Path
 
 from datetime import datetime
 
-from .helpers import get_system_versions
+from .helpers import get_system_versions, prepare_cv2_imshow
 
 def prepare_project(
     directory_project='./',
     overwrite_config=False,
+    initialize_visualization=True,
     verbose=1,
 ):
     """
@@ -20,7 +21,15 @@ def prepare_project(
             Path to the project. 
             If './' is passed, the current working directory is used
         overwrite_config (bool): 
-            whether to overwrite the config
+            Whether to overwrite the config
+        initialize_visualization (bool):
+            Whether to initialize cv2.imshow visualization. If on a server,
+             this should be set to False.
+        verbose (int):
+            Verbosity level.
+            0: No output
+            1: Warnings
+            2: Info
 
     Returns:
         path_config (str):
@@ -30,6 +39,10 @@ def prepare_project(
         directory_project (str):
             path to the project directory
     """
+    ## initialize cv2.imshow
+    print('Initializing cv2.imshow') if verbose > 1 else None
+    prepare_cv2_imshow() if initialize_visualization else None
+
     def _create_config_file():
         """
         Creates a config.yaml file.
