@@ -11,7 +11,7 @@ __all__=[
     'rois',
     'tests',
     'util',
-    # 'visualize',
+    'video_playback',
     'data_importing',
 ]
 

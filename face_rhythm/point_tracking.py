@@ -359,6 +359,55 @@ class PointTracker(FR_Module):
         # return points_prev
 
 
+class Dataset_VideoReader(torch.utils.data.Dataset):
+    """
+    demo:
+    ds = Basic_dataset(X, device='cuda:0')
+    dl = DataLoader(ds, batch_size=32, shuffle=True)
+    """
+    def __init__(self, 
+                 video, 
+                #  device='cpu',
+                #  dtype=torch.float32
+    ):
+        """
+        Make a basic dataset.
+        RH 2021
+
+        Args:
+            X (torch.Tensor or np.array):
+                Data to make dataset from.
+            device (str):
+                Device to use.
+            dtype (torch.dtype):
+                Data type to use.
+        """
+        self.video = video
+        self.buffer_length = 1000
+        self.X = video[:self.buffer_length]
+        self.idx_available = torch.arange(len(self.X))
+        
+    def __len__(self):
+        return len(self.video)
+    
+    def __getitem__(self, idx):
+        """
+        Returns a single sample.
+
+        Args:
+            idx (int):
+                Index of sample to return.
+        """
+        idx_in_buffer = torch.where(self.idx_available == idx)[0]
+        if idx_in_buffer > self.buffer_length/2:
+            self.X = torch.cat((self.X[idx_in_buffer:], self.video[self.idx_available[-1]+1:self.idx_available[-1]+1+self.buffer_length-idx_in_buffer+2]))
+            self.idx_available = torch.cat((self.idx_available[idx_in_buffer:], torch.arange(int(self.idx_available[-1]+1), int(self.idx_available[-1]+1+self.buffer_length-idx_in_buffer+2))))
+            return self.X[0]
+
+        return self.X[idx_in_buffer]
+
+
+
 def visualize_image_with_points(
     image,
     points=None,
@@ -458,9 +507,12 @@ def visualize_image_with_points(
         ## Check points
         if points is not None:
             assert isinstance(points, np.ndarray), 'points must be a numpy array.'
-            assert points.dtype == int, 'points must be a numpy array of type int.'
+            assert points.dtype == int, 'points must be a numpy array of int.'
             assert points.ndim == 3, 'points must be a 3D array.'
-            assert points.shape[-1] == 2, 'points must have 2 coordinates (y,x).'
+            assert points.shape[-1] == 2, 'points must have 2 coordinates.'
+            assert np.all(points >= 0), 'points must be non-negative.'
+            assert np.all(points[:, :, 0] < image.shape[0]), 'points must be within image.'
+            assert np.all(points[:, :, 1] < image.shape[1]), 'points must be within image.'
 
         ## Check points_colors
         if points_colors is not None:
@@ -518,11 +570,11 @@ def visualize_image_with_points(
         image = image.copy()
 
     ## Convert point colors to list of BGR tuples
-    if isinstance(points_colors, tuple):
+    if isinstance(points_colors, tuple) and points is not None:
         points_colors = [points_colors] * points.shape[0]
 
     ## Convert points_sizes to list
-    if isinstance(points_sizes, int):
+    if isinstance(points_sizes, int) and points is not None:
         points_sizes = [points_sizes] * points.shape[0]
 
     ## Convert text to list
@@ -544,14 +596,15 @@ def visualize_image_with_points(
     ## Plot points
     if points is not None:
         ## Plot points
-        for i in range(points.shape[0]):
-            cv2.circle(
-                img=image,
-                center=tuple(points[i, :][::-1]),
-                radius=points_sizes[i],
-                color=points_colors[i],
-                thickness=-1,
-            )
+        for i_batch in range(points.shape[0]):
+            for i_point in range(points.shape[1]):
+                cv2.circle(
+                    img=image,
+                    center=tuple(points[i_batch][i_point][::-1]),
+                    radius=points_sizes[i_batch],
+                    color=points_colors[i_batch],
+                    thickness=-1,
+                )
 
     ## Plot text
     if text is not None:
