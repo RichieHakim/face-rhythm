@@ -8,7 +8,7 @@ dependencies:
     - numpy
     - jupyterlab
     - tensorly
-    - opencv-python
+    - opencv-contrib-python
     - imageio
     - matplotlib
     - scikit-learn

@@ -34,7 +34,7 @@ def visualize_image_with_points(
             3D array: First dimension is batch of points to plot.
                 Each batch can have different colors and sizes.
                 Second dimension is point number, and third dimension
-                is point coordinates. Order (y,x).
+                is point coordinates. Order (x,y).
         points_colors (tuple of int or list of tuple of int):
             Used as argument for cv2.circle.
             If tuple: All points will be this color.
@@ -56,7 +56,7 @@ def visualize_image_with_points(
                 text_positions must be 3D array.
         text_positions (np.ndarray, np.float32):
             Must be specified if text is not None.
-            2D array: Each row is a text position. Order (y,x).
+            2D array: Each row is a text position. Order (x,y).
         text_color (str or list):
             Used as argument for cv2.putText.
             If str: All text will be this color.
@@ -104,8 +104,8 @@ def visualize_image_with_points(
             assert points.ndim == 3, 'points must be a 3D array.'
             assert points.shape[-1] == 2, 'points must have 2 coordinates.'
             assert np.all(points >= 0), 'points must be non-negative.'
-            assert np.all(points[:, :, 0] < image.shape[0]), 'points must be within image.'
-            assert np.all(points[:, :, 1] < image.shape[1]), 'points must be within image.'
+            assert np.all(points[:, :, 1] < image.shape[0]), 'points must be within image.'
+            assert np.all(points[:, :, 0] < image.shape[1]), 'points must be within image.'
 
         ## Check points_colors
         if points_colors is not None:
@@ -137,7 +137,7 @@ def visualize_image_with_points(
             assert isinstance(text_positions, np.ndarray), 'text_positions must be a numpy array.'
             assert text_positions.dtype == np.float32, 'text_positions must be a numpy array of np.float32.'
             assert text_positions.ndim == 2, 'text_positions must be a 2D array.'
-            assert text_positions.shape[-1] == 2, 'text_positions must have 2 coordinates (y,x).'
+            assert text_positions.shape[-1] == 2, 'text_positions must have 2 coordinates (x,y).'
 
         ## Check text_color
         assert isinstance(text_color, str) or isinstance(text_color, list), 'text_color must be a string or a list.'
@@ -193,7 +193,7 @@ def visualize_image_with_points(
             for i_point in range(points.shape[1]):
                 cv2.circle(
                     img=image,
-                    center=tuple(points[i_batch][i_point][::-1]),
+                    center=tuple(points[i_batch][i_point]),
                     radius=points_sizes[i_batch],
                     color=points_colors[i_batch],
                     thickness=-1,
@@ -206,7 +206,7 @@ def visualize_image_with_points(
             cv2.putText(
                 img=image,
                 text=text[i],
-                org=tuple(text_positions[i, :][::-1]),
+                org=tuple(text_positions[i, :]),
                 fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=text_size[i],
                 color=text_color[i],

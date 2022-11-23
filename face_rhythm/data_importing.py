@@ -2,10 +2,13 @@ from pathlib import Path
 from typing import Union
 from typing import List
 import multiprocessing as mp
+import threading
+import time
 
 import numpy as np
 from tqdm import tqdm
 import decord
+import torch
 
 from .util import FR_Module
 
@@ -127,4 +130,175 @@ class _VideoReaderWrapper(decord.VideoReader):
     def __getitem__(self, key):
         frames = super().__getitem__(key)
         self.seek(0)
+        return frames
+
+
+class _ContinuousBufferedVideoReader:
+    """
+    Allows for reading videos continuously without breaks between 
+     videos or batches by buffering future frames in the background.
+    Uses threading to read frames in the background.
+    """
+    def __init__(
+        self,
+        video_readers: list,
+        paths_videos: list=None,
+        buffer_size: int=1000,
+        starting_video_index: int=0,
+        starting_frame_index: int=0,
+        verbose: int=1,
+    ):
+        """
+        video_readers (list of decord.VideoReader): 
+            list of decord.VideoReader objects
+        """
+        self.video_readers = video_readers
+        self.buffer_size = buffer_size
+        self.starting_video_index = starting_video_index
+        self.starting_frame_index = starting_frame_index
+        self._verbose = verbose
+
+        ## Initialize the buffer
+        ### Make a list containing a slot for each buffer chunk
+        self.slots = [[None] * np.ceil(len(d)/self.buffer_size).astype(int) for d in self.video_readers]
+        ### Make a list containing the bounding indices for each buffer video chunk. Upper bound should be min(buffer_size, num_frames)
+        self.boundaries = [[(i*self.buffer_size, min((i+1)*self.buffer_size, len(d))-1) for i in range(len(s))] for d, s in zip(self.video_readers, self.slots)]
+
+        ## Find first two slots to load
+        idx_slot = (self.starting_video_index, self.starting_frame_index // self.buffer_size)  ## (idx_video, idx_buffer)
+        idx_slot_next = (idx_slot[0], idx_slot[1]+1) if (idx_slot[1] < len(self.slots[idx_slot[0]])-1) else (idx_slot[0]+1, 0)
+
+        ## Initialize the threads
+        self.threads = []
+
+        ## Make a list for which slots are loaded or loading
+        self.loading = []
+        self.loaded = []
+
+
+        ## Load first two slots
+        self._load_slots([idx_slot, idx_slot_next], wait_for_load=[True, False])
+
+    def _load_slots(self, idx_slots: list, wait_for_load: Union[bool, list]=False):
+        """
+        Load slots in the background using threading.
+
+        Args:
+            idx_slots (list): 
+                List of tuples containing the indices of the slots to load.
+                Each tuple should be of the form (idx_video, idx_buffer).
+            wait_for_load (bool or list):
+                If True, wait for the slots to load before returning.
+                If False, return immediately.
+                If True wait for each slot to load before returning.
+                If a list of bools, each bool corresponds to a slot in
+                 idx_slots.
+        """
+        ## Check if idx_slots is a list
+        if not isinstance(idx_slots, list):
+            idx_slots = [idx_slots]
+
+        ## Check if wait_for_load is a list
+        if not isinstance(wait_for_load, list):
+            wait_for_load = [wait_for_load] * len(idx_slots)
+
+        print(f"FR: Loading slots {idx_slots} in the background.") if self._verbose > 1 else None
+        thread = None
+        for idx_slot, wait in zip(idx_slots, wait_for_load):
+            ## Check if slot is already loaded
+            (print(f"FR: Slot {idx_slot} already loaded") if (idx_slot in self.loaded) else None) if self._verbose > 1 else None
+            (print(f"FR: Slot {idx_slot} already loading") if (idx_slot in self.loading) else None) if self._verbose > 1 else None
+            ## If the slot is not already loaded or loading
+            if (idx_slot not in self.loading) and (idx_slot not in self.loaded):
+                print(f"FR: Loading slot {idx_slot}") if self._verbose > 1 else None
+                ## Load the slot
+                self.loading.append(idx_slot)
+                thread = threading.Thread(target=self._load_slot, args=(idx_slot, thread))
+                thread.start()
+                self.threads.append(thread)
+
+                ## Wait for the slot to load if wait_for_load is True
+                if wait:
+                    print(f"FR: Waiting for slot {idx_slot} to load") if self._verbose > 1 else None
+                    thread.join()
+                    print(f"FR: Slot {idx_slot} loaded") if self._verbose > 1 else None
+
+
+    def _load_slot(self, idx_slot: tuple, blocking_thread: threading.Thread=None):
+        """
+        Load a single slot.
+        """
+        ## Set backend of decord to PyTorch
+        decord.bridge.set_bridge('torch')
+        ## Wait for the previous slot to finish loading
+        if blocking_thread is not None:
+            blocking_thread.join()
+        ## Load the slot
+        idx_video, idx_buffer = idx_slot
+        idx_frame_start, idx_frame_end = self.boundaries[idx_video][idx_buffer]
+        self.slots[idx_video][idx_buffer] = self.video_readers[idx_video][idx_frame_start:idx_frame_end+1]
+        ## Mark the slot as loaded
+        self.loaded.append(idx_slot)
+        ## Remove the slot from the loading list
+        self.loading.remove(idx_slot)
+                
+    def _delete_slots(self, idx_slots: list):
+        """
+        Delete slots from memory.
+        """
+        print(f"FR: Deleting slots {idx_slots}") if self._verbose > 1 else None
+        for idx_slot in idx_slots:
+            ## If the slot is loaded
+            if idx_slot in self.loaded:
+                print(f"FR: Deleting slot {idx_slot}") if self._verbose > 1 else None
+                ## Delete the slot
+                self.slots[idx_slot[0]][idx_slot[1]] = None
+                ## Remove the slot from the loaded list
+                self.loaded.remove(idx_slot)
+
+    
+    ## Define __getitem__ method for getting slices of the video
+    def __getitem__(self, idx: tuple):
+        """
+        Get a slice of frames from the video.
+
+        Args:
+            idx (tuple):
+            A tuple containing the index of the video and a slice for the frames.
+            (idx_video: int, idx_frames: slice)
+        """
+        ## Get the index of the video and the slice of frames
+        idx_video, idx_frames = idx
+        ## Bound the range of the slice
+        idx_frames = slice(max(idx_frames.start, 0), min(idx_frames.stop, len(self.video_readers[idx_video])))
+
+        ## Get the start and end indices for the slice of frames
+        idx_frame_start = idx_frames.start if idx_frames.start is not None else 0
+        idx_frame_end = idx_frames.stop if idx_frames.stop is not None else len(self.video_readers[idx_video])
+        idx_frame_step = idx_frames.step if idx_frames.step is not None else 1
+
+        ## Get the indices of the slots that contain the frames
+        idx_slots = [(idx_video, i) for i in range(idx_frame_start // self.buffer_size, idx_frame_end // self.buffer_size + 1)]
+        print(f"FR: Slots to load: {idx_slots}") if self._verbose > 1 else None
+        ## Get the subsequent slot
+        idx_slot_next = (idx_slots[-1][0], idx_slots[-1][1]+1) if (idx_slots[-1][1] < len(self.slots[idx_slots[-1][0]])-1) else (idx_slots[-1][0]+1, 0)
+        ## Load the slots
+        self._load_slots(idx_slots + [idx_slot_next], wait_for_load=[True]*len(idx_slots) + [False])
+        ## Delete the slots that are no longer needed. 
+        ### All slots from old videos should be deleted.
+        self._delete_slots([idx_slot for idx_slot in self.loaded if idx_slot[0] < idx_video])
+        ### All slots from previous buffers should be deleted.
+        self._delete_slots([idx_slot for idx_slot in self.loaded if idx_slot[0] == idx_video and idx_slot[1] < idx_frame_start // self.buffer_size])
+
+        ## Get the indices of the frames within the slots. Define them as slices.
+        idx_frames_slots = [slice(max(0, idx_frame_start - i*self.buffer_size), min(self.buffer_size, idx_frame_end - i*self.buffer_size), idx_frame_step) for i in range(idx_frame_start // self.buffer_size, idx_frame_end // self.buffer_size + 1)]
+
+        ## Get the frames. Then concatenate them along the first dimension using torch.cat
+        ### Skip the concatenation if there is only one slot
+        if len(idx_slots) == 1:
+            frames = self.slots[idx_slots[0][0]][idx_slots[0][1]][idx_frames_slots[0]]
+        else:
+            print(f"FR: Warning. Slicing across multiple slots is SLOW. Consider increasing buffer size or adjusting batching method.") if self._verbose > 1 else None
+            frames = torch.cat([self.slots[idx_slot[0]][idx_slot[1]][idx_frames_slot] for idx_slot, idx_frames_slot in zip(idx_slots, idx_frames_slots)], dim=0)
+        
         return frames

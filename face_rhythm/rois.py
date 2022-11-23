@@ -224,6 +224,13 @@ class _Select_ROI:
         import matplotlib.pyplot as plt
         import matplotlib as mpl
 
+        import torch
+
+        ## Make sure that the image is a numpy array or torch.Tensor
+        assert isinstance(image, (np.ndarray, torch.Tensor)), "FR ERROR: 'image' must be a numpy array or torch.Tensor."
+        if isinstance(image, torch.Tensor):
+            image = image.numpy()
+
         ## set jupyter notebook to use interactive matplotlib.
         ## equivalent to %matplotlib notebook
         mpl.use("nbagg")        

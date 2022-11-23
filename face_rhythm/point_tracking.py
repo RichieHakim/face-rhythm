@@ -11,6 +11,7 @@ from .util import FR_Module
 from .data_importing import Dataset_videos
 from .rois import ROIs
 from .helpers import make_batches
+from .video_playback import visualize_image_with_points
 
 ## Define class for performing point tracking using optical flow
 class PointTracker(FR_Module):
@@ -22,6 +23,7 @@ class PointTracker(FR_Module):
         contiguous: bool=False,
         batch_size: int=1000,
         params_optical_flow: dict=None,
+        visualize_video: bool=False,
         verbose: Union[bool, int]=1,
     ):
         """
@@ -55,6 +57,7 @@ class PointTracker(FR_Module):
                     params_optical_flow = {
                         "method": "lucas_kanade",
                         "point_spacing": 10,
+                        "mesh_rigidity": 0.005,
                         "relaxation": 0.5,
                         "kwargs_method": {
                             "winSize": (15,15),
@@ -65,6 +68,14 @@ class PointTracker(FR_Module):
                 See https://docs.opencv.org/3.4/d4/dee/tutorial_optical_flow.html
                  and https://docs.opencv.org/3.4/dc/d6b/group__video__track.html#ga473e4b886d0bcc6b65831eb88ed93323
                  for more information about the lucas kanade optical flow parameters.
+            visualize_video (bool, optional):
+                Whether or not to visualize the video.
+                If on a server or system without a display, this should be False.
+            verbose (bool or int, optional):
+                Whether or not to print progress updates.
+                0: no progress updates
+                1: warnings
+                2: all info
         """
         ## Imports
         super().__init__()
@@ -76,6 +87,7 @@ class PointTracker(FR_Module):
         self._contiguous = bool(contiguous)
         self._verbose = int(verbose)
         self._batch_size = int(batch_size)
+        self._visualize_video = bool(visualize_video)
 
         ## Assert that dataset_videos is a Dataset_videos object
         assert isinstance(dataset_videos, Dataset_videos), "FR ERROR: dataset_videos must be a Dataset_videos object"
@@ -93,6 +105,8 @@ class PointTracker(FR_Module):
         params_default = {
                 "method": "lucas_kanade",
                 "point_spacing": 10,
+                "mesh_rigidity": 0.005,
+                "mesh_n_neighbors": 10,
                 "relaxation": 0.5,
                 "kwargs_method": {
                     "winSize": (15,15),
@@ -120,11 +134,14 @@ class PointTracker(FR_Module):
         if rois_masks is None:
             self.mask = torch.ones(dataset_videos[0][0].shape[:2], dtype=bool)
         else:
-            self.mask = torch.stack(rois_masks, dim=0).all(dim=0)
+            self.mask = torch.as_tensor(np.stack((rois_masks), axis=0).all(axis=0)).type(torch.bool)
 
         ## Store dataset_videos
         self.dataset_videos = dataset_videos
 
+        p_0 = torch.as_tensor(self.point_positions.copy(), dtype=torch.float32)
+        self.neighbors = torch.argsort(torch.linalg.norm(p_0.T[:,:,None] - p_0.T[:,None,:], ord=2, dim=0), dim=1)[:,:self.params_optical_flow["mesh_n_neighbors"]]
+        self.d_0 = dv_s(torch.as_tensor(self.point_positions.copy(), dtype=torch.float32), self.neighbors)
 
     def _make_points(self, roi, point_spacing):
         """
@@ -160,10 +177,11 @@ class PointTracker(FR_Module):
         y_points, x_points = np.meshgrid(y_points, x_points)
         y_points = y_points.flatten()
         x_points = x_points.flatten()
-
         ## remove points outside of roi
         points = np.stack([y_points, x_points], axis=1)
         points = points[roi[points[:, 0], points[:, 1]]].astype(np.float32)
+        ## flip to (x,y)
+        points = np.fliplr(points)
 
         return points
 
@@ -190,7 +208,7 @@ class PointTracker(FR_Module):
             ## Otherwise, use the first frame of the current video
             else:
                 points_prev = self.point_positions
-                frame_prev = self._format_decordTorchVideo_for_opticalFlow(video[0])
+                frame_prev = self._format_decordTorchVideo_for_opticalFlow(video[0][None,...], mask=self.mask)[0,...]
 
             ## Call point tracking function
             points, frame_last = self._track_points_singleVideo(video=video, points_prev=points_prev, frame_prev=frame_prev, batch_size=self._batch_size)
@@ -219,7 +237,7 @@ class PointTracker(FR_Module):
             points_prev (np.ndarray, np.float32):
                 A 2D array of np.float32, where each row is a point
                  to track. The points should be in the same order
-                 as the points in the previous video. Order (y,x).
+                 as the points in the previous video. Order (x,y).
             frame_prev (np.ndarray, uint8):
                 Previous frame. Should be formatted correctly, as no
                  corrective formatting will be done here.
@@ -227,7 +245,7 @@ class PointTracker(FR_Module):
         Returns:
             points (np.ndarray, np.float32):
                 A 2D array of np.float32, where each row is a point
-                 that has been tracked. Order (y,x).
+                 that has been tracked. Order (x,y).
             frame_last (np.ndarray, uint8):
                 Last frame of the video. Formatted correctly.
         """
@@ -298,10 +316,24 @@ class PointTracker(FR_Module):
             points_prev (np.ndarray, np.float32):
                 A 2D array of np.float32, where each row is a point
                  to track. The points should be in the same order
-                 as the points in the previous video. Order (y,x).
+                 as the points in the previous video. Order (x,y).
         """
         ## Call optical flow function
         points_new = self._optical_flow(frame_new=frame_new, frame_prev=frame_prev, points_prev=points_prev)
+
+        ## Visualize points
+        if self._visualize_video:
+            visualize_image_with_points(
+                image=cv2.cvtColor(frame_new, cv2.COLOR_GRAY2BGR),
+                points=points_new[None,...].astype(np.int64),
+                points_colors=(255,255,255),
+                points_sizes=1,
+                text=None,
+                display=True,
+                writer_cv2=None,
+                in_place=False,
+                error_checking=False,
+            )
 
         return points_new
 
@@ -346,287 +378,34 @@ class PointTracker(FR_Module):
             points_prev (np.ndarray, np.float32):
                 A 2D array of np.float32, where each row is a point
                  to track. The points should be in the same order
-                 as the points in the previous video. Order (y,x).
+                 as the points in the previous video. Order (x,y).
         """
         ## Call optical flow function
+        # print(points_prev.max(0))
         if self.params_optical_flow['method'] == 'lucas_kanade':
             points_new, status, err = cv2.calcOpticalFlowPyrLK(frame_prev, frame_new, points_prev, None, **self.params_optical_flow['kwargs_method'])
-        elif self.params_optical_flow['method'] == 'RLOF':
-            points_new, status, err = cv2.calcOpticalFlowSparseRLOF(frame_prev, frame_new, points_prev, None, **self.params_optical_flow['kwargs_method'])
+        else:
+            raise ValueError("FR ERROR: optical flow method not recognized")
+
+        ## Apply mesh_rigity force
+        points_new -= (displacement_of_vectors(torch.as_tensor(points_new, dtype=torch.float32), self.d_0, self.neighbors)*self.params_optical_flow['mesh_rigidity']).numpy()
+
+        ## Apply relaxation force
+        points_new -= (points_new-self.point_positions)*self.params_optical_flow['relaxation']
+        
 
         return points_new
 
         # return points_prev
 
 
-class Dataset_VideoReader(torch.utils.data.Dataset):
-    """
-    demo:
-    ds = Basic_dataset(X, device='cuda:0')
-    dl = DataLoader(ds, batch_size=32, shuffle=True)
-    """
-    def __init__(self, 
-                 video, 
-                #  device='cpu',
-                #  dtype=torch.float32
-    ):
-        """
-        Make a basic dataset.
-        RH 2021
+def distance_vectors(pi, neighbors):
+    pm = torch.tile(pi.T[:,:,None], (1,1,neighbors.shape[1]))
+    d = pm - pi.T[:, neighbors]
+    d2m = d.mean(2).T
+    return d2m
+dv_s = torch.jit.script(distance_vectors)
 
-        Args:
-            X (torch.Tensor or np.array):
-                Data to make dataset from.
-            device (str):
-                Device to use.
-            dtype (torch.dtype):
-                Data type to use.
-        """
-        self.video = video
-        self.buffer_length = 1000
-        self.X = video[:self.buffer_length]
-        self.idx_available = torch.arange(len(self.X))
-        
-    def __len__(self):
-        return len(self.video)
-    
-    def __getitem__(self, idx):
-        """
-        Returns a single sample.
-
-        Args:
-            idx (int):
-                Index of sample to return.
-        """
-        idx_in_buffer = torch.where(self.idx_available == idx)[0]
-        if idx_in_buffer > self.buffer_length/2:
-            self.X = torch.cat((self.X[idx_in_buffer:], self.video[self.idx_available[-1]+1:self.idx_available[-1]+1+self.buffer_length-idx_in_buffer+2]))
-            self.idx_available = torch.cat((self.idx_available[idx_in_buffer:], torch.arange(int(self.idx_available[-1]+1), int(self.idx_available[-1]+1+self.buffer_length-idx_in_buffer+2))))
-            return self.X[0]
-
-        return self.X[idx_in_buffer]
-
-
-
-def visualize_image_with_points(
-    image,
-    points=None,
-
-    points_colors=(255, 255, 255),
-    points_sizes=1,
-    
-    text=None,
-    text_positions=None,
-    text_color='white',
-    text_size=1,
-    text_thickness=1,
-
-    display=False,
-    handle_cv2Imshow='FaceRhythmPointVisualizer',
-    writer_cv2=None,
-
-    in_place=False,
-    error_checking=False,
-):
-    """
-    Visualize an image with points and text.
-    Be careful to follow input formats as little error checking is done
-     to save time.
-
-    Args:
-        image (np.ndarray, uint8):
-            3D array of integers, where each element is a 
-             pixel value. Last dimension should be channels.
-        points (np.ndarray, int):
-            3D array: First dimension is batch of points to plot.
-                Each batch can have different colors and sizes.
-                Second dimension is point number, and third dimension
-                is point coordinates. Order (y,x).
-        points_colors (tuple of int or list of tuple of int):
-            Used as argument for cv2.circle.
-            If tuple: All points will be this color.
-                Elements of tuple should be 3 integers between 0 and 255.
-            If list: Each element is a color for a batch of points.
-                Length of list must match the first dimension of points.
-                points must be 3D array.
-        points_sizes (int or list):
-            Used as argument for cv2.circle.
-            If int: All points will be this size.
-            If list: Each element is a size for a batch of points.
-                Length of list must match the first dimension of points.
-                points must be 3D array.
-        text (str or list):
-            Used as argument for cv2.putText.
-            If None: No text will be plotted.
-            If str: All text will be this string.
-            If list: Each element is a string for a batch of text.
-                text_positions must be 3D array.
-        text_positions (np.ndarray, np.float32):
-            Must be specified if text is not None.
-            2D array: Each row is a text position. Order (y,x).
-        text_color (str or list):
-            Used as argument for cv2.putText.
-            If str: All text will be this color.
-            If list: Each element is a color for a different text.
-                Length of list must match the length of text.
-        text_size (int or list):
-            Used as argument for cv2.putText.
-            If int: All text will be this size.
-            If list: Each element is a size for a different text.
-                Length of list must match the length of text.
-        text_thickness (int or list):
-            Used as argument for cv2.putText.
-            If int: All text will be this thickness.
-            If list: Each element is a thickness for a different text.
-                Length of list must match the length of text.
-        display (bool):
-            If True: Display image using cv2.imshow.
-        handle_cv2Imshow (str):
-            Used as argument for cv2.imshow.
-            Can be used to close window later.
-        writer_cv2 (cv2.VideoWriter):
-            If not None: Write image to video using writer_cv2.write.
-        in_place (bool):
-            If True: Modify image in place. Otherwise, return a copy.
-        error_checking (bool):
-            If True: Perform error checking.
-
-    Returns:
-        image (np.ndarray, uint8):
-            A 3D array of integers, where each element is a 
-             pixel value.
-    """
-    ## Check inputs
-    if error_checking:
-        ## Check image
-        assert isinstance(image, np.ndarray), 'image must be a numpy array.'
-        assert image.dtype == np.uint8, 'image must be a numpy array of uint8.'
-        assert image.ndim == 3, 'image must be a 3D array.'
-        assert image.shape[-1] == 3, 'image must have 3 channels.'
-
-        ## Check points
-        if points is not None:
-            assert isinstance(points, np.ndarray), 'points must be a numpy array.'
-            assert points.dtype == int, 'points must be a numpy array of int.'
-            assert points.ndim == 3, 'points must be a 3D array.'
-            assert points.shape[-1] == 2, 'points must have 2 coordinates.'
-            assert np.all(points >= 0), 'points must be non-negative.'
-            assert np.all(points[:, :, 0] < image.shape[0]), 'points must be within image.'
-            assert np.all(points[:, :, 1] < image.shape[1]), 'points must be within image.'
-
-        ## Check points_colors
-        if points_colors is not None:
-            if isinstance(points_colors, tuple):
-                assert len(points_colors) == 3, 'points_colors must be a tuple of 3 integers.'
-                assert all([isinstance(c, int) for c in points_colors]), 'points_colors must be a tuple of 3 integers.'
-                assert all([c >= 0 and c <= 255 for c in points_colors]), 'points_colors must be a tuple of 3 integers between 0 and 255.'
-            elif isinstance(points_colors, list):
-                assert all([isinstance(c, tuple) for c in points_colors]), 'points_colors must be a list of tuples.'
-                assert all([len(c) == 3 for c in points_colors]), 'points_colors must be a list of tuples of 3 integers.'
-                assert all([all([isinstance(c_, int) for c_ in c]) for c in points_colors]), 'points_colors must be a list of tuples of 3 integers.'
-                assert all([all([c_ >= 0 and c_ <= 255 for c_ in c]) for c in points_colors]), 'points_colors must be a list of tuples of 3 integers between 0 and 255.'
-
-        ## Check points_sizes
-        assert isinstance(points_sizes, int) or isinstance(points_sizes, list), 'points_sizes must be an integer or a list.'
-        if isinstance(points_sizes, list):
-            assert len(points_sizes) == points.shape[0], 'Length of points_sizes must match the first dimension of points.'
-            assert all([isinstance(size, int) for size in points_sizes]), 'All elements of points_sizes must be integers.'
-
-        ## Check text
-        if text is not None:
-            assert isinstance(text, str) or isinstance(text, list), 'text must be a string or a list.'
-            if isinstance(text, list):
-                assert len(text) == text_positions.shape[0], 'Length of text must match the first dimension of text_positions.'
-                assert all([isinstance(string, str) for string in text]), 'All elements of text must be strings.'
-
-        ## Check text_positions
-        if text_positions is not None:
-            assert isinstance(text_positions, np.ndarray), 'text_positions must be a numpy array.'
-            assert text_positions.dtype == np.float32, 'text_positions must be a numpy array of np.float32.'
-            assert text_positions.ndim == 2, 'text_positions must be a 2D array.'
-            assert text_positions.shape[-1] == 2, 'text_positions must have 2 coordinates (y,x).'
-
-        ## Check text_color
-        assert isinstance(text_color, str) or isinstance(text_color, list), 'text_color must be a string or a list.'
-        if isinstance(text_color, list):
-            assert len(text_color) == len(text), 'Length of text_color must match the length of text.'
-            assert all([isinstance(color, str) for color in text_color]), 'All elements of text_color must be strings.'
-
-        ## Check text_size
-        assert isinstance(text_size, int) or isinstance(text_size, list), 'text_size must be an integer or a list.'
-        if isinstance(text_size, list):
-            assert len(text_size) == len(text), 'Length of text_size must match the length of text.'
-            assert all([isinstance(size, int) for size in text_size]), 'All elements of text_size must be integers.'
-
-        ## Check text_thickness
-        assert isinstance(text_thickness, int) or isinstance(text_thickness, list), 'text_thickness must be an integer or a list.'
-        if isinstance(text_thickness, list):
-            assert len(text_thickness) == len(text), 'Length of text_thickness must match the length of text.'
-            assert all([isinstance(thickness, int) for thickness in text_thickness]), 'All elements of text_thickness must be integers.'
-
-
-    ## Copy image
-    if not in_place:
-        image = image.copy()
-
-    ## Convert point colors to list of BGR tuples
-    if isinstance(points_colors, tuple) and points is not None:
-        points_colors = [points_colors] * points.shape[0]
-
-    ## Convert points_sizes to list
-    if isinstance(points_sizes, int) and points is not None:
-        points_sizes = [points_sizes] * points.shape[0]
-
-    ## Convert text to list
-    if isinstance(text, str):
-        text = [text]
-
-    ## Convert text_color to list
-    if isinstance(text_color, str):
-        text_color = [text_color]
-
-    ## Convert text_size to list
-    if isinstance(text_size, int):
-        text_size = [text_size]
-
-    ## Convert text_thickness to list
-    if isinstance(text_thickness, int):
-        text_thickness = [text_thickness]
-
-    ## Plot points
-    if points is not None:
-        ## Plot points
-        for i_batch in range(points.shape[0]):
-            for i_point in range(points.shape[1]):
-                cv2.circle(
-                    img=image,
-                    center=tuple(points[i_batch][i_point][::-1]),
-                    radius=points_sizes[i_batch],
-                    color=points_colors[i_batch],
-                    thickness=-1,
-                )
-
-    ## Plot text
-    if text is not None:
-        ## Plot text
-        for i in range(len(text)):
-            cv2.putText(
-                img=image,
-                text=text[i],
-                org=tuple(text_positions[i, :][::-1]),
-                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale=text_size[i],
-                color=text_color[i],
-                thickness=text_thickness[i],
-            )
-
-    ## Display image
-    if display:
-        cv2.imshow(handle_cv2Imshow, image)
-        cv2.waitKey(1)
-
-    ## Write image
-    if writer_cv2 is not None:
-        writer_cv2.write(image)
-
-    return image
+def displacement_of_vectors(di, dj, neighbors):
+    return dv_s(di, neighbors) - dj
+dov_s = torch.jit.script(displacement_of_vectors)
