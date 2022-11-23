@@ -10,7 +10,7 @@ import torch
 from .util import FR_Module
 from .data_importing import Dataset_videos
 from .rois import ROIs
-from .helpers import make_batches
+from .helpers import make_batches, BufferedVideoReader
 from .video_playback import visualize_image_with_points
 
 ## Define class for performing point tracking using optical flow
@@ -80,17 +80,14 @@ class PointTracker(FR_Module):
         ## Imports
         super().__init__()
         
-        ## Set decord bridge (backend for video reading)
-        decord.bridge.set_bridge('torch')
-
         ## Set variables
         self._contiguous = bool(contiguous)
         self._verbose = int(verbose)
         self._batch_size = int(batch_size)
         self._visualize_video = bool(visualize_video)
 
-        ## Assert that dataset_videos is a Dataset_videos object
-        # assert isinstance(dataset_videos, Dataset_videos), "FR ERROR: dataset_videos must be a Dataset_videos object"
+        ## Assert that dataset_videos is either a data_importing.Dataset_videos object or a fr.helpers.BufferedVideoReader object
+        assert (isinstance(dataset_videos, Dataset_videos) or isinstance(dataset_videos, BufferedVideoReader)), "dataset_videos must be a data_importing.Dataset_videos object or a fr.helpers.BufferedVideoReader object."
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
         if isinstance(rois_points, np.ndarray):
             rois_points = [rois_points]
@@ -101,7 +98,12 @@ class PointTracker(FR_Module):
         assert all([roi.dtype == bool for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
         
 
+        ## Set decord bridge (backend for video reading)
+        print("FR INFO: Setting decord bridge to 'torch'") if self._verbose > 1 else None
+        decord.bridge.set_bridge('torch')
+        
         ## Set parameters for optical flow
+        print("FR: Setting parameters for optical flow") if self._verbose > 1 else None
         params_default = {
                 "method": "lucas_kanade",
                 "point_spacing": 10,
@@ -109,9 +111,9 @@ class PointTracker(FR_Module):
                 "mesh_n_neighbors": 10,
                 "relaxation": 0.5,
                 "kwargs_method": {
-                    "winSize": (15,15),
+                    "winSize": [15,15],
                     "maxLevel": 2,
-                    "criteria": (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+                    "criteria": [cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03],
                 },
             }
         if params_optical_flow is None:
@@ -127,10 +129,13 @@ class PointTracker(FR_Module):
 
         ## Make points within rois_points with spacing of point_spacing
         ##  First make a single ROI boolean image, then make points
+        print("FR: Making points to track") if self._verbose > 1 else None
         rois_all = np.stack(rois_points, axis=0).all(axis=0)
         self.point_positions = self._make_points(rois_all, self.params_optical_flow["point_spacing"])
+        print(f"FR: {self.point_positions.shape[0]} points will be tracked") if self._verbose > 1 else None
 
         ## Collapse masks into single mask
+        print(f"FR: Collapsing mask ROI images into single mask") if self._verbose > 1 else None
         if rois_masks is None:
             self.mask = torch.ones(dataset_videos[0][0].shape[:2], dtype=bool)
         else:
@@ -139,9 +144,33 @@ class PointTracker(FR_Module):
         ## Store dataset_videos
         self.dataset_videos = dataset_videos
 
+        ## Initialize mesh distances
+        print("FR: Initializing mesh distances") if self._verbose > 1 else None
         p_0 = torch.as_tensor(self.point_positions.copy(), dtype=torch.float32)
         self.neighbors = torch.argsort(torch.linalg.norm(p_0.T[:,:,None] - p_0.T[:,None,:], ord=2, dim=0), dim=1)[:,:self.params_optical_flow["mesh_n_neighbors"]]
-        self.d_0 = dv_s(torch.as_tensor(self.point_positions.copy(), dtype=torch.float32), self.neighbors)
+        self.d_0 = vector_distance_scripted(torch.as_tensor(self.point_positions.copy(), dtype=torch.float32), self.neighbors)
+        
+        self.points_tracked = []
+
+        ## For FR_Module compatibility
+        self.config = {
+            "contiguous": self._contiguous,
+            "batch_size": self._batch_size,
+            "visualize_video": self._visualize_video,
+            "params_optical_flow": self.params_optical_flow,
+            "verbose": self._verbose,
+        }
+        self.run_info = {
+        }
+        self.run_data = {
+            "point_positions": self.point_positions,
+            "neighbors": self.neighbors,
+            "mesh_d0": self.d_0,
+            "mask": self.mask,
+        }
+        ## Append the self.run_info data to self.run_data
+        self.run_data.update(self.run_info)
+
 
     def _make_points(self, roi, point_spacing):
         """
@@ -208,7 +237,10 @@ class PointTracker(FR_Module):
             ## Otherwise, use the first frame of the current video
             else:
                 points_prev = self.point_positions
-                frame_prev = self._format_decordTorchVideo_for_opticalFlow(video[0], mask=self.mask)[0,...]
+                ## Get a frame from the video and add a singleton dimension to the front if needed
+                frame_tmp = video[0]
+                frame_tmp = frame_tmp[None, ...] if frame_tmp.ndim == 3 else frame_tmp
+                frame_prev = self._format_decordTorchVideo_for_opticalFlow(frame_tmp, mask=self.mask)[0,...]
 
             ## Call point tracking function
             points, frame_last = self._track_points_singleVideo(video=video, points_prev=points_prev, frame_prev=frame_prev, batch_size=self._batch_size)
@@ -216,13 +248,25 @@ class PointTracker(FR_Module):
             ## Store points
             self.points_tracked.append(points)
 
+        ## Concatenate points from all videos if contiguous
+        if self._contiguous:
+            print(f"FR: Concatenating points from {len(self.points_tracked)} videos to make contiguous") if self._verbose > 1 else None
+            self.points_tracked = [np.concatenate(self.points_tracked, axis=0)]
+        print(f"FR: Tracking complete") if self._verbose > 1 else None
+        print(f"FR: Placing poitns_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
+        self.points_tracked = {f"{ii}": points for ii, points in enumerate(self.points_tracked)}
+
+        ## For FR_Module compatibility
+        self.run_data["points_tracked"] = self.points_tracked
+
+
     def _track_points_singleVideo(
         self,
         video,
         points_prev,
         frame_prev,
         batch_size=1000,
-        ):
+    ):
         """
         Track points in a single video.
         
@@ -388,24 +432,67 @@ class PointTracker(FR_Module):
             raise ValueError("FR ERROR: optical flow method not recognized")
 
         ## Apply mesh_rigity force
-        points_new -= (displacement_of_vectors(torch.as_tensor(points_new, dtype=torch.float32), self.d_0, self.neighbors)*self.params_optical_flow['mesh_rigidity']).numpy()
+        points_new -= (vector_displacement_scripted(torch.as_tensor(points_new, dtype=torch.float32), self.d_0, self.neighbors)*self.params_optical_flow['mesh_rigidity']).numpy()
 
         ## Apply relaxation force
         points_new -= (points_new-self.point_positions)*self.params_optical_flow['relaxation']
         
 
         return points_new
+    
+    def __repr__(self): return f"PointTracker(params_optical_flow={self.params_optical_flow}, visualize_video={self._visualize_video}, verbose={self._verbose})"
+    def __getitem__(self, index): return self.points_tracked[index]
+    def __len__(self): return len(self.points_tracked)
+    def __iter__(self): return iter(self.points_tracked)
+    def __next__(self): return next(self.points_tracked)
+    
 
-        # return points_prev
+def vector_distance(pi, neighbors):
+    """
+    Calculate the distance between each point and its neighbors.
 
+    Args:
+        pi (torch.Tensor, dtype=torch.float32):
+            A 2D array of torch.float32, where each row is a
+             (y,x) point.
+        neighbors (torch.Tensor, dtype=torch.int64):
+            A 2D array of torch.int64 listing the indices of the
+             neighbors of each point.
 
-def distance_vectors(pi, neighbors):
+    Returns:
+        d (torch.Tensor, dtype=torch.float32):
+            A 2D array of torch.float32, where each row is a
+             (y,x) vector describing the mean distance between
+              each point and its neighbors.
+    """
     pm = torch.tile(pi.T[:,:,None], (1,1,neighbors.shape[1]))
     d = pm - pi.T[:, neighbors]
     d2m = d.mean(2).T
     return d2m
-dv_s = torch.jit.script(distance_vectors)
+vector_distance_scripted = torch.jit.script(vector_distance)
 
-def displacement_of_vectors(di, dj, neighbors):
-    return dv_s(di, neighbors) - dj
-dov_s = torch.jit.script(displacement_of_vectors)
+def vector_displacement(di, dj, neighbors):
+    """
+    Calculate the displacement between each point and its
+     neighbors relative to a reference distance (dj).
+
+    Args:
+        di (torch.Tensor, dtype=torch.float32):
+            A 2D array of torch.float32, where each row is a
+             (y,x) point.
+        dj (torch.Tensor, dtype=torch.float32):
+            A 2D array of torch.float32, where each row is a
+             (y,x) distance vector.
+        neighbors (torch.Tensor, dtype=torch.int64):
+            A 2D array of torch.int64 listing the indices of the
+             neighbors of each point.
+
+    Returns:
+        d (torch.Tensor, dtype=torch.float32):
+            A 2D array of torch.float32, where each row is a
+             (y,x) vector describing the mean displacement between
+             each point and its neighbors relative to the reference
+             distance.
+    """
+    return vector_distance_scripted(di, neighbors) - dj
+vector_displacement_scripted = torch.jit.script(vector_displacement)

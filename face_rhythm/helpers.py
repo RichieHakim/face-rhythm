@@ -6,6 +6,7 @@ import time
 import numpy as np
 import decord
 import torch
+from tqdm import tqdm
 
 def prepare_cv2_imshow():
     """

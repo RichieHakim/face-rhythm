@@ -10,18 +10,18 @@ def close_all_h5():
     '''
     Closes all h5 objects in workspace. Not tested thoroughly.
     from here: https://stackoverflow.com/questions/29863342/close-an-open-h5py-data-file
-    also see: pytables is able to do this with a simple function
-        ```
+    '''
+    try:
+        for obj in gc.get_objects():   # Browse through ALL objects
+            if isinstance(obj, h5py.File):   # Just HDF5 files
+                try:
+                    obj.close()
+                except:
+                    pass # Was already closed
+    except:
         import tables
         tables.file._open_files.close_all()
-        ```
-    '''
-    for obj in gc.get_objects():   # Browse through ALL objects
-        if isinstance(obj, h5py.File):   # Just HDF5 files
-            try:
-                obj.close()
-            except:
-                pass # Was already closed
+    
     gc.collect()
 
 
