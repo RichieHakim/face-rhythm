@@ -90,7 +90,7 @@ class PointTracker(FR_Module):
         self._visualize_video = bool(visualize_video)
 
         ## Assert that dataset_videos is a Dataset_videos object
-        assert isinstance(dataset_videos, Dataset_videos), "FR ERROR: dataset_videos must be a Dataset_videos object"
+        # assert isinstance(dataset_videos, Dataset_videos), "FR ERROR: dataset_videos must be a Dataset_videos object"
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
         if isinstance(rois_points, np.ndarray):
             rois_points = [rois_points]
@@ -208,7 +208,7 @@ class PointTracker(FR_Module):
             ## Otherwise, use the first frame of the current video
             else:
                 points_prev = self.point_positions
-                frame_prev = self._format_decordTorchVideo_for_opticalFlow(video[0][None,...], mask=self.mask)[0,...]
+                frame_prev = self._format_decordTorchVideo_for_opticalFlow(video[0], mask=self.mask)[0,...]
 
             ## Call point tracking function
             points, frame_last = self._track_points_singleVideo(video=video, points_prev=points_prev, frame_prev=frame_prev, batch_size=self._batch_size)
@@ -250,7 +250,7 @@ class PointTracker(FR_Module):
                 Last frame of the video. Formatted correctly.
         """
         ## Assert that video is a decord VideoReader object
-        assert isinstance(video, decord.VideoReader), "FR ERROR: video must be a decord VideoReader object"
+        # assert isinstance(video, decord.VideoReader), "FR ERROR: video must be a decord VideoReader object"
         ## Assert that points_prev is a 2D array of integers
         assert isinstance(points_prev, np.ndarray), "FR ERROR: points_prev must be a numpy array"
         assert points_prev.ndim == 2, "FR ERROR: points_prev must be a 2D array"
