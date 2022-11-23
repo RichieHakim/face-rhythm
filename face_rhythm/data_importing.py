@@ -141,22 +141,68 @@ class _ContinuousBufferedVideoReader:
     """
     def __init__(
         self,
-        video_readers: list,
+        video_readers: list=None,
         paths_videos: list=None,
         buffer_size: int=1000,
-        starting_video_index: int=0,
-        starting_frame_index: int=0,
+        starting_video_index: int=None,
+        starting_frame_index: int=None,
         verbose: int=1,
     ):
         """
         video_readers (list of decord.VideoReader): 
             list of decord.VideoReader objects
+            Can also be single decord.VideoReader object
+        paths_videos (list of str):
+            list of paths to videos
+            Can also be single str
+        buffer_size (int):
+            Number of frames per buffer slot.
+            When indexing this object, try to not index more than
+             buffer_size frames at a time, and try to not index
+             across buffer slots (eg. across idx%buffer_size==0).
+             These require concatenating buffers, which is slow.
+        starting_video_index (int):
+            Index of video to load in initialization.
+            If None, no video is loaded into buffer.
+        starting_frame_index (int):
+            Index of frame to load in initialization.
+            If None, no frames are loaded into buffer.
+        verbose (int):
+            Verbosity level.
+            0: no output
+            1: output warnings
+            2: output warnings and info
         """
-        self.video_readers = video_readers
+        self._verbose = verbose
         self.buffer_size = buffer_size
         self.starting_video_index = starting_video_index
         self.starting_frame_index = starting_frame_index
-        self._verbose = verbose
+
+        ## Check inputs
+        if isinstance(video_readers, decord.VideoReader):
+            video_readers = [video_readers]
+        if isinstance(paths_videos, str):
+            paths_videos = [paths_videos]
+        assert (video_readers is not None) or (paths_videos is not None), "Must provide either video_readers or paths_videos"
+
+        ## If both video_readers and paths_videos are provided, use the video_readers and print a warning
+        if (video_readers is not None) and (paths_videos is not None):
+            print(f"FR WARNING: Both video_readers and paths_videos were provided. Using video_readers and ignoring path_videos.")
+            paths_videos = None
+        ## If paths are specified, import them as decord.VideoReader objects
+        if paths_videos is not None:
+            print(f"FR: Loading lazy video reader objects...") if self._verbose > 1 else None
+            assert isinstance(paths_videos, list), "paths_videos must be list of str"
+            assert all([isinstance(p, str) for p in paths_videos]), "paths_videos must be list of str"
+            video_readers = [_VideoReaderWrapper(path_video, ctx=decord.cpu(0), num_threads=mp.cpu_count()) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
+            self.paths_videos = paths_videos
+        else:
+            print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
+            assert isinstance(video_readers, list), "video_readers must be list of decord.VideoReader objects"
+            assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
+
+
+        self.video_readers = video_readers
 
         ## Initialize the buffer
         ### Make a list containing a slot for each buffer chunk
@@ -164,20 +210,20 @@ class _ContinuousBufferedVideoReader:
         ### Make a list containing the bounding indices for each buffer video chunk. Upper bound should be min(buffer_size, num_frames)
         self.boundaries = [[(i*self.buffer_size, min((i+1)*self.buffer_size, len(d))-1) for i in range(len(s))] for d, s in zip(self.video_readers, self.slots)]
 
-        ## Find first two slots to load
-        idx_slot = (self.starting_video_index, self.starting_frame_index // self.buffer_size)  ## (idx_video, idx_buffer)
-        idx_slot_next = (idx_slot[0], idx_slot[1]+1) if (idx_slot[1] < len(self.slots[idx_slot[0]])-1) else (idx_slot[0]+1, 0)
-
-        ## Initialize the threads
-        self.threads = []
-
         ## Make a list for which slots are loaded or loading
         self.loading = []
         self.loaded = []
 
+        ## Load the starting video and frame
+        if self.starting_video_index is not None:
+            ## Find first two slots to load
+            idx_slot = (self.starting_video_index, self.starting_frame_index // self.buffer_size)  ## (idx_video, idx_buffer)
+            idx_slot_next = (idx_slot[0], idx_slot[1]+1) if (idx_slot[1] < len(self.slots[idx_slot[0]])-1) else (idx_slot[0]+1, 0)
 
-        ## Load first two slots
-        self._load_slots([idx_slot, idx_slot_next], wait_for_load=[True, False])
+            ## Load first two slots
+            self._load_slots([idx_slot, idx_slot_next], wait_for_load=[True, False])
+        else:
+            print(f"FR: No starting video index provided. No video loaded into buffer.") if (self._verbose > 1) else None
 
     def _load_slots(self, idx_slots: list, wait_for_load: Union[bool, list]=False):
         """
@@ -215,14 +261,20 @@ class _ContinuousBufferedVideoReader:
                 self.loading.append(idx_slot)
                 thread = threading.Thread(target=self._load_slot, args=(idx_slot, thread))
                 thread.start()
-                self.threads.append(thread)
 
                 ## Wait for the slot to load if wait_for_load is True
                 if wait:
                     print(f"FR: Waiting for slot {idx_slot} to load") if self._verbose > 1 else None
                     thread.join()
                     print(f"FR: Slot {idx_slot} loaded") if self._verbose > 1 else None
-
+            ## If the slot is already loading
+            elif idx_slot in self.loading:
+                ## Wait for the slot to load if wait_for_load is True
+                if wait:
+                    print(f"FR: Waiting for slot {idx_slot} to load") if self._verbose > 1 else None
+                    while idx_slot in self.loading:
+                        time.sleep(0.01)
+                    print(f"FR: Slot {idx_slot} loaded") if self._verbose > 1 else None
 
     def _load_slot(self, idx_slot: tuple, blocking_thread: threading.Thread=None):
         """
@@ -271,6 +323,8 @@ class _ContinuousBufferedVideoReader:
         idx_video, idx_frames = idx
         ## Bound the range of the slice
         idx_frames = slice(max(idx_frames.start, 0), min(idx_frames.stop, len(self.video_readers[idx_video])))
+        ## Assert that slice is not empty
+        assert idx_frames.start < idx_frames.stop, "Slice is empty."
 
         ## Get the start and end indices for the slice of frames
         idx_frame_start = idx_frames.start if idx_frames.start is not None else 0
