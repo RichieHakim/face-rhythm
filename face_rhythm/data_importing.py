@@ -150,11 +150,15 @@ class _ContinuousBufferedVideoReader:
     ):
         """
         video_readers (list of decord.VideoReader): 
-            list of decord.VideoReader objects
-            Can also be single decord.VideoReader object
+            list of decord.VideoReader objects.
+            Can also be single decord.VideoReader object.
+            If None, then paths_videos must be provided.
         paths_videos (list of str):
-            list of paths to videos
-            Can also be single str
+            list of paths to videos.
+            Can also be single str.
+            If None, then video_readers must be provided.
+            If both paths_videos and video_readers are provided, 
+             then video_readers will be used.
         buffer_size (int):
             Number of frames per buffer slot.
             When indexing this object, try to not index more than
@@ -279,6 +283,18 @@ class _ContinuousBufferedVideoReader:
     def _load_slot(self, idx_slot: tuple, blocking_thread: threading.Thread=None):
         """
         Load a single slot.
+        self.slots[idx_slot[0]][idx_slot[1]] will be populated
+         with the loaded data.
+        Allows for a blocking_thread argument to be passed in,
+         which will force this new thread to wait until the
+         blocking_thread is finished (join()) before loading.
+        
+        Args:
+            idx_slot (tuple):
+                Tuple containing the indices of the slot to load.
+                Should be of the form (idx_video, idx_buffer).
+            blocking_thread (threading.Thread):
+                Thread to wait for before loading.
         """
         ## Set backend of decord to PyTorch
         decord.bridge.set_bridge('torch')
@@ -297,6 +313,13 @@ class _ContinuousBufferedVideoReader:
     def _delete_slots(self, idx_slots: list):
         """
         Delete slots from memory.
+        Sets self.slots[idx_slot[0]][idx_slot[1]] to None.
+
+        Args:
+            idx_slots (list):
+                List of tuples containing the indices of the 
+                 slots to delete.
+                Each tuple should be of the form (idx_video, idx_buffer).
         """
         print(f"FR: Deleting slots {idx_slots}") if self._verbose > 1 else None
         for idx_slot in idx_slots:
@@ -309,15 +332,19 @@ class _ContinuousBufferedVideoReader:
                 self.loaded.remove(idx_slot)
 
     
-    ## Define __getitem__ method for getting slices of the video
     def __getitem__(self, idx: tuple):
         """
-        Get a slice of frames from the video.
+        Get a slice of frames by specifying the video number and 
+         the frame number.
 
         Args:
             idx (tuple):
             A tuple containing the index of the video and a slice for the frames.
             (idx_video: int, idx_frames: slice)
+
+        Returns:
+            frames (torch.Tensor):
+                A tensor of shape (num_frames, height, width, num_channels)
         """
         ## Get the index of the video and the slice of frames
         idx_video, idx_frames = idx
