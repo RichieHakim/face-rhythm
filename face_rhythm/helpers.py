@@ -336,7 +336,6 @@ class BufferedVideoReader:
         self._verbose = verbose
         self.buffer_size = buffer_size
         self.prefetch = prefetch
-        self_starting_seek_position = starting_seek_position
 
         ## Check inputs
         if isinstance(video_readers, decord.VideoReader):
@@ -661,11 +660,20 @@ class BufferedVideoReader:
         elif self.method_getitem == 'continuous':
             return f"BufferedVideoReader(buffer_size={self.buffer_size}, total_frames={self.total_frames}, method_getitem='{self.method_getitem}', iterator_frame={self._iterator_frame}, prefetch={self.prefetch}, loaded={self.loaded}, loading={self.loading}, verbose={self._verbose})"
     def __iter__(self): 
+        """
+        Iterate over the frames in the video.
+        Makes a generator that yields single frames directly from
+         the buffer slots.
+        If it is the initial frame, or the first frame of a slot,
+         then self.get_frames_from_continuous_index is called to
+         load the next slots into the buffer.
+        """
         if self.method_getitem == 'by_video':
             return iter([_BufferedVideoReader_singleVideo(self, idx_video) for idx_video in range(len(self.video_readers))])
         elif self.method_getitem == 'continuous':
-            ## Make lazy iterator over all frames
+            ## Initialise the buffers by loading the first frame in the sequence
             self.get_frames_from_continuous_index(self._iterator_frame)
+            ## Make lazy iterator over all frames
             def lazy_iterator():
                 while self._iterator_frame < self.total_frames:
                     ## Find slot for current frame idx
@@ -676,6 +684,7 @@ class BufferedVideoReader:
                     if (self._iterator_frame in self._start_frame_continuous):
                         yield self.get_frames_from_continuous_index(self._iterator_frame)
                     else:
+                    ## Get the frame directly from the slot
                         yield self.slots[idx_video][idx_slot_in_video][idx_frame%self.buffer_size]
                     self._iterator_frame += 1
         return iter(lazy_iterator())
