@@ -670,5 +670,8 @@ class _BufferedVideoReader_singleVideo:
     def __getitem__(self, idx: slice):
         return self.bvr[self.idx_video, idx]
 
+    def __repr__(self) -> str:
+        return f"BufferedVideoReader_singleVideo(idx_video={self.idx_video}, num_frames={len(self.bvr.video_readers[self.idx_video])}, loaded={self.bvr.loaded}, loading={self.bvr.loading})"
+
     def __len__(self): return len(self.bvr.video_readers[self.idx_video])
     def __iter__(self): return iter([self.bvr[self.idx_video, idx] for idx in range(len(self))])
