@@ -359,7 +359,7 @@ class BufferedVideoReader:
         else:
             print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
             assert isinstance(video_readers, list), "video_readers must be list of decord.VideoReader objects"
-            assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
+            # assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
         ## Assert that method_getitem is valid
         assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
 
@@ -386,7 +386,9 @@ class BufferedVideoReader:
             'start_frame': np.concatenate([np.array([s[0] for s in b]) for b in self.boundaries]).astype(int).tolist(), 
             'end_frame': np.concatenate([np.array([s[1] for s in b]) for b in self.boundaries]).astype(int).tolist(),
         }
+        self.lookup['start_frame_continuous'] = (np.array(self.lookup['start_frame']) + np.array(self._cumulative_frame_start[self.lookup['video']])).tolist()
         self.lookup = pd.DataFrame(self.lookup)
+        self._start_frame_continuous = self.lookup['start_frame_continuous'].values
 
         ## Make a list for which slots are loaded or loading
         self.loading = []
@@ -486,14 +488,16 @@ class BufferedVideoReader:
                 Each tuple should be of the form (idx_video, idx_buffer).
         """
         print(f"FR: Deleting slots {idx_slots}") if self._verbose > 1 else None
-        for idx_slot in idx_slots:
+        ## Find all loaded slots
+        idx_loaded = [idx_slot for idx_slot in idx_slots if idx_slot in self.loaded]
+        for idx_slot in idx_loaded:
             ## If the slot is loaded
             if idx_slot in self.loaded:
-                print(f"FR: Deleting slot {idx_slot}") if self._verbose > 1 else None
                 ## Delete the slot
                 self.slots[idx_slot[0]][idx_slot[1]] = None
                 ## Remove the slot from the loaded list
                 self.loaded.remove(idx_slot)
+                print(f"FR: Deleted slot {idx_slot}") if self._verbose > 1 else None
 
     def _delete_all_slots(self):
         """
@@ -528,8 +532,11 @@ class BufferedVideoReader:
             print(f"FR: Returning single video reader. Video={idx}. (Enter a tuple (idx_video, idx_frame) to get a single frame back.)") if self._verbose > 1 else None
             return _BufferedVideoReader_singleVideo(self, idx)
         print(f"FR: Getting item {idx}") if self._verbose > 1 else None
-        ## If there is only one video, the video number is not needed
-        idx = (0, idx) if (len(self.video_readers) == 1) else idx
+        ## Assert that idx is a tuple of (int, int) or (int, slice)
+        assert isinstance(idx, tuple), f"idx must be: int, tuple of (int, int), or (int, slice). Got {type(idx)}"
+        assert len(idx) == 2, f"idx must be: int, tuple of (int, int), or (int, slice). Got {len(idx)} elements"
+        assert isinstance(idx[0], int), f"idx[0] must be an int. Got {type(idx[0])}"
+        assert isinstance(idx[1], int) or isinstance(idx[1], slice), f"idx[1] must be an int or a slice. Got {type(idx[1])}"
         ## Get the index of the video and the slice of frames
         idx_video, idx_frames = idx
         ## If idx_frames is a single integer, convert it to a slice
@@ -554,7 +561,6 @@ class BufferedVideoReader:
             idx_slots_prefetch = [(self.lookup['video'][ii], self.lookup['slot'][ii]) for ii in range(idx_slot_lookuptable+1, idx_slot_lookuptable+self.prefetch+1) if ii < len(self.lookup)]
         else:
             idx_slots_prefetch = []
-        # idx_slot_next = (idx_slots[-1][0], idx_slots[-1][1]+1) if (idx_slots[-1][1] < len(self.slots[idx_slots[-1][0]])-1) else (idx_slots[-1][0]+1, 0)
         ## Load the slots
         self._load_slots(idx_slots + idx_slots_prefetch, wait_for_load=[True]*len(idx_slots) + [False])
         ## Delete the slots that are no longer needed. 
@@ -595,8 +601,15 @@ class BufferedVideoReader:
             frames (torch.Tensor):
                 A tensor of shape (num_frames, height, width, num_channels)
         """
+        ## Assert that idx is an int or a slice
+        assert isinstance(idx, int) or isinstance(idx, slice), f"idx must be an int or a slice. Got {type(idx)}"
         ## If idx is a single integer, convert it to a slice
         idx = slice(idx, idx+1) if isinstance(idx, int) else idx
+        ## Assert that the slice is not empty
+        assert idx.start < idx.stop, f"Slice is empty: idx:{idx}"
+        ## Assert that the slice is not out of bounds
+        assert idx.stop <= self.total_frames, f"Slice is out of bounds: idx:{idx}"
+        
         ## Find the video and frame indices
         idx_video_start = np.searchsorted(self._cumulative_frame_start, idx.start, side='right') - 1
         idx_video_end = np.searchsorted(self._cumulative_frame_end, idx.stop, side='left')
@@ -652,11 +665,20 @@ class BufferedVideoReader:
             return iter([_BufferedVideoReader_singleVideo(self, idx_video) for idx_video in range(len(self.video_readers))])
         elif self.method_getitem == 'continuous':
             ## Make lazy iterator over all frames
+            self.get_frames_from_continuous_index(self._iterator_frame)
             def lazy_iterator():
                 while self._iterator_frame < self.total_frames:
-                    yield self.get_frames_from_continuous_index(self._iterator_frame)
+                    ## Find slot for current frame idx
+                    idx_video = np.searchsorted(self._cumulative_frame_start, self._iterator_frame, side='right') - 1
+                    idx_slot_in_video = (self._iterator_frame - self._cumulative_frame_start[idx_video]) // self.buffer_size
+                    idx_frame = self._iterator_frame - self._cumulative_frame_start[idx_video]
+                    ## If the frame is at the beginning of a slot, then use get_frames_from_single_video_index otherwise just grab directly from the slot
+                    if (self._iterator_frame in self._start_frame_continuous):
+                        yield self.get_frames_from_continuous_index(self._iterator_frame)
+                    else:
+                        yield self.slots[idx_video][idx_slot_in_video][idx_frame%self.buffer_size]
                     self._iterator_frame += 1
-            return lazy_iterator()
+        return iter(lazy_iterator())
     
 class _BufferedVideoReader_singleVideo:
     def __init__(
