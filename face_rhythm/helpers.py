@@ -290,8 +290,8 @@ class BufferedVideoReader:
         paths_videos: list=None,
         buffer_size: int=1000,
         prefetch: int=2,
-        starting_video_index: int=None,
-        starting_frame_index: int=None,
+        method_getitem: str='continuous',
+        starting_seek_position: int=0,
         verbose: int=1,
     ):
         """
@@ -314,12 +314,17 @@ class BufferedVideoReader:
         prefetch (int):
             Number of buffers to prefetch.
             If 0, then no prefetching.
-        starting_video_index (int):
-            Index of video to load in initialization.
-            If None, no video is loaded into buffer.
-        starting_frame_index (int):
-            Index of frame to load in initialization.
-            If None, no frames are loaded into buffer.
+            Note that a single buffer slot can only contain frames
+             from a single video. Best to keep 
+             buffer_size <= video length.
+        method_getitem (str):
+            Method to use for __getitem__.
+            'continuous' - read frames continuously across videos.
+                Index behaves like videos are concatenated:
+                - reader[idx] where idx: slice=idx_frames
+            'by_video' - index must specify video index and frame 
+                index:
+                - reader[idx] where idx: tuple=(int: idx_video, slice: idx_frames)
         verbose (int):
             Verbosity level.
             0: no output
@@ -331,8 +336,7 @@ class BufferedVideoReader:
         self._verbose = verbose
         self.buffer_size = buffer_size
         self.prefetch = prefetch
-        self.starting_video_index = starting_video_index
-        self.starting_frame_index = starting_frame_index
+        self_starting_seek_position = starting_seek_position
 
         ## Check inputs
         if isinstance(video_readers, decord.VideoReader):
@@ -356,9 +360,19 @@ class BufferedVideoReader:
             print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
             assert isinstance(video_readers, list), "video_readers must be list of decord.VideoReader objects"
             assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
+        ## Assert that method_getitem is valid
+        assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
 
 
         self.video_readers = video_readers
+        self._cumulative_frame_end = np.cumsum([len(video_reader) for video_reader in self.video_readers])
+        self._cumulative_frame_start = np.concatenate([[0], self._cumulative_frame_end[:-1]])
+        self.total_frames = self._cumulative_frame_end[-1]
+        self.method_getitem = method_getitem
+
+        ## Set iterator starting frame
+        print(f"FR: Setting iterator starting frame to {starting_seek_position}") if self._verbose > 1 else None
+        self.set_iterator_frame_idx(starting_seek_position)
 
         ## Initialize the buffer
         ### Make a list containing a slot for each buffer chunk
@@ -378,17 +392,6 @@ class BufferedVideoReader:
         self.loading = []
         self.loaded = []
 
-        if self.starting_video_index is not None:
-            ## Load the starting video and frame
-            idx_video = 0
-            idx_frame_start = 0
-            idx_frame_end = self.buffer_size * (self.prefetch + 1)
-            idx_slots = [(idx_video, i) for i in range(idx_frame_start // self.buffer_size, ((idx_frame_end-1) // self.buffer_size)+1)]
-
-            ## Load first prefetch slots
-            self._load_slots(idx_slots, wait_for_load=[[True]+[False]*(self.prefetch-1)])
-        else:
-            print(f"FR: No starting video index provided. No video loaded into buffer.") if (self._verbose > 1) else None
 
     def _load_slots(self, idx_slots: list, wait_for_load: Union[bool, list]=False):
         """
@@ -492,16 +495,27 @@ class BufferedVideoReader:
                 ## Remove the slot from the loaded list
                 self.loaded.remove(idx_slot)
 
+    def _delete_all_slots(self):
+        """
+        Delete all slots from memory.
+        Uses the _delete_slots() method.
+        """
+        print(f"FR: Deleting all slots") if self._verbose > 1 else None
+        self._delete_slots(self.loaded)
+        
+
     
-    def __getitem__(self, idx: tuple):
+    def get_frames_from_single_video_index(self, idx: tuple):
         """
         Get a slice of frames by specifying the video number and 
          the frame number.
 
         Args:
-            idx (tuple):
+            idx (tuple or int):
             A tuple containing the index of the video and a slice for the frames.
             (idx_video: int, idx_frames: slice)
+            If idx is an int, it is assumed to be the index of the video, and
+             a single video reader object is returned.
             If there is only one video, idx_video can be omitted and
              idx can simply be a slice.
 
@@ -509,6 +523,10 @@ class BufferedVideoReader:
             frames (torch.Tensor):
                 A tensor of shape (num_frames, height, width, num_channels)
         """
+        ## if idx is an int, return a single video reader
+        if isinstance(idx, int):
+            print(f"FR: Returning single video reader. Video={idx}. (Enter a tuple (idx_video, idx_frame) to get a single frame back.)") if self._verbose > 1 else None
+            return _BufferedVideoReader_singleVideo(self, idx)
         print(f"FR: Getting item {idx}") if self._verbose > 1 else None
         ## If there is only one video, the video number is not needed
         idx = (0, idx) if (len(self.video_readers) == 1) else idx
@@ -519,7 +537,7 @@ class BufferedVideoReader:
         ## Bound the range of the slice
         idx_frames = slice(max(idx_frames.start, 0), min(idx_frames.stop, len(self.video_readers[idx_video])))
         ## Assert that slice is not empty
-        assert idx_frames.start < idx_frames.stop, "Slice is empty."
+        assert idx_frames.start < idx_frames.stop, f"Slice is empty: idx:{idx}"
 
         ## Get the start and end indices for the slice of frames
         idx_frame_start = idx_frames.start if idx_frames.start is not None else 0
@@ -562,9 +580,83 @@ class BufferedVideoReader:
 
         return frames
 
-    def __len__(self): return len(self.video_readers)
-    def __repr__(self): return f"BufferedVideoReader(buffer_size={self.buffer_size}, loaded={self.loaded}, loading={self.loading}, verbose={self._verbose})"
-    def __iter__(self): return iter([_BufferedVideoReader_singleVideo(self, idx_video) for idx_video in range(len(self.video_readers))])
+    def get_frames_from_continuous_index(self, idx):
+        """
+        Get a batch of frames from a continuous index.
+        Here the videos are treated as one long sequence of frames,
+         and the index is the index of the frames in this sequence.
+
+        Args:
+            idx (int or slice):
+                The index of the frames to get. If an int, a single frame is returned.
+                If a slice, a batch of frames is returned.
+
+        Returns:
+            frames (torch.Tensor):
+                A tensor of shape (num_frames, height, width, num_channels)
+        """
+        ## If idx is a single integer, convert it to a slice
+        idx = slice(idx, idx+1) if isinstance(idx, int) else idx
+        ## Find the video and frame indices
+        idx_video_start = np.searchsorted(self._cumulative_frame_start, idx.start, side='right') - 1
+        idx_video_end = np.searchsorted(self._cumulative_frame_end, idx.stop, side='left')
+        ## Get the frames using the __getitem__ method
+        ### This needs to be done one video at a time
+        frames = []
+        for idx_video in range(idx_video_start, idx_video_end+1):
+            ## Get the start and end indices for the slice of frames
+            idx_frame_start = idx.start - self._cumulative_frame_start[idx_video] if idx_video == idx_video_start else 0
+            idx_frame_end = idx.stop - self._cumulative_frame_start[idx_video] if idx_video == idx_video_end else len(self.video_readers[idx_video])
+            ## Get the frames
+            print(f"FR: Getting frames from video {idx_video} from {idx_frame_start} to {idx_frame_end}") if self._verbose > 1 else None
+            frames.append(self.get_frames_from_single_video_index((idx_video, slice(idx_frame_start, idx_frame_end, idx.step))))
+        ## Concatenate the frames if there are multiple videos
+        frames = torch.cat(frames, dim=0) if len(frames) > 1 else frames[0]
+
+        return frames
+
+    def set_iterator_frame_idx(self, idx):
+        """
+        Set the starting frame for the iterator.
+        Index should be in 'continuous' format.
+
+        Args:
+            idx (int):
+                The index of the frame to start the iterator from.
+                Should be in 'continuous' format where the index
+                 is the index of the frame in the entire sequence 
+                 of frames.
+        """
+        self._iterator_frame = idx
+        
+    def __getitem__(self, idx):
+        if self.method_getitem == 'by_video':
+            return self.get_frames_from_single_video_index(idx)
+        elif self.method_getitem == 'continuous':
+            return self.get_frames_from_continuous_index(idx)
+        else:
+            raise ValueError(f"Invalid method_getitem: {self.method_getitem}")
+
+    def __len__(self): 
+        if self.method_getitem == 'by_video':
+            return len(self.video_readers)
+        elif self.method_getitem == 'continuous':
+            return self.total_frames
+    def __repr__(self): 
+        if self.method_getitem == 'by_video':
+            return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={len(self.video_readers)}, method_getitem='{self.method_getitem}', loaded={self.loaded}, prefetch={self.prefetch}, loading={self.loading}, verbose={self._verbose})"    
+        elif self.method_getitem == 'continuous':
+            return f"BufferedVideoReader(buffer_size={self.buffer_size}, total_frames={self.total_frames}, method_getitem='{self.method_getitem}', iterator_frame={self._iterator_frame}, prefetch={self.prefetch}, loaded={self.loaded}, loading={self.loading}, verbose={self._verbose})"
+    def __iter__(self): 
+        if self.method_getitem == 'by_video':
+            return iter([_BufferedVideoReader_singleVideo(self, idx_video) for idx_video in range(len(self.video_readers))])
+        elif self.method_getitem == 'continuous':
+            ## Make lazy iterator over all frames
+            def lazy_iterator():
+                while self._iterator_frame < self.total_frames:
+                    yield self.get_frames_from_continuous_index(self._iterator_frame)
+                    self._iterator_frame += 1
+            return lazy_iterator()
     
 class _BufferedVideoReader_singleVideo:
     def __init__(
