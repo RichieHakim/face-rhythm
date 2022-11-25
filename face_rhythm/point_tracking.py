@@ -38,6 +38,12 @@ class PointTracker(FR_Module):
                         'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
                     },
         visualize_video: bool=False,
+        kwargs_visualizeImageWithPoints: dict={
+                        'points_colors':(0, 255, 255),
+                        'alpha':1.0,
+                        'points_sizes':1,
+                        'writer_cv2':None,
+        },
         verbose: Union[bool, int]=1,
     ):
         """
@@ -119,6 +125,7 @@ class PointTracker(FR_Module):
         self._contiguous = bool(contiguous)
         self._verbose = int(verbose)
         self._visualize_video = bool(visualize_video)
+        self._kwargs_visualizeImageWithPoints = kwargs_visualizeImageWithPoints.copy()
 
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
         # print(type(buffered_video_reader))
@@ -156,7 +163,7 @@ class PointTracker(FR_Module):
                 if key not in params_optical_flow:
                     print(f"FR: 'params_optical_flow' does not contain key '{key}', using default value: {value}") if self._verbose > 0 else None
                     params_optical_flow[key] = value
-            self.params_optical_flow = params_optical_flow
+            self.params_optical_flow = params_optical_flow.copy()
 
         ## Make points within rois_points with spacing of point_spacing
         ##  First make a single ROI boolean image, then make points
@@ -191,7 +198,27 @@ class PointTracker(FR_Module):
         self.neighbors = torch.argsort(torch.linalg.norm(p_0.T[:,:,None] - p_0.T[:,None,:], ord=2, dim=0), dim=1)[:,:self.params_optical_flow["mesh_n_neighbors"]]
         self.d_0 = _vector_distance(torch.as_tensor(self.point_positions.copy(), dtype=torch.float32), self.neighbors)
         
+        ## Preallocate points_tracked (will be overwrittenw with another empty list)
         self.points_tracked = []
+
+        # ## Make convolutional kernel for dot visualization
+        # if self._visualize_video:
+
+        #         'points_colors':(0, 255, 255),
+        #         'alpha':1.0,
+        #         'points_sizes':1,
+
+        #     diameter = 5
+        #     d = int((diameter//2)*2+1)
+        #     c = int(diameter//2)
+        #     r = diameter/2
+        #     center = r
+        #     k = fr.helpers.cosine_kernel_2D(center=(c,c), image_size=(d,d), width=r*2)**0.05
+
+        #     self._kernel_dot = torch.as_tensor(_make_dot_kernel(5, 1), dtype=torch.float32)
+        #     self._kernel_dot = self._kernel_dot / self._kernel_dot.sum()
+
+
 
         ## For FR_Module compatibility
         self.config = {
@@ -384,13 +411,10 @@ class PointTracker(FR_Module):
             visualize_image_with_points(
                 image=cv2.cvtColor(frame_new, cv2.COLOR_GRAY2BGR),
                 points=points_new[None,...].astype(np.int64),
-                points_colors=(0,255,255),
-                alpha=0.3,
-                points_sizes=1,
                 text=None,
                 display=True,
-                writer_cv2=None,
                 error_checking=False,
+                **self._kwargs_visualizeImageWithPoints,
             )
 
         return points_new

@@ -1,5 +1,79 @@
+from typing import Union
+
 import numpy as np
 import cv2
+import scipy.sparse
+
+from .helpers import BufferedVideoReader, Toeplitz_convolution2d
+
+class FrameVisualizer:
+    """
+    Class for playing back a video.
+    Allows for playing back one frame at a time, or playing back
+     an array of frames.
+    """
+    def __init__(
+        self,
+        ## can be tuple of int or list of int
+        image_height_width: Union[tuple, list],
+        points_sizes: Union[float, int, list, list]=[3.0],
+        verbose: int=1,
+    ):
+        """
+        Initialize the VideoPlayback object.
+        This class wraps the primary function which is:
+         self.visualize_image_with_points. It is used to visualize
+         single frame inputs of images and overlayed points.
+        The reason why this is a class is to initialize the
+         Toeplitz convolution object which is used to control the
+         size of the points being visualized.
+
+        Args:
+            image_height_width (tuple or list):
+                The height and width of the images to be played back.
+            points_sizes (float or list of floats):
+                Diameter of the points to draw on the video.
+                If a list is passed, then each element should be the
+                 diameter for that batch of points.
+                See self.visualize_image_with_points for details on 
+                 batches.
+        """
+        ## Assertions
+        assert isinstance(image_height_width, (tuple(int), list(int))), "FR ERROR: image_height_width must be a tuple or list of ints"
+        assert len(image_height_width) == 2, "FR ERROR: image_height_width must be a tuple or list of length 2: (height, width)"
+        assert isinstance(points_sizes, (float, int, list)), "FR ERROR: points_sizes must be a float, int, or list of floats or ints"
+        if isinstance(points_sizes, list):
+            assert all([isinstance(x, (float, int)) for x in points_sizes]), "FR ERROR: points_sizes must be a float, int, or list of floats or ints"
+        assert isinstance(verbose, int), "FR ERROR: verbose must be an int"
+
+        ## Set variables
+        self.image_height_width = tuple(image_height_width)
+        self.points_sizes = [float(p) for p in points_sizes]
+        self._verbose = int(verbose)
+
+        ## Make convolutional kernels for points
+        def _make_convolution_kernel(point_size):
+            ## Make a cosine kernel
+            d = int((point_size//2)*2 + 1)
+            c = int(point_size//2)
+            x = np.linspace(-c, c, d)
+            y = np.linspace(-c, c, d)
+            xx, yy = np.meshgrid(x, y)
+            r = np.sqrt(xx**2 + yy**2)
+            kernel = np.cos(r/point_size*np.pi/2)
+            kernel[r > point_size/2] = 0
+            kernel = kernel / np.sum(kernel)
+            return kernel
+        self.kernels = [_make_convolution_kernel(p) for p in self.points_sizes]
+        
+        ## Initialize Toeplitz convolution objects
+        self.convolvers = [Toeplitz_convolution2d(
+            x_shape=self.image_height_width,
+            k=kernel,
+            mode='same',
+            dtype=np.float32,
+        ) for kernel in self.kernels]
+
 
 def visualize_image_with_points(
     image,
@@ -190,14 +264,22 @@ def visualize_image_with_points(
     if points is not None:
         ## Plot points
         for i_batch in range(points.shape[0]):
-            for i_point in range(points.shape[1]):
-                cv2.circle(
-                    img=image_out,
-                    center=tuple(points[i_batch][i_point]),
-                    radius=points_sizes[i_batch],
-                    color=points_colors[i_batch],
-                    thickness=-1,
-                )
+            # for i_point in range(points.shape[1]):
+            #     cv2.circle(
+            #         img=image_out,
+            #         center=tuple(points[i_batch][i_point]),
+            #         radius=points_sizes[i_batch],
+            #         color=points_colors[i_batch],
+            #         thickness=-1,
+            #     )
+            mat = scipy.sparse.coo_matrix((image_out.shape[0], image_out.shape[1]), dtype=np.uint8)
+            mat.row = points[i_batch][:, 1]
+            mat.col = points[i_batch][:, 0]
+            mat.data = np.ones(points[i_batch].shape[0], dtype=np.uint8)*(int(255*0.2))
+            
+            # image_out = cv2.add(image_out, mat.toarray()[:, :, None]*np.array(points_colors[i_batch], dtype=np.uint8)[None, None, :])
+            image_out = cv2.add(image_out, cv2.cvtColor(mat.toarray(), cv2.COLOR_GRAY2BGR))
+
 
     ## Plot text
     if text is not None:
@@ -213,8 +295,6 @@ def visualize_image_with_points(
                 thickness=text_thickness[i],
             )
 
-    if alpha != 1.0:
-        image_out = cv2.addWeighted(image_out, alpha, image, 1 - alpha, 0)
 
     ## Display image_out
     if display:

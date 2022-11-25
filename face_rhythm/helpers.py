@@ -8,6 +8,9 @@ import decord
 import torch
 from tqdm import tqdm
 
+import scipy
+import scipy.sparse
+
 def prepare_cv2_imshow():
     """
     This function is necessary because cv2.imshow() 
@@ -295,17 +298,18 @@ class BufferedVideoReader:
         "loaded",
         "loading",
         "lookup",
+        "metadata",
         "method_getitem",
         "num_videos",
         "paths_videos",
         "prefetch",
         "slots", 
         "total_frames",
-        "video_lengths",
         "video_readers",
-        "_backend",
         "_cumulative_frame_end",
         "_cumulative_frame_start",
+        "_decord_backend",
+        "_decord_ctx",
         "_iterator_frame",
         "_start_frame_continuous",
         "_verbose",
@@ -319,7 +323,8 @@ class BufferedVideoReader:
         prefetch: int=2,
         method_getitem: str='continuous',
         starting_seek_position: int=0,
-        backend: str='torch',
+        decord_backend: str='torch',
+        decord_ctx=None,
         verbose: int=1,
     ):
         """
@@ -357,10 +362,14 @@ class BufferedVideoReader:
             Starting frame index to start iterator from.
             Only used when method_getitem=='continuous' and
              using the iterator method.
-        backend (str):
-            Backend to use for loading frames.
+        decord_backend (str):
+            Backend to use for decord when loading frames.
             See decord documentation for options.
             ('torch', 'numpy', 'mxnet', ...)
+        decord_ctx (decord.Context):
+            Context to use for decord when loading frames.
+            See decord documentation for options.
+            (decord.cpu(), decord.gpu(), ...)
         verbose (int):
             Verbosity level.
             0: no output
@@ -372,7 +381,8 @@ class BufferedVideoReader:
         self._verbose = verbose
         self.buffer_size = buffer_size
         self.prefetch = prefetch
-        self._backend = backend
+        self._decord_backend = decord_backend
+        self._decord_ctx = decord.cpu(0) if decord_ctx is None else decord_ctx
 
         ## Check inputs
         if isinstance(video_readers, decord.VideoReader):
@@ -390,7 +400,7 @@ class BufferedVideoReader:
             print(f"FR: Loading lazy video reader objects...") if self._verbose > 1 else None
             assert isinstance(paths_videos, list), "paths_videos must be list of str"
             assert all([isinstance(p, str) for p in paths_videos]), "paths_videos must be list of str"
-            video_readers = [VideoReaderWrapper(path_video, ctx=decord.cpu(0), num_threads=mp.cpu_count()) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
+            video_readers = [VideoReaderWrapper(path_video, ctx=self._decord_ctx) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
             self.paths_videos = paths_videos
         else:
             print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
@@ -399,17 +409,17 @@ class BufferedVideoReader:
         ## Assert that method_getitem is valid
         assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
         ## Check if backend is valid by trying to set it here (only works fully when used in the _load_frames method)
-        decord.bridge.set_bridge(self._backend)
+        decord.bridge.set_bridge(self._decord_backend)
 
 
         self.video_readers = video_readers
         self._cumulative_frame_end = np.cumsum([len(video_reader) for video_reader in self.video_readers])
         self._cumulative_frame_start = np.concatenate([[0], self._cumulative_frame_end[:-1]])
-        self.total_frames = self._cumulative_frame_end[-1]
+        self.num_frames_total = self._cumulative_frame_end[-1]
         self.method_getitem = method_getitem
 
-        ## Get video lengths
-        self.video_lengths = [len(video_reader) for video_reader in self.video_readers]
+        ## Get metadata about videos: lengths, fps, frame size, etc.
+        self.metadata, self.num_frames_total, self.frame_rate, self.frame_height_width, self.num_channels = self._get_metadata(self.video_readers)
         ## Get number of videos
         self.num_videos = len(self.video_readers)
 
@@ -436,6 +446,67 @@ class BufferedVideoReader:
         ## Make a list for which slots are loaded or loading
         self.loading = []
         self.loaded = []
+
+
+    def _get_metadata(self, video_readers):
+        """
+        Get metadata about videos: lengths, fps, frame size, 
+         num_channels, etc.
+
+        Args:
+            video_readers (list of decord.VideoReader):
+                List of decord.VideoReader objects
+
+        Returns:
+            metadata (list of dict):
+                Dictionary containing metadata for each video.
+                Contains: 'num_frames', 'frame_rate',
+                 'frame_height_width', 'num_channels'
+            num_frames_total (int):
+                Total number of frames across all videos.
+            frame_rate (float):
+                Frame rate of videos.
+            frame_height_width (tuple of int):
+                Height and width of frames.
+            num_channels (int):
+                Number of channels.
+        """
+
+        ## make video metadata dataframe
+        print("FR: Collecting video metadata...") if self._verbose > 1 else None
+        metadata = {"paths_videos": self.paths_videos}
+        num_frames, frame_rate, frame_height_width, num_channels = [], [], [], []
+        for v in tqdm(video_readers):
+            num_frames.append(int(len(v)))
+            frame_rate.append(float(v.get_avg_fps()))
+            frame_tmp = v[0]
+            frame_height_width.append([int(n) for n in frame_tmp.shape[:2]])
+            num_channels.append(int(frame_tmp.shape[2]))
+        metadata["num_frames"] = num_frames
+        metadata["frame_rate"] = frame_rate
+        metadata["frame_height_width"] = frame_height_width
+        metadata["num_channels"] = num_channels
+            
+
+        ## Assert that all videos must have at least one frame
+        assert all([n > 0 for n in metadata["num_frames"]]), "FR ERROR: All videos must have at least one frame"
+        ## Assert that all videos must have the same shape
+        assert all([n == metadata["frame_height_width"][0] for n in metadata["frame_height_width"]]), "FR ERROR: All videos must have the same shape"
+        ## Assert that all videos must have the same number of channels
+        assert all([n == metadata["num_channels"][0] for n in metadata["num_channels"]]), "FR ERROR: All videos must have the same number of channels"
+
+        ## get frame rate
+        frame_rates = metadata["frame_rate"]
+        ## warn if any video's frame rate is very different from others
+        max_diff = float((np.max(frame_rates) - np.min(frame_rates)) / np.mean(frame_rates))
+        print(f"FR WARNING: max frame rate difference is large: {max_diff*100:.2f}%") if ((max_diff > 0.1) and (self._verbose > 0)) else None
+        frame_rate = float(np.median(frame_rates))
+
+        num_frames_total = int(np.sum(metadata["num_frames"]))
+        frame_height_width = metadata["frame_height_width"][0]
+        num_channels = metadata["num_channels"][0]
+
+        return metadata, num_frames_total, frame_rate, frame_height_width, num_channels
 
 
     def _load_slots(self, idx_slots: list, wait_for_load: Union[bool, list]=False):
@@ -506,7 +577,7 @@ class BufferedVideoReader:
                 Thread to wait for before loading.
         """
         ## Set backend of decord to PyTorch
-        decord.bridge.set_bridge(self._backend)
+        decord.bridge.set_bridge(self._decord_backend)
         ## Wait for the previous slot to finish loading
         if blocking_thread is not None:
             blocking_thread.join()
@@ -580,7 +651,7 @@ class BufferedVideoReader:
                 prefetch=self.prefetch,
                 method_getitem='continuous',
                 starting_seek_position=0,
-                backend=self._backend,
+                backend=self._decord_backend,
                 verbose=self._verbose,
             )
         print(f"FR: Getting item {idx}") if self._verbose > 1 else None
@@ -660,7 +731,7 @@ class BufferedVideoReader:
         ## Assert that the slice is not empty
         assert idx.start < idx.stop, f"Slice is empty: idx:{idx}"
         ## Assert that the slice is not out of bounds
-        assert idx.stop <= self.total_frames, f"Slice is out of bounds: idx:{idx}"
+        assert idx.stop <= self.num_frames_total, f"Slice is out of bounds: idx:{idx}"
         
         ## Find the video and frame indices
         idx_video_start = np.searchsorted(self._cumulative_frame_start, idx.start, side='right') - 1
@@ -706,12 +777,12 @@ class BufferedVideoReader:
         if self.method_getitem == 'by_video':
             return len(self.video_readers)
         elif self.method_getitem == 'continuous':
-            return self.total_frames
+            return self.num_frames_total
     def __repr__(self): 
         if self.method_getitem == 'by_video':
-            return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={len(self.video_readers)}, method_getitem='{self.method_getitem}', loaded={self.loaded}, prefetch={self.prefetch}, loading={self.loading}, verbose={self._verbose})"    
+            return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={self.num_videos}, method_getitem='{self.method_getitem}', loaded={self.loaded}, prefetch={self.prefetch}, loading={self.loading}, verbose={self._verbose})"    
         elif self.method_getitem == 'continuous':
-            return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={len(self.video_readers)}, total_frames={self.total_frames}, method_getitem='{self.method_getitem}', iterator_frame={self._iterator_frame}, prefetch={self.prefetch}, loaded={self.loaded}, loading={self.loading}, verbose={self._verbose})"
+            return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={self.num_videos}, total_frames={self.num_frames_total}, method_getitem='{self.method_getitem}', iterator_frame={self._iterator_frame}, prefetch={self.prefetch}, loaded={self.loaded}, loading={self.loading}, verbose={self._verbose})"
     def __iter__(self): 
         """
         If method_getitem is 'by_video':
@@ -731,7 +802,7 @@ class BufferedVideoReader:
                 prefetch=self.prefetch,
                 method_getitem='continuous',
                 starting_seek_position=0,
-                backend=self._backend,
+                backend=self._decord_backend,
                 verbose=self._verbose,
             ) for idx in range(len(self.video_readers))])
         elif self.method_getitem == 'continuous':
@@ -739,7 +810,7 @@ class BufferedVideoReader:
             self.get_frames_from_continuous_index(self._iterator_frame)
             ## Make lazy iterator over all frames
             def lazy_iterator():
-                while self._iterator_frame < self.total_frames:
+                while self._iterator_frame < self.num_frames_total:
                     ## Find slot for current frame idx
                     idx_video = np.searchsorted(self._cumulative_frame_start, self._iterator_frame, side='right') - 1
                     idx_slot_in_video = (self._iterator_frame - self._cumulative_frame_start[idx_video]) // self.buffer_size
@@ -752,3 +823,199 @@ class BufferedVideoReader:
                         yield self.slots[idx_video][idx_slot_in_video][idx_frame%self.buffer_size]
                     self._iterator_frame += 1
         return iter(lazy_iterator())
+
+
+##############################
+######## CONVOLUTION #########
+##############################
+
+class Toeplitz_convolution2d:
+    """
+    Convolve a 2D array with a 2D kernel using the Toeplitz matrix 
+     multiplication method.
+    Allows for SPARSE 'x' inputs. 'k' should remain dense.
+    Ideal when 'x' is very sparse (density<0.01), 'x' is small
+     (shape <(1000,1000)), 'k' is small (shape <(100,100)), and
+     the batch size is large (e.g. 1000+).
+    Generally faster than scipy.signal.convolve2d when convolving mutliple
+     arrays with the same kernel. Maintains low memory footprint by
+     storing the toeplitz matrix as a sparse matrix.
+
+    See: https://stackoverflow.com/a/51865516 and https://github.com/alisaaalehi/convolution_as_multiplication
+     for a nice illustration.
+    See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.convolution_matrix.html 
+     for 1D version.
+    See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.matmul_toeplitz.html#scipy.linalg.matmul_toeplitz 
+     for potential ways to make this implementation faster.
+
+    Test with: tests.test_toeplitz_convolution2d()
+    RH 2022
+    """
+    def __init__(
+        self,
+        x_shape,
+        k,
+        mode='same',
+        dtype=None,
+    ):
+        """
+        Initialize the convolution object.
+        Makes the Toeplitz matrix and stores it.
+
+        Args:
+            x_shape (tuple):
+                The shape of the 2D array to be convolved.
+            k (np.ndarray):
+                2D kernel to convolve with
+            mode (str):
+                'full', 'same' or 'valid'
+                see scipy.signal.convolve2d for details
+            dtype (np.dtype):
+                The data type to use for the Toeplitz matrix.
+                Ideally, this matches the data type of the input array.
+                If None, then the data type of the kernel is used.
+        """
+        self.k = k = np.flipud(k.copy())
+        self.mode = mode
+        self.x_shape = x_shape
+        self.dtype = k.dtype if dtype is None else dtype
+
+        if mode == 'valid':
+            assert x_shape[0] >= k.shape[0] and x_shape[1] >= k.shape[1], "x must be larger than k in both dimensions for mode='valid'"
+
+        self.so = so = size_output_array = ( (k.shape[0] + x_shape[0] -1), (k.shape[1] + x_shape[1] -1))  ## 'size out' is the size of the output array
+
+        ## make the toeplitz matrices
+        t = toeplitz_matrices = [scipy.sparse.diags(
+            diagonals=np.ones((k.shape[1], x_shape[1]), dtype=self.dtype) * k_i[::-1][:,None], 
+            offsets=np.arange(-k.shape[1]+1, 1), 
+            shape=(so[1], x_shape[1]),
+            dtype=self.dtype,
+        ) for k_i in k[::-1]]  ## make the toeplitz matrices for the rows of the kernel
+        tc = toeplitz_concatenated = scipy.sparse.vstack(t + [scipy.sparse.dia_matrix((t[0].shape), dtype=self.dtype)]*(x_shape[0]-1))  ## add empty matrices to the bottom of the block due to padding, then concatenate
+
+        ## make the double block toeplitz matrix
+        self.dt = double_toeplitz = scipy.sparse.hstack([self._roll_sparse(
+            x=tc, 
+            shift=(ii>0)*ii*(so[1])  ## shift the blocks by the size of the output array
+        ) for ii in range(x_shape[0])]).tocsr()
+    
+    def __call__(
+        self,
+        x,
+        batching=True,
+        mode=None,
+    ):
+        """
+        Convolve the input array with the kernel.
+
+        Args:
+            x (np.ndarray or scipy.sparse.csc_matrix or scipy.sparse.csr_matrix):
+                Input array(s) (i.e. image(s)) to convolve with the kernel
+                If batching==False: Single 2D array to convolve with the kernel.
+                    shape: (self.x_shape[0], self.x_shape[1])
+                    type: np.ndarray or scipy.sparse.csc_matrix or scipy.sparse.csr_matrix
+                If batching==True: Multiple 2D arrays that have been flattened
+                 into row vectors (with order='C').
+                    shape: (n_arrays, self.x_shape[0]*self.x_shape[1])
+                    type: np.ndarray or scipy.sparse.csc_matrix or scipy.sparse.csr_matrix
+            batching (bool):
+                If False, x is a single 2D array.
+                If True, x is a 2D array where each row is a flattened 2D array.
+            mode (str):
+                'full', 'same' or 'valid'
+                see scipy.signal.convolve2d for details
+                Overrides the mode set in __init__.
+
+        Returns:
+            out (np.ndarray or scipy.sparse.csr_matrix):
+                If batching==True: Multiple convolved 2D arrays that have been flattened
+                 into row vectors (with order='C').
+                    shape: (n_arrays, height*width)
+                    type: np.ndarray or scipy.sparse.csc_matrix
+                If batching==False: Single convolved 2D array of shape (height, width)
+        """
+        if mode is None:
+            mode = self.mode  ## use the mode that was set in the init if not specified
+        issparse = scipy.sparse.issparse(x)
+        
+        if batching:
+            x_v = x.T  ## transpose into column vectors
+        else:
+            x_v = x.reshape(-1, 1)  ## reshape 2D array into a column vector
+        
+        if issparse:
+            x_v = x_v.tocsc()
+        
+        out_v = self.dt @ x_v  ## if sparse, then 'out_v' will be a csc matrix
+            
+        ## crop the output to the correct size
+        if mode == 'full':
+            p_t = 0
+            p_b = self.so[0]+1
+            p_l = 0
+            p_r = self.so[1]+1
+        if mode == 'same':
+            p_t = (self.k.shape[0]-1)//2
+            p_b = -(self.k.shape[0]-1)//2
+            p_l = (self.k.shape[1]-1)//2
+            p_r = -(self.k.shape[1]-1)//2
+
+            p_b = self.x_shape[0]+1 if p_b==0 else p_b
+            p_r = self.x_shape[1]+1 if p_r==0 else p_r
+        if mode == 'valid':
+            p_t = (self.k.shape[0]-1)
+            p_b = -(self.k.shape[0]-1)
+            p_l = (self.k.shape[1]-1)
+            p_r = -(self.k.shape[1]-1)
+
+            p_b = self.x_shape[0]+1 if p_b==0 else p_b
+            p_r = self.x_shape[1]+1 if p_r==0 else p_r
+        
+        if batching:
+            idx_crop = np.zeros((self.so), dtype=np.bool8)
+            idx_crop[p_t:p_b, p_l:p_r] = True
+            idx_crop = idx_crop.reshape(-1)
+            out = out_v[idx_crop,:].T
+        else:
+            if issparse:
+                out = out_v.reshape((self.so)).tocsc()[p_t:p_b, p_l:p_r]
+            else:
+                out = out_v.reshape((self.so))[p_t:p_b, p_l:p_r]  ## reshape back into 2D array and crop
+        return out
+    
+    def _roll_sparse(
+        self,
+        x,
+        shift,
+    ):
+        """
+        Roll columns of a sparse matrix.
+        """
+        out = x.copy()
+        out.row += shift
+        return out
+
+def cosine_kernel_2D(center=(5,5), image_size=(11,11), width=5):
+    """
+    Generate a 2D cosine kernel
+    RH 2021
+    
+    Args:
+        center (tuple):  
+            The mean position (X, Y) - where high value expected. 0-indexed. Make second value 0 to make 1D
+        image_size (tuple): 
+            The total image size (width, height). Make second value 0 to make 1D
+        width (scalar): 
+            The full width of one cycle of the cosine
+    
+    Return:
+        k_cos (np.ndarray): 
+            2D or 1D array of the cosine kernel
+    """
+    x, y = np.meshgrid(range(image_size[1]), range(image_size[0]))  # note dim 1:X and dim 2:Y
+    dist = np.sqrt((y - int(center[1])) ** 2 + (x - int(center[0])) ** 2)
+    dist_scaled = (dist/(width/2))*np.pi
+    dist_scaled[np.abs(dist_scaled > np.pi)] = np.pi
+    k_cos = (np.cos(dist_scaled) + 1)/2
+    return k_cos
