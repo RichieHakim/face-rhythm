@@ -2,7 +2,7 @@ from typing import Union
 import time
 
 import numpy as np
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import decord
 import cv2
 import torch
@@ -10,19 +10,33 @@ import torch
 from .util import FR_Module
 from .data_importing import Dataset_videos
 from .rois import ROIs
-from .helpers import make_batches, BufferedVideoReader
+from .helpers import BufferedVideoReader
 from .video_playback import visualize_image_with_points
 
 ## Define class for performing point tracking using optical flow
 class PointTracker(FR_Module):
     def __init__(
         self,
-        dataset_videos: Dataset_videos,
+        buffered_video_reader: BufferedVideoReader,
         rois_points: ROIs,
         rois_masks: ROIs=None,
         contiguous: bool=False,
-        batch_size: int=1000,
-        params_optical_flow: dict=None,
+        params_optical_flow: dict={
+                        "method": "lucas_kanade",  # method for optical flow. Only "lucas_kanade" is supported for now.
+                        "point_spacing": 10,  ## spacing between points, in pixels
+                        "mesh_rigidity": 0.005,  ## Rigidity of mesh. Changes depending on point spacing.
+                        "relaxation": 0.5,  ## How quickly points relax back to their original position.
+                        "kwargs_method": {
+                            "winSize": (15,15),  ## Size of window to use for optical flow
+                            "maxLevel": 2,  ## Maximum number of pyramid levels
+                            "criteria": (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),  ## Stopping criteria for optical flow optimization
+                        },
+                    },
+        params_outlier_handling: dict={
+                        'threshold_displacement': 25,  ## Maximum displacement between frames, in pixels.
+                        'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
+                        'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
+                    },
         visualize_video: bool=False,
         verbose: Union[bool, int]=1,
     ):
@@ -32,9 +46,9 @@ class PointTracker(FR_Module):
          to track, and prepares masks for the video.
 
         Args:
-            dataset_videos (Dataset_videos):
-                A Dataset_videos object, containing the videos to track.
-                Object comes from data_importing.Dataset_videos.
+            buffered_video_reader (BuffereVideoReader):
+                A BufferedVideoReader object, containing the videos to track.
+                Object comes from fr.helpers.BufferedVideoReader
             rois_points (2D array of booleans or list of 2D arrays of booleans):
                 An ROI is a 2D array of booleans, where True indicates a pixel
                  that is within the region of interest.
@@ -55,19 +69,40 @@ class PointTracker(FR_Module):
                 Parameters for optical flow.
                 If None, the following parameters will be used:
                     params_optical_flow = {
-                        "method": "lucas_kanade",
-                        "point_spacing": 10,
-                        "mesh_rigidity": 0.005,
-                        "relaxation": 0.5,
+                        "method": "lucas_kanade",  # method for optical flow. Only "lucas_kanade" is supported for now.
+                        "point_spacing": 10,  ## spacing between points, in pixels
+                        "mesh_rigidity": 0.005,  ## Rigidity of mesh. Changes depending on point spacing.
+                        "relaxation": 0.5,  ## How quickly points relax back to their original position.
                         "kwargs_method": {
-                            "winSize": (15,15),
-                            "maxLevel": 2,
-                            "criteria": (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+                            "winSize": (15,15),  ## Size of window to use for optical flow
+                            "maxLevel": 2,  ## Maximum number of pyramid levels
+                            "criteria": (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),  ## Stopping criteria for optical flow optimization
                         },
                     }
                 See https://docs.opencv.org/3.4/d4/dee/tutorial_optical_flow.html
                  and https://docs.opencv.org/3.4/dc/d6b/group__video__track.html#ga473e4b886d0bcc6b65831eb88ed93323
                  for more information about the lucas kanade optical flow parameters.
+            params_outlier_handling (dict, optional):
+                Parameters for outlier handling.
+                Outliers/violations are frames when a point goes beyond a
+                 threshold distance from its original position. For these
+                 frames, the violating point has its velocity frozen for
+                 'framesHalted_before' frames before and 'framesHalted_after'
+                 frames after the violation.
+                If None, the following parameters will be used:
+                    params_outlier_handling = {
+                        'threshold_displacement': 25,  ## Maximum displacement between frames, in pixels.
+                        'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
+                        'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
+                    }
+            violation_threshold_displacement (float, optional):
+                The maximum displacement, in pixels, that a point can
+                 be displaced from its original position before it is
+                 considered a violation and the velocity of that point is
+                 halted for violation_framesHalted_before before and
+                 violation_framesHalted_after after the violation.
+            violation_framesHalted_before (int, optional):
+                The number of frames before a violation that the velocity
             visualize_video (bool, optional):
                 Whether or not to visualize the video.
                 If on a server or system without a display, this should be False.
@@ -83,11 +118,12 @@ class PointTracker(FR_Module):
         ## Set variables
         self._contiguous = bool(contiguous)
         self._verbose = int(verbose)
-        self._batch_size = int(batch_size)
         self._visualize_video = bool(visualize_video)
 
-        ## Assert that dataset_videos is either a data_importing.Dataset_videos object or a fr.helpers.BufferedVideoReader object
-        assert (isinstance(dataset_videos, Dataset_videos) or isinstance(dataset_videos, BufferedVideoReader)), "dataset_videos must be a data_importing.Dataset_videos object or a fr.helpers.BufferedVideoReader object."
+        ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
+        # print(type(buffered_video_reader))
+        # print(isinstance(buffered_video_reader, BufferedVideoReader))
+        assert isinstance(buffered_video_reader, BufferedVideoReader), "buffered_video_reader must be a fr.helpers.BufferedVideoReader object."
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
         if isinstance(rois_points, np.ndarray):
             rois_points = [rois_points]
@@ -96,11 +132,6 @@ class PointTracker(FR_Module):
         assert isinstance(rois_points, list) and all([isinstance(roi, np.ndarray) for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
         assert all([roi.ndim == 2 for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
         assert all([roi.dtype == bool for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
-        
-
-        ## Set decord bridge (backend for video reading)
-        print("FR INFO: Setting decord bridge to 'torch'") if self._verbose > 1 else None
-        decord.bridge.set_bridge('torch')
         
         ## Set parameters for optical flow
         print("FR: Setting parameters for optical flow") if self._verbose > 1 else None
@@ -137,25 +168,34 @@ class PointTracker(FR_Module):
         ## Collapse masks into single mask
         print(f"FR: Collapsing mask ROI images into single mask") if self._verbose > 1 else None
         if rois_masks is None:
-            self.mask = torch.ones(dataset_videos[0][0].shape[:2], dtype=bool)
+            self.mask = torch.ones(buffered_video_reader[0][0].shape[:2], dtype=bool)
         else:
             self.mask = torch.as_tensor(np.stack((rois_masks), axis=0).all(axis=0)).type(torch.bool)
 
-        ## Store dataset_videos
-        self.dataset_videos = dataset_videos
+        ## Store buffered_video_reader
+        self.buffered_video_reader = buffered_video_reader
+        ## Prepare video(s)
+        self.buffered_video_reader.method_getitem = "by_video"
+        if self._contiguous:
+            video = self.buffered_video_reader
+            video.method_getitem = "continuous"
+            video.set_iterator_frame_idx(0)
+            self.videos = [video]
+        else:
+            self.buffered_video_reader.method_getitem = "by_video"
+            self.videos = [vid for vid in self.buffered_video_reader]
 
         ## Initialize mesh distances
         print("FR: Initializing mesh distances") if self._verbose > 1 else None
         p_0 = torch.as_tensor(self.point_positions.copy(), dtype=torch.float32)
         self.neighbors = torch.argsort(torch.linalg.norm(p_0.T[:,:,None] - p_0.T[:,None,:], ord=2, dim=0), dim=1)[:,:self.params_optical_flow["mesh_n_neighbors"]]
-        self.d_0 = vector_distance_scripted(torch.as_tensor(self.point_positions.copy(), dtype=torch.float32), self.neighbors)
+        self.d_0 = _vector_distance(torch.as_tensor(self.point_positions.copy(), dtype=torch.float32), self.neighbors)
         
         self.points_tracked = []
 
         ## For FR_Module compatibility
         self.config = {
             "contiguous": self._contiguous,
-            "batch_size": self._batch_size,
             "visualize_video": self._visualize_video,
             "params_optical_flow": self.params_optical_flow,
             "verbose": self._verbose,
@@ -220,40 +260,37 @@ class PointTracker(FR_Module):
         Tracks points in videos using specified parameters, roi_points,
          and roi_masks.
         """
+        ## Initialize points_tracked
         self.points_tracked = []
+
+        ## Set the initial frame_prev as the first frame of the video
+        # self.buffered_video_reader.method_getitem = "continuous"
+        frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=self.buffered_video_reader.get_frames_from_continuous_index(0), mask=self.mask)[0]
+        ## Set the inital points_prev as the original points
+        points_prev = self.point_positions.copy()
+
+        
         ## Iterate through videos
-        for i_video, video in tqdm(
-            enumerate(self.dataset_videos), 
+        for ii, video in tqdm(
+            enumerate(self.videos), 
             desc='video #', 
             position=0, 
             leave=True, 
             disable=self._verbose < 2, 
-            total=len(self.dataset_videos)
+            total=len(self.videos)
         ):
-            ## If contiguous, use the last frame of the previous video
-            if self._contiguous and i_video > 0:
-                points_prev = points[-1]
-                frame_prev = frame_last
-            ## Otherwise, use the first frame of the current video
-            else:
-                points_prev = self.point_positions
-                ## Get a frame from the video and add a singleton dimension to the front if needed
-                frame_tmp = video[0]
-                frame_tmp = frame_tmp[None, ...] if frame_tmp.ndim == 3 else frame_tmp
-                frame_prev = self._format_decordTorchVideo_for_opticalFlow(frame_tmp, mask=self.mask)[0,...]
+            ## If the video is not contiguous, set the iterator to the first frame
+            frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(0), mask=self.mask)[0] if not self._contiguous else frame_prev
 
-            ## Call point tracking function
-            points, frame_last = self._track_points_singleVideo(video=video, points_prev=points_prev, frame_prev=frame_prev, batch_size=self._batch_size)
-
-            ## Store points
+            points, frame_prev = self._track_points_singleVideo(
+                video=video,
+                points_prev=points_prev,
+                frame_prev=frame_prev,
+            )
             self.points_tracked.append(points)
 
-        ## Concatenate points from all videos if contiguous
-        if self._contiguous:
-            print(f"FR: Concatenating points from {len(self.points_tracked)} videos to make contiguous") if self._verbose > 1 else None
-            self.points_tracked = [np.concatenate(self.points_tracked, axis=0)]
         print(f"FR: Tracking complete") if self._verbose > 1 else None
-        print(f"FR: Placing poitns_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
+        print(f"FR: Placing points_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
         self.points_tracked = {f"{ii}": points for ii, points in enumerate(self.points_tracked)}
 
         ## For FR_Module compatibility
@@ -265,14 +302,13 @@ class PointTracker(FR_Module):
         video,
         points_prev,
         frame_prev,
-        batch_size=1000,
     ):
         """
         Track points in a single video.
         
         Args:
-            video (Dataset_videos):
-                A decord VideoReader object.
+            video (BufferedVideoReader):
+                A BufferedVideoReader object.
                 Should be a single video object, where iterating over
                  the object returns frames. The frames should either
                   be 3D arrays of shape (height, width, channels) or
@@ -293,8 +329,6 @@ class PointTracker(FR_Module):
             frame_last (np.ndarray, uint8):
                 Last frame of the video. Formatted correctly.
         """
-        ## Assert that video is a decord VideoReader object
-        # assert isinstance(video, decord.VideoReader), "FR ERROR: video must be a decord VideoReader object"
         ## Assert that points_prev is a 2D array of integers
         assert isinstance(points_prev, np.ndarray), "FR ERROR: points_prev must be a numpy array"
         assert points_prev.ndim == 2, "FR ERROR: points_prev must be a 2D array"
@@ -303,48 +337,28 @@ class PointTracker(FR_Module):
         ## Preallocate points
         points_tracked = np.zeros((len(video), points_prev.shape[0], 2), dtype=np.float32)
 
-        ## Make batches
-        batches = make_batches(
-            iterable=video,
-            batch_size=batch_size,
-            length=len(video),
-        )
-
-        ## Iterate through batches
-        for i_batch, batch in tqdm(
-            enumerate(batches),
-            desc='batch #', 
-            position=1, 
-            leave=False, 
-            disable=self._verbose < 2, 
-            total=np.ceil(len(video)/batch_size).astype(int)
+        ## Iterate through frames
+        video.set_iterator_frame_idx(0)
+        for i_frame, frame in tqdm(
+            enumerate(video),
+            desc='frame #',
+            position=1,
+            leave=False,
+            disable=self._verbose < 2,
+            total=len(video)
         ):
-            ## Format batch
-            batch = self._format_decordTorchVideo_for_opticalFlow(batch, mask=self.mask)
+            frame_new = self._format_decordTorchVideo_for_opticalFlow(vid=frame[None,...], mask=self.mask)[0]
+            points_tracked[i_frame] = self._track_points_singleFrame(
+                frame_new=frame_new,
+                frame_prev=frame_prev,
+                points_prev=points_prev,
+            )
+            frame_prev = frame_new
+            points_prev = points_tracked[i_frame]
+            # frame_prev= np.roll(frame_prev, 1, axis=0)
 
-            ## Iterate through frames in batch
-            for i_frame, frame in tqdm(
-                enumerate(batch),
-                desc='frame #',
-                position=2,
-                leave=False,
-                disable=self._verbose < 2,
-                total=len(batch)
-            ):
-                ## Track points
-                points_tracked[i_batch*batch_size + i_frame] = self._track_points_singleFrame(
-                    frame_new=frame,
-                    frame_prev=frame_prev,
-                    points_prev=points_prev,
-                )
+        return points_tracked, frame_prev
 
-                ## Update frame_prev
-                frame_prev = frame
-                ## Update points_prev
-                points_prev = points_tracked[i_batch*batch_size + i_frame]
-
-        frame_last = frame
-        return points_tracked, frame_last
 
     def _track_points_singleFrame(self, frame_new, frame_prev, points_prev):
         """
@@ -370,12 +384,12 @@ class PointTracker(FR_Module):
             visualize_image_with_points(
                 image=cv2.cvtColor(frame_new, cv2.COLOR_GRAY2BGR),
                 points=points_new[None,...].astype(np.int64),
-                points_colors=(255,255,255),
+                points_colors=(0,255,255),
+                alpha=0.3,
                 points_sizes=1,
                 text=None,
                 display=True,
                 writer_cv2=None,
-                in_place=False,
                 error_checking=False,
             )
 
@@ -387,21 +401,19 @@ class PointTracker(FR_Module):
         
         Args:
             vid (decord NDAdarray):
-                A 3D or 4D array of numbers, where each element is a pixel
+                A 4D array of numbers, where each element is a pixel
                  value. Last dimension should be channels.
+                 (batch, height, width, channels)
             mask (np.ndarray, bool):
 
         Returns:
             vid (np.ndarray, uint8):
-                A 2D array of integers, where each element is a pixel
+                A 3D array of integers, where each element is a pixel
                  value.
+                 (batch, height, width)
         """
-        ## Collapse channels
-        vid = vid.type(torch.float32).mean(dim=-1).type(torch.uint8)
-
-        ## Mask video
-        if mask is not None:
-            vid *= mask[None, :, :]
+        ## Collapse channels and mask video
+        vid = _helper_format_decordTorchVideo_for_opticalFlow(vid, mask=mask)
 
         ## Convert to numpy array
         vid = vid.numpy()
@@ -432,7 +444,7 @@ class PointTracker(FR_Module):
             raise ValueError("FR ERROR: optical flow method not recognized")
 
         ## Apply mesh_rigity force
-        points_new -= (vector_displacement_scripted(torch.as_tensor(points_new, dtype=torch.float32), self.d_0, self.neighbors)*self.params_optical_flow['mesh_rigidity']).numpy()
+        points_new -= (_vector_displacement(torch.as_tensor(points_new, dtype=torch.float32), self.d_0, self.neighbors)*self.params_optical_flow['mesh_rigidity']).numpy()
 
         ## Apply relaxation force
         points_new -= (points_new-self.point_positions)*self.params_optical_flow['relaxation']
@@ -447,7 +459,19 @@ class PointTracker(FR_Module):
     def __next__(self): return next(self.points_tracked)
     
 
-def vector_distance(pi, neighbors):
+@torch.jit.script
+def _helper_format_decordTorchVideo_for_opticalFlow(vid, mask=None):
+    ## Collapse channels
+    vid = vid.type(torch.float32).mean(dim=-1).type(torch.uint8)
+
+    ## Mask video
+    if mask is not None:
+        return vid * mask[None, :, :]
+    else:
+        return vid
+
+@torch.jit.script
+def _vector_distance(pi, neighbors):
     """
     Calculate the distance between each point and its neighbors.
 
@@ -469,9 +493,9 @@ def vector_distance(pi, neighbors):
     d = pm - pi.T[:, neighbors]
     d2m = d.mean(2).T
     return d2m
-vector_distance_scripted = torch.jit.script(vector_distance)
 
-def vector_displacement(di, dj, neighbors):
+@torch.jit.script
+def _vector_displacement(di, dj, neighbors):
     """
     Calculate the displacement between each point and its
      neighbors relative to a reference distance (dj).
@@ -494,5 +518,4 @@ def vector_displacement(di, dj, neighbors):
              each point and its neighbors relative to the reference
              distance.
     """
-    return vector_distance_scripted(di, neighbors) - dj
-vector_displacement_scripted = torch.jit.script(vector_displacement)
+    return _vector_distance(di, neighbors) - dj

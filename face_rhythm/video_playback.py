@@ -5,7 +5,8 @@ def visualize_image_with_points(
     image,
     points=None,
 
-    points_colors=(255, 255, 255),
+    points_colors=(0, 255, 255),
+    alpha=1.0,
     points_sizes=1,
     
     text=None,
@@ -18,7 +19,6 @@ def visualize_image_with_points(
     handle_cv2Imshow='FaceRhythmPointVisualizer',
     writer_cv2=None,
 
-    in_place=False,
     error_checking=False,
 ):
     """
@@ -42,6 +42,9 @@ def visualize_image_with_points(
             If list: Each element is a color for a batch of points.
                 Length of list must match the first dimension of points.
                 points must be 3D array.
+        alpha (float):
+            Transparency of points.
+            Note that values other than 1 will be slow for now.
         points_sizes (int or list):
             Used as argument for cv2.circle.
             If int: All points will be this size.
@@ -79,8 +82,6 @@ def visualize_image_with_points(
             Can be used to close window later.
         writer_cv2 (cv2.VideoWriter):
             If not None: Write image to video using writer_cv2.write.
-        in_place (bool):
-            If True: Modify image in place. Otherwise, return a copy.
         error_checking (bool):
             If True: Perform error checking.
 
@@ -158,9 +159,8 @@ def visualize_image_with_points(
             assert all([isinstance(thickness, int) for thickness in text_thickness]), 'All elements of text_thickness must be integers.'
 
 
-    ## Copy image
-    if not in_place:
-        image = image.copy()
+    ## Make a copy of image
+    image_out = image.copy()
 
     ## Convert point colors to list of BGR tuples
     if isinstance(points_colors, tuple) and points is not None:
@@ -192,7 +192,7 @@ def visualize_image_with_points(
         for i_batch in range(points.shape[0]):
             for i_point in range(points.shape[1]):
                 cv2.circle(
-                    img=image,
+                    img=image_out,
                     center=tuple(points[i_batch][i_point]),
                     radius=points_sizes[i_batch],
                     color=points_colors[i_batch],
@@ -204,7 +204,7 @@ def visualize_image_with_points(
         ## Plot text
         for i in range(len(text)):
             cv2.putText(
-                img=image,
+                img=image_out,
                 text=text[i],
                 org=tuple(text_positions[i, :]),
                 fontFace=cv2.FONT_HERSHEY_SIMPLEX,
@@ -213,13 +213,16 @@ def visualize_image_with_points(
                 thickness=text_thickness[i],
             )
 
-    ## Display image
+    if alpha != 1.0:
+        image_out = cv2.addWeighted(image_out, alpha, image, 1 - alpha, 0)
+
+    ## Display image_out
     if display:
-        cv2.imshow(handle_cv2Imshow, image)
+        cv2.imshow(handle_cv2Imshow, image_out)
         cv2.waitKey(1)
 
-    ## Write image
+    ## Write image_out
     if writer_cv2 is not None:
-        writer_cv2.write(image)
+        writer_cv2.write(image_out)
 
-    return image
+    return image_out
