@@ -292,6 +292,7 @@ class BufferedVideoReader:
         prefetch: int=2,
         method_getitem: str='continuous',
         starting_seek_position: int=0,
+        backend: str='torch',
         verbose: int=1,
     ):
         """
@@ -325,6 +326,14 @@ class BufferedVideoReader:
             'by_video' - index must specify video index and frame 
                 index:
                 - reader[idx] where idx: tuple=(int: idx_video, slice: idx_frames)
+        starting_seek_position (int):
+            Starting frame index to start iterator from.
+            Only used when method_getitem=='continuous' and
+             using the iterator method.
+        backend (str):
+            Backend to use for loading frames.
+            See decord documentation for options.
+            ('torch', 'numpy', 'mxnet', ...)
         verbose (int):
             Verbosity level.
             0: no output
@@ -336,6 +345,7 @@ class BufferedVideoReader:
         self._verbose = verbose
         self.buffer_size = buffer_size
         self.prefetch = prefetch
+        self._backend = backend
 
         ## Check inputs
         if isinstance(video_readers, decord.VideoReader):
@@ -361,6 +371,8 @@ class BufferedVideoReader:
             # assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
         ## Assert that method_getitem is valid
         assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
+        ## Check if backend is valid by trying to set it here (only works fully when used in the _load_frames method)
+        decord.bridge.set_bridge(self._backend)
 
 
         self.video_readers = video_readers
@@ -462,7 +474,7 @@ class BufferedVideoReader:
                 Thread to wait for before loading.
         """
         ## Set backend of decord to PyTorch
-        decord.bridge.set_bridge('torch')
+        decord.bridge.set_bridge(self._backend)
         ## Wait for the previous slot to finish loading
         if blocking_thread is not None:
             blocking_thread.join()
