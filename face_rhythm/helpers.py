@@ -272,7 +272,10 @@ class BufferedVideoReader:
 
     Optimal use case:
     1. Create a _BufferedVideoReader object
-    2. Call batches of frames sequentially. Going backwards is
+    EITHER 2A. Set method_getitem to 'continuous' and iterate over the
+        object. This will read frames continuously in the
+        background. This is the fastest way to read frames.
+    OR 2B. Call batches of frames sequentially. Going backwards is
         slow. Buffers move forward.
     3. Each batch should be within a buffer. There should be no
         batch slices that overlap multiple buffers. Eg. if the
@@ -284,6 +287,30 @@ class BufferedVideoReader:
 
     RH 2022
     """
+
+    __slots__ = (
+        "__dict__",
+        "boundaries",
+        "buffer_size",
+        "loaded",
+        "loading",
+        "lookup",
+        "method_getitem",
+        "num_videos",
+        "paths_videos",
+        "prefetch",
+        "slots", 
+        "total_frames",
+        "video_lengths",
+        "video_readers",
+        "_backend",
+        "_cumulative_frame_end",
+        "_cumulative_frame_start",
+        "_iterator_frame",
+        "_start_frame_continuous",
+        "_verbose",
+        )
+
     def __init__(
         self,
         video_readers: list=None,
