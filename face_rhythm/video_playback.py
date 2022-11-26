@@ -71,11 +71,11 @@ class FrameVisualizer:
             image (np.ndarray, uint8):
                 3D array of integers, where each element is a 
                 pixel value. Last dimension should be channels.
-            points (np.ndarray, int):
-                3D array: First dimension is batch of points to plot.
+            points (list of np.ndarray, int):
+                list of 2D array: List elements are batches of points.
                     Each batch can have different colors and sizes.
-                    Second dimension is point number, and third dimension
-                    is point coordinates. Order (x,y).
+                    First dimension of each array is point number, and
+                     second dimension is point coordinates. Order (x,y).
             point_sizes (int or list):
                 Used as argument for cv2.circle.
                 If int: All points will be this size.
@@ -141,14 +141,18 @@ class FrameVisualizer:
 
             ## Check points
             if points is not None:
-                assert isinstance(points, np.ndarray), 'points must be a numpy array.'
-                assert points.dtype == int, 'points must be a numpy array of int.'
-                assert points.ndim == 3, 'points must be a 3D array.'
-                assert points.shape[-1] == 2, 'points must have 2 coordinates.'
-                assert np.all(points >= 0), 'points must be non-negative.'
-                assert np.all(points[:, :, 1] < image.shape[0]), 'points must be within image.'
-                assert np.all(points[:, :, 0] < image.shape[1]), 'points must be within image.'
-            
+                assert isinstance(points, list), 'points must be a list.'
+                assert len(points) > 0, 'points must have at least one element.'
+                assert isinstance(points[0], np.ndarray), 'points must be a list of numpy arrays.'
+                assert points[0].dtype == np.int, 'points must be a list of numpy arrays of int.'
+                assert points[0].ndim == 2, 'points must be a list of 2D numpy arrays.'
+                assert points[0].shape[1] == 2, 'points must be a list of 2D numpy arrays with 2 columns.'
+                ## all points must be non-negative
+                assert np.all([np.all(points[i] >= 0) for i in range(len(points))]), 'points must be non-negative.'
+                ## all points must be within image
+                assert np.all([np.all(points[i][:,0] < image.shape[1]) for i in range(len(points))]), 'points must be within image.'
+                assert np.all([np.all(points[i][:,1] < image.shape[0]) for i in range(len(points))]), 'points must be within image.'
+
             ## Check points_sizes
             assert isinstance(point_sizes, (int, list)), 'points_sizes must be an integer or a list.'
             if isinstance(point_sizes, list):
@@ -205,7 +209,7 @@ class FrameVisualizer:
 
         ## Convert point colors to list of BGR tuples
         if isinstance(points_colors, tuple) and points is not None:
-            points_colors = [points_colors] * points.shape[0]
+            points_colors = [points_colors] * len(points)
 
         ## Convert text to list
         if isinstance(text, str):
@@ -213,7 +217,7 @@ class FrameVisualizer:
 
         ## Convert points_sizes to list
         if isinstance(point_sizes, int) and points is not None:
-            point_sizes = [point_sizes] * points.shape[0]
+            point_sizes = [point_sizes] * len(points)
 
         ## Convert text_color to list
         if isinstance(text_color, str):
@@ -239,9 +243,8 @@ class FrameVisualizer:
                         color=points_colors[i_batch],
                         thickness=-1,
                     )
-                ## Do weighted addition
-                image_out = cv2.addWeighted(image_out, alpha, image, (1-alpha), 0.0)
-                # image_out = cv2.add(image, image_out)
+            ## Do weighted addition
+            image_out = cv2.addWeighted(image_out, alpha, image, (1-alpha), 0.0)
 
         ## Plot text
         if text is not None:

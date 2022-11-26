@@ -39,7 +39,6 @@ class PointTracker(FR_Module):
                     },
         visualize_video: bool=False,
         params_visualization: dict={
-                        'points_colors':(0, 255, 255),
                         'alpha':1.0,
                         'point_sizes':1,
                         'writer_cv2':None,
@@ -101,17 +100,19 @@ class PointTracker(FR_Module):
                         'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
                         'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
                     }
-            violation_threshold_displacement (float, optional):
-                The maximum displacement, in pixels, that a point can
-                 be displaced from its original position before it is
-                 considered a violation and the velocity of that point is
-                 halted for violation_framesHalted_before before and
-                 violation_framesHalted_after after the violation.
-            violation_framesHalted_before (int, optional):
-                The number of frames before a violation that the velocity
             visualize_video (bool, optional):
                 Whether or not to visualize the video.
                 If on a server or system without a display, this should be False.
+            params_visualization (dict, optional):
+                Parameters for visualization.
+                If None, the following parameters will be used:
+                    params_visualization = {
+                        'alpha':1.0,
+                        'point_sizes':1,
+                        'writer_cv2':None,
+                    }
+                See fr.video_playback.FrameVisualizer for more information.
+                Leave out 'points_colors' as this is reserved for outlier coloring.
             verbose (bool or int, optional):
                 Whether or not to print progress updates.
                 0: no progress updates
@@ -126,8 +127,10 @@ class PointTracker(FR_Module):
         self._verbose = int(verbose)
         self._visualize_video = bool(visualize_video)
         self._params_visualization = params_visualization.copy()
+        self._params_outlier_handling = params_outlier_handling.copy()
 
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
+        type(buffered_video_reader)  ## For some reason this line is necessary for the next line to work
         assert isinstance(buffered_video_reader, BufferedVideoReader), "buffered_video_reader must be a fr.helpers.BufferedVideoReader object."
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
         if isinstance(rois_points, np.ndarray):
@@ -199,6 +202,12 @@ class PointTracker(FR_Module):
         ## Preallocate points_tracked (will be overwrittenw with another empty list)
         self.points_tracked = []
 
+        ## Prepare violation tracker
+        self._pointIdx_violations_current = np.zeros((self.point_positions.shape[0]), dtype=bool)
+        self._pointIdx_violations_countdown = np.zeros((self.point_positions.shape[0]), dtype=int)
+        self._duration_violation_frames = self._params_outlier_handling["framesHalted_before"] + self._params_outlier_handling["framesHalted_after"]
+        self._violation_event = False
+        
         ## Prepare a playback visualizer
         if self._visualize_video:
             print("FR: Preparing playback visualizer") if self._verbose > 1 else None
@@ -355,23 +364,45 @@ class PointTracker(FR_Module):
         points_tracked = np.zeros((len(video), points_prev.shape[0], 2), dtype=np.float32)
 
         ## Iterate through frames
+        # video.set_iterator_frame_idx(0)
+        # for i_frame, frame in tqdm(
+        #     enumerate(video),
+        #     desc='frame #',
+        #     position=1,
+        #     leave=False,
+        #     disable=self._verbose < 2,
+        #     total=len(video)
+        # ):
+        i_frame = 0
         video.set_iterator_frame_idx(0)
-        for i_frame, frame in tqdm(
-            enumerate(video),
-            desc='frame #',
-            position=1,
-            leave=False,
-            disable=self._verbose < 2,
-            total=len(video)
-        ):
-            frame_new = self._format_decordTorchVideo_for_opticalFlow(vid=frame[None,...], mask=self.mask)[0]
-            points_tracked[i_frame] = self._track_points_singleFrame(
-                frame_new=frame_new,
-                frame_prev=frame_prev,
-                points_prev=points_prev,
-            )
-            frame_prev = frame_new
-            points_prev = points_tracked[i_frame]
+        with tqdm(total=len(video), desc='frame #', position=1, leave=False, disable=self._verbose < 2) as pbar:
+            while (i_frame < len(video)):
+                for frame in video:
+                    frame_new = self._format_decordTorchVideo_for_opticalFlow(vid=frame[None,...], mask=self.mask)[0]
+                    points_tracked[i_frame] = self._track_points_singleFrame(
+                        frame_new=frame_new,
+                        frame_prev=frame_prev,
+                        points_prev=points_prev,
+                    )
+                    frame_prev = frame_new
+                    points_prev = points_tracked[i_frame]
+
+                    # print(i_frame)
+                    # print(np.where(self._pointIdx_violations_current)[0])
+                    if self._violation_event:
+                        # print('FUCK')
+                        self._violation_event = False
+                        i_frame = max(i_frame - self._params_outlier_handling['framesHalted_before'], 0)
+                        frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(max(i_frame-1,0)), mask=self.mask)[0]
+                        video.set_iterator_frame_idx(i_frame)
+                        points_prev = points_tracked[i_frame]
+                        break
+
+                    pbar.n = i_frame
+                    i_frame += 1
+                    ## Update progress bar
+                    pbar.update(1)
+
 
         ## clear buffered_video_reader
         video.delete_all_slots()
@@ -398,17 +429,52 @@ class PointTracker(FR_Module):
         ## Call optical flow function
         points_new = self._optical_flow(frame_new=frame_new, frame_prev=frame_prev, points_prev=points_prev)
 
+        ## Update violations
+        self._update_violations(points_new=points_new)
+
         ## Visualize points
         if self._visualize_video:
             self.visualizer.visualize_image_with_points(
                 image=cv2.cvtColor(frame_new, cv2.COLOR_GRAY2BGR),
-                points=points_new[None,...].astype(np.int64),
+                # points=points_new[None,...].astype(np.int64),
+                points=[points_new[self._pointIdx_violations_current].astype(np.int64), points_new[~self._pointIdx_violations_current].astype(np.int64)],
+                points_colors=[(0,0,255), (0,255,0)],
                 display=True,
                 error_checking=True,
                 **self._params_visualization,
             )
 
         return points_new
+
+    def _update_violations(self, points_new):
+        """
+        Update violations.
+        Finds points that violate the max displacement threshold.
+        Sets the countdown for these points.
+        Updates the countdown for existing violating points.
+        Updates the violation event flag.
+        Updates the current violation points.
+
+        Args:
+            points_new (np.ndarray, np.float32):
+                The points that have been tracked. Order (x,y).
+                A 2D array of np.float32, where each row is a point
+                 to track.
+        """
+        displacement = points_new - self.point_positions
+        pointIdx_violations_new = np.linalg.norm(displacement, axis=1) > self._params_outlier_handling['threshold_displacement']
+        ## Find violating neighbors
+        pointIdx_violations_new[self.neighbors.numpy()[pointIdx_violations_new].reshape(-1)] = True
+        ## Determine if a violation event has occurred
+        self._violation_event = np.any(pointIdx_violations_new)
+        ## Update violation countdowns
+        if self._violation_event:
+            self._pointIdx_violations_countdown[self._pointIdx_violations_current] += self._params_outlier_handling['framesHalted_before'] + 1
+        self._pointIdx_violations_countdown[pointIdx_violations_new] = self._duration_violation_frames + 1
+        self._pointIdx_violations_countdown -= 1
+        ## Find all points that are currently violating
+        self._pointIdx_violations_current = self._pointIdx_violations_countdown > 0
+
 
     def _format_decordTorchVideo_for_opticalFlow(self, vid, mask=None):
         """
@@ -456,6 +522,9 @@ class PointTracker(FR_Module):
             points_new, status, err = cv2.calcOpticalFlowPyrLK(frame_prev, frame_new, points_prev, None, **self.params_optical_flow['kwargs_method'])
         else:
             raise ValueError("FR ERROR: optical flow method not recognized")
+
+        ## Freeze violating points
+        points_new[self._pointIdx_violations_current] = points_prev[self._pointIdx_violations_current]
 
         ## Apply mesh_rigity force
         points_new -= (_vector_displacement(torch.as_tensor(points_new, dtype=torch.float32), self.d_0, self.neighbors)*self.params_optical_flow['mesh_rigidity']).numpy()

@@ -291,29 +291,29 @@ class BufferedVideoReader:
     RH 2022
     """
 
-    __slots__ = (
-        "__dict__",
-        "boundaries",
-        "buffer_size",
-        "loaded",
-        "loading",
-        "lookup",
-        "metadata",
-        "method_getitem",
-        "num_videos",
-        "paths_videos",
-        "prefetch",
-        "slots", 
-        "total_frames",
-        "video_readers",
-        "_cumulative_frame_end",
-        "_cumulative_frame_start",
-        "_decord_backend",
-        "_decord_ctx",
-        "_iterator_frame",
-        "_start_frame_continuous",
-        "_verbose",
-        )
+    # __slots__ = (
+    #     "__dict__",
+    #     "boundaries",
+    #     "buffer_size",
+    #     "loaded",
+    #     "loading",
+    #     "lookup",
+    #     "metadata",
+    #     "method_getitem",
+    #     "num_videos",
+    #     "paths_videos",
+    #     "prefetch",
+    #     "slots", 
+    #     "total_frames",
+    #     "video_readers",
+    #     "_cumulative_frame_end",
+    #     "_cumulative_frame_start",
+    #     "_decord_backend",
+    #     "_decord_ctx",
+    #     "_iterator_frame",
+    #     "_start_frame_continuous",
+    #     "_verbose",
+    #     )
 
     def __init__(
         self,
