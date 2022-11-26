@@ -405,6 +405,7 @@ class BufferedVideoReader:
         else:
             print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
             assert isinstance(video_readers, list), "video_readers must be list of decord.VideoReader objects"
+            self.paths_videos = None
             # assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
         ## Assert that method_getitem is valid
         assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
@@ -476,7 +477,7 @@ class BufferedVideoReader:
         print("FR: Collecting video metadata...") if self._verbose > 1 else None
         metadata = {"paths_videos": self.paths_videos}
         num_frames, frame_rate, frame_height_width, num_channels = [], [], [], []
-        for v in tqdm(video_readers):
+        for v in tqdm(video_readers, disable=(self._verbose < 2)):
             num_frames.append(int(len(v)))
             frame_rate.append(float(v.get_avg_fps()))
             frame_tmp = v[0]
@@ -644,14 +645,14 @@ class BufferedVideoReader:
         if isinstance(idx, slice):
             ## convert to a slice
             print(f"FR: Returning new buffered video reader(s). Videos={idx.start} to {idx.stop}.") if self._verbose > 1 else None
-            # return _BufferedVideoReader_singleVideo(self, idx)
             return BufferedVideoReader(
                 video_readers=self.video_readers[idx],
                 buffer_size=self.buffer_size,
                 prefetch=self.prefetch,
                 method_getitem='continuous',
                 starting_seek_position=0,
-                backend=self._decord_backend,
+                decord_backend='torch',
+                decord_ctx=None,
                 verbose=self._verbose,
             )
         print(f"FR: Getting item {idx}") if self._verbose > 1 else None
@@ -802,7 +803,8 @@ class BufferedVideoReader:
                 prefetch=self.prefetch,
                 method_getitem='continuous',
                 starting_seek_position=0,
-                backend=self._decord_backend,
+                decord_backend='torch',
+                decord_ctx=None,
                 verbose=self._verbose,
             ) for idx in range(len(self.video_readers))])
         elif self.method_getitem == 'continuous':

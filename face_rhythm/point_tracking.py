@@ -11,7 +11,7 @@ from .util import FR_Module
 from .data_importing import Dataset_videos
 from .rois import ROIs
 from .helpers import BufferedVideoReader
-from .video_playback import visualize_image_with_points
+from .video_playback import FrameVisualizer
 
 ## Define class for performing point tracking using optical flow
 class PointTracker(FR_Module):
@@ -38,10 +38,10 @@ class PointTracker(FR_Module):
                         'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
                     },
         visualize_video: bool=False,
-        kwargs_visualizeImageWithPoints: dict={
+        params_visualization: dict={
                         'points_colors':(0, 255, 255),
                         'alpha':1.0,
-                        'points_sizes':1,
+                        'point_sizes':1,
                         'writer_cv2':None,
         },
         verbose: Union[bool, int]=1,
@@ -125,7 +125,7 @@ class PointTracker(FR_Module):
         self._contiguous = bool(contiguous)
         self._verbose = int(verbose)
         self._visualize_video = bool(visualize_video)
-        self._kwargs_visualizeImageWithPoints = kwargs_visualizeImageWithPoints.copy()
+        self._params_visualization = params_visualization.copy()
 
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
         # print(type(buffered_video_reader))
@@ -201,23 +201,13 @@ class PointTracker(FR_Module):
         ## Preallocate points_tracked (will be overwrittenw with another empty list)
         self.points_tracked = []
 
-        # ## Make convolutional kernel for dot visualization
-        # if self._visualize_video:
-
-        #         'points_colors':(0, 255, 255),
-        #         'alpha':1.0,
-        #         'points_sizes':1,
-
-        #     diameter = 5
-        #     d = int((diameter//2)*2+1)
-        #     c = int(diameter//2)
-        #     r = diameter/2
-        #     center = r
-        #     k = fr.helpers.cosine_kernel_2D(center=(c,c), image_size=(d,d), width=r*2)**0.05
-
-        #     self._kernel_dot = torch.as_tensor(_make_dot_kernel(5, 1), dtype=torch.float32)
-        #     self._kernel_dot = self._kernel_dot / self._kernel_dot.sum()
-
+        ## Prepare a playback visualizer
+        if self._visualize_video:
+            print("FR: Preparing playback visualizer") if self._verbose > 1 else None
+            self.visualizer = FrameVisualizer(
+                image_height_width=self.buffered_video_reader.frame_height_width,
+                verbose=self._verbose,
+            )
 
 
         ## For FR_Module compatibility
@@ -292,12 +282,14 @@ class PointTracker(FR_Module):
 
         ## Set the initial frame_prev as the first frame of the video
         # self.buffered_video_reader.method_getitem = "continuous"
+        print("FR: Setting initial frame_prev") if self._verbose > 1 else None
         frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=self.buffered_video_reader.get_frames_from_continuous_index(0), mask=self.mask)[0]
         ## Set the inital points_prev as the original points
         points_prev = self.point_positions.copy()
 
         
         ## Iterate through videos
+        print("FR: Iterating point tracking through videos") if self._verbose > 1 else None
         for ii, video in tqdm(
             enumerate(self.videos), 
             desc='video #', 
@@ -309,6 +301,7 @@ class PointTracker(FR_Module):
             ## If the video is not contiguous, set the iterator to the first frame
             frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(0), mask=self.mask)[0] if not self._contiguous else frame_prev
 
+            print(f"FR: Iterating through frames of video {ii}") if self._verbose > 2 else None
             points, frame_prev = self._track_points_singleVideo(
                 video=video,
                 points_prev=points_prev,
@@ -408,13 +401,12 @@ class PointTracker(FR_Module):
 
         ## Visualize points
         if self._visualize_video:
-            visualize_image_with_points(
+            self.visualizer.visualize_image_with_points(
                 image=cv2.cvtColor(frame_new, cv2.COLOR_GRAY2BGR),
                 points=points_new[None,...].astype(np.int64),
-                text=None,
                 display=True,
-                error_checking=False,
-                **self._kwargs_visualizeImageWithPoints,
+                error_checking=True,
+                **self._params_visualization,
             )
 
         return points_new
