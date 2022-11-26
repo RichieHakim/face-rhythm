@@ -22,7 +22,7 @@ class PointTracker(FR_Module):
         rois_masks: ROIs=None,
         contiguous: bool=False,
         params_optical_flow: dict={
-                        "method": "lucas_kanade",  # method for optical flow. Only "lucas_kanade" is supported for now.
+                        "method": "lucas_kanade", ## method for optical flow. Only "lucas_kanade" is supported for now.
                         "point_spacing": 10,  ## spacing between points, in pixels
                         "mesh_rigidity": 0.005,  ## Rigidity of mesh. Changes depending on point spacing.
                         "relaxation": 0.5,  ## How quickly points relax back to their original position.
@@ -75,7 +75,7 @@ class PointTracker(FR_Module):
                 Parameters for optical flow.
                 If None, the following parameters will be used:
                     params_optical_flow = {
-                        "method": "lucas_kanade",  # method for optical flow. Only "lucas_kanade" is supported for now.
+                        "method": "lucas_kanade",  ## method for optical flow. Only "lucas_kanade" is supported for now.
                         "point_spacing": 10,  ## spacing between points, in pixels
                         "mesh_rigidity": 0.005,  ## Rigidity of mesh. Changes depending on point spacing.
                         "relaxation": 0.5,  ## How quickly points relax back to their original position.
@@ -128,8 +128,6 @@ class PointTracker(FR_Module):
         self._params_visualization = params_visualization.copy()
 
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
-        # print(type(buffered_video_reader))
-        # print(isinstance(buffered_video_reader, BufferedVideoReader))
         assert isinstance(buffered_video_reader, BufferedVideoReader), "buffered_video_reader must be a fr.helpers.BufferedVideoReader object."
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
         if isinstance(rois_points, np.ndarray):
@@ -281,7 +279,6 @@ class PointTracker(FR_Module):
         self.points_tracked = []
 
         ## Set the initial frame_prev as the first frame of the video
-        # self.buffered_video_reader.method_getitem = "continuous"
         print("FR: Setting initial frame_prev") if self._verbose > 1 else None
         frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=self.buffered_video_reader.get_frames_from_continuous_index(0), mask=self.mask)[0]
         ## Set the inital points_prev as the original points
@@ -375,7 +372,9 @@ class PointTracker(FR_Module):
             )
             frame_prev = frame_new
             points_prev = points_tracked[i_frame]
-            # frame_prev= np.roll(frame_prev, 1, axis=0)
+
+        ## clear buffered_video_reader
+        video.delete_all_slots()
 
         return points_tracked, frame_prev
 
@@ -453,7 +452,6 @@ class PointTracker(FR_Module):
                  as the points in the previous video. Order (x,y).
         """
         ## Call optical flow function
-        # print(points_prev.max(0))
         if self.params_optical_flow['method'] == 'lucas_kanade':
             points_new, status, err = cv2.calcOpticalFlowPyrLK(frame_prev, frame_new, points_prev, None, **self.params_optical_flow['kwargs_method'])
         else:

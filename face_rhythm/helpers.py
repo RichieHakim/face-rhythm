@@ -614,7 +614,7 @@ class BufferedVideoReader:
                 self.loaded.remove(idx_slot)
                 print(f"FR: Deleted slot {idx_slot}") if self._verbose > 1 else None
 
-    def _delete_all_slots(self):
+    def delete_all_slots(self):
         """
         Delete all slots from memory.
         Uses the _delete_slots() method.
