@@ -6,6 +6,7 @@ from tqdm import tqdm
 import decord
 import cv2
 import torch
+import scipy.sparse
 
 from .util import FR_Module
 from .data_importing import Dataset_videos
@@ -287,6 +288,7 @@ class PointTracker(FR_Module):
         """
         ## Initialize points_tracked
         self.points_tracked = []
+        self.violations = []
 
         ## Set the initial frame_prev as the first frame of the video
         print("FR: Setting initial frame_prev") if self._verbose > 1 else None
@@ -321,6 +323,8 @@ class PointTracker(FR_Module):
         print(f"FR: Tracking complete") if self._verbose > 1 else None
         print(f"FR: Placing points_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
         self.points_tracked = {f"{ii}": points for ii, points in enumerate(self.points_tracked)}
+        print(f"FR: Placing violations into dictionary self.violations where keys are video indices") if self._verbose > 1 else None
+        self.violations = {f"{ii}": violations for ii, violations in enumerate(self.violations)}
 
         ## For FR_Module compatibility
         self.run_data["points_tracked"] = self.points_tracked
@@ -365,6 +369,7 @@ class PointTracker(FR_Module):
 
         ## Preallocate points
         points_tracked = np.zeros((len(video), points_prev.shape[0], 2), dtype=np.float32)
+        self.violations_currentVideo = scipy.sparse.lil_matrix((len(video), points_prev.shape[0]), dtype=np.bool)
 
         ## Iterate through frames
         # video.set_iterator_frame_idx(0)
@@ -376,29 +381,29 @@ class PointTracker(FR_Module):
         #     disable=self._verbose < 2,
         #     total=len(video)
         # ):
-        i_frame = 0
+        self.i_frame = 0
         video.set_iterator_frame_idx(0)
         with tqdm(total=len(video), desc='frame #', position=1, leave=False, disable=self._verbose < 2) as pbar:
-            while (i_frame < len(video)):
+            while (self.i_frame < len(video)):
                 for frame in video:
                     frame_new = self._format_decordTorchVideo_for_opticalFlow(vid=frame[None,...], mask=self.mask)[0]
-                    points_tracked[i_frame] = self._track_points_singleFrame(
+                    points_tracked[self.i_frame] = self._track_points_singleFrame(
                         frame_new=frame_new,
                         frame_prev=frame_prev,
                         points_prev=points_prev,
                     )
                     frame_prev = frame_new
-                    points_prev = points_tracked[i_frame]
+                    points_prev = points_tracked[self.i_frame]
                     if self._violation_event:
                         self._violation_event = False
-                        i_frame = max(i_frame - self._params_outlier_handling['framesHalted_before'], 0)
-                        frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(max(i_frame-1,0)), mask=self.mask)[0]
-                        video.set_iterator_frame_idx(i_frame)
-                        points_prev = points_tracked[i_frame]
+                        self.i_frame = max(self.i_frame - self._params_outlier_handling['framesHalted_before'], 0)
+                        frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(max(self.i_frame-1,0)), mask=self.mask)[0]
+                        video.set_iterator_frame_idx(self.i_frame)
+                        points_prev = points_tracked[self.i_frame]
                         break
 
-                    pbar.n = i_frame
-                    i_frame += 1
+                    pbar.n = self.i_frame
+                    self.i_frame += 1
                     ## Update progress bar
                     pbar.update(1)
 
@@ -429,7 +434,7 @@ class PointTracker(FR_Module):
         points_new = self._optical_flow(frame_new=frame_new, frame_prev=frame_prev, points_prev=points_prev)
 
         ## Update violations
-        self._update_violations(points_new=points_new)
+        violations_frame = self._update_violations(points_new=points_new)
 
         ## Visualize points
         if self._visualize_video:
@@ -460,19 +465,35 @@ class PointTracker(FR_Module):
                 A 2D array of np.float32, where each row is a point
                  to track.
         """
+        # displacement = points_new - self.point_positions
+        # pointIdx_violations_new = np.linalg.norm(displacement, axis=1) > self._params_outlier_handling['threshold_displacement']
+        # ## Find violating neighbors
+        # pointIdx_violations_new[np.unique(self.neighbors.numpy()[pointIdx_violations_new].reshape(-1))] = True
+        # ## Determine if a violation event has occurred
+        # self._violation_event = np.any(pointIdx_violations_new)
+        # ## Update violation countdowns
+        # if self._violation_event:
+        #     self._pointIdx_violations_countdown[self._pointIdx_violations_current] += self._params_outlier_handling['framesHalted_before'] + 1
+        # self._pointIdx_violations_countdown[pointIdx_violations_new] = self._duration_violation_frames + 1
+        # self._pointIdx_violations_countdown -= 1
+        # ## Find all points that are currently violating
+        # self._pointIdx_violations_current = self._pointIdx_violations_countdown > 0
+
         displacement = points_new - self.point_positions
         pointIdx_violations_new = np.linalg.norm(displacement, axis=1) > self._params_outlier_handling['threshold_displacement']
         ## Find violating neighbors
-        pointIdx_violations_new[self.neighbors.numpy()[pointIdx_violations_new].reshape(-1)] = True
+        pointIdx_violations_new[np.unique(self.neighbors.numpy()[pointIdx_violations_new].reshape(-1))] = True
         ## Determine if a violation event has occurred
         self._violation_event = np.any(pointIdx_violations_new)
         ## Update violation countdowns
         if self._violation_event:
-            self._pointIdx_violations_countdown[self._pointIdx_violations_current] += self._params_outlier_handling['framesHalted_before'] + 1
-        self._pointIdx_violations_countdown[pointIdx_violations_new] = self._duration_violation_frames + 1
-        self._pointIdx_violations_countdown -= 1
+            self.violations_currentVideo[
+                max(self.i_frame - self._params_outlier_handling['framesHalted_before'], 0) : \
+                min(self.i_frame + self._params_outlier_handling['framesHalted_after'], self.violations_currentVideo.shape[0]),
+                pointIdx_violations_new
+            ] = True
         ## Find all points that are currently violating
-        self._pointIdx_violations_current = self._pointIdx_violations_countdown > 0
+        self._pointIdx_violations_current = self.violations_currentVideo[self.i_frame].toarray().squeeze()
 
 
     def _format_decordTorchVideo_for_opticalFlow(self, vid, mask=None):

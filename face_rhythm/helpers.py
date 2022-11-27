@@ -322,6 +322,7 @@ class BufferedVideoReader:
         paths_videos: list=None,
         buffer_size: int=1000,
         prefetch: int=2,
+        posthold: int=1,
         method_getitem: str='continuous',
         starting_seek_position: int=0,
         decord_backend: str='torch',
@@ -351,6 +352,10 @@ class BufferedVideoReader:
             Note that a single buffer slot can only contain frames
              from a single video. Best to keep 
              buffer_size <= video length.
+        posthold (int):
+            Number of buffers to hold after a new buffer is loaded.
+            If 0, then no posthold.
+            This is useful if you want to go backwards in the video.
         method_getitem (str):
             Method to use for __getitem__.
             'continuous' - read frames continuously across videos.
@@ -382,6 +387,7 @@ class BufferedVideoReader:
         self._verbose = verbose
         self.buffer_size = buffer_size
         self.prefetch = prefetch
+        self.posthold = posthold
         self._decord_backend = decord_backend
         self._decord_ctx = decord.cpu(0) if decord_ctx is None else decord_ctx
 
@@ -700,18 +706,22 @@ class BufferedVideoReader:
         print(f"FR: Slots to load: {idx_slots}") if self._verbose > 1 else None
 
         ## Load the prefetch slots
+        idx_slot_lookuptable = np.where((self.lookup['video']==idx_slots[-1][0]) * (self.lookup['slot']==idx_slots[-1][1]))[0][0]
         if self.prefetch > 0:
-            idx_slot_lookuptable = np.where((self.lookup['video']==idx_slots[-1][0]) * (self.lookup['slot']==idx_slots[-1][1]))[0][0]
             idx_slots_prefetch = [(self.lookup['video'][ii], self.lookup['slot'][ii]) for ii in range(idx_slot_lookuptable+1, idx_slot_lookuptable+self.prefetch+1) if ii < len(self.lookup)]
         else:
             idx_slots_prefetch = []
         ## Load the slots
         self._load_slots(idx_slots + idx_slots_prefetch, wait_for_load=[True]*len(idx_slots) + [False]*len(idx_slots_prefetch))
         ## Delete the slots that are no longer needed. 
-        ### All slots from old videos should be deleted.
-        self._delete_slots([idx_slot for idx_slot in self.loaded if idx_slot[0] < idx_video])
-        ### All slots from previous buffers should be deleted.
-        self._delete_slots([idx_slot for idx_slot in self.loaded if idx_slot[0] == idx_video and idx_slot[1] < idx_frame_start // self.buffer_size])
+        ### Find slots before the posthold to delete
+        idx_slots_delete = [(self.lookup['video'][ii], self.lookup['slot'][ii]) for ii in range(idx_slot_lookuptable-self.posthold) if ii >= 0]
+        ### Delete all previous slots
+        self._delete_slots(idx_slots_delete)
+        # ### All slots from old videos should be deleted.
+        # self._delete_slots([idx_slot for idx_slot in self.loaded if idx_slot[0] < idx_video])
+        # ### All slots from previous buffers should be deleted.
+        # self._delete_slots([idx_slot for idx_slot in self.loaded if idx_slot[0] == idx_video and idx_slot[1] < idx_frame_start // self.buffer_size])
 
         ## Get the frames from the slots
         idx_frames_slots = [slice(max(idx_frame_start - self.boundaries[idx_slot[0]][idx_slot[1]][0], 0), min(idx_frame_end - self.boundaries[idx_slot[0]][idx_slot[1]][0], self.buffer_size), idx_frame_step) for idx_slot in idx_slots]
