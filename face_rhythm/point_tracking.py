@@ -326,7 +326,7 @@ class PointTracker(FR_Module):
         print(f"FR: Placing points_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
         self.points_tracked = {f"{ii}": points for ii, points in enumerate(self.points_tracked)}
         print(f"FR: Placing violations into dictionary self.violations where keys are video indices") if self._verbose > 1 else None
-        self.violations = {f"{ii}": {'row': v.row, 'col': v.col, 'data': v.data} for ii, v in enumerate(self.violations)}
+        self.violations = {f"{ii}": {'row': v.row, 'col': v.col, 'data': v.data, 'shape': v.shape} for ii, v in enumerate(self.violations)}
 
         ## For FR_Module compatibility
         self.run_data["points_tracked"] = self.points_tracked

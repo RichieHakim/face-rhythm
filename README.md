@@ -29,24 +29,15 @@ Learn more at https://face-rhythm.readthedocs.io/
 ```
 pip install -e . 
 ```
-4. Install the correct version of cuda toolkit (if you plan on using a gpu). [This link](https://anaconda.org/anaconda/cudatoolkit) and [this link](https://pytorch.org/get-started/locally/) are useful for figuring that out
-```
-conda install cudatoolkit=10.2
-```
-5. Create a "project directory" where we will save intermediate files, videos, and config files.
+4. Create a "project directory" where we will save intermediate files, videos, and config files.
 This project directory should ideally be outside of the repo, and you'll create a new one each time
-you analyze a new dataset.
-Again, given that your ipynb will change a lot (get populated with plots and new parameters,
-it's good to copy this out of the repo while you're doing analysis. I typically put one notebook in
-each of my project folders.
-
+you analyze a new dataset. You may want to save a copy of the .ipynb file you use for the run there.
 ```
 cd ..
 mkdir face_rhythm_run
-cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_run/
 ```
 
-6. Get started! The plots display better using Jupyter Notebook
+5. Get started! The plots display better using Jupyter Notebook
 ```
 jupyter notebook
 ```
