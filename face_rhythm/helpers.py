@@ -593,7 +593,7 @@ class BufferedVideoReader:
                 self.slots[idx_video][idx_buffer] = self.video_readers[idx_video][idx_frame_start:idx_frame_end+1]
                 loaded = True
             except Exception as e:
-                print(f"FR WARNING: Failed to load slot {idx_slot}. File may be partially corrupted.") if self._verbose > 0 else None
+                print(f"FR WARNING: Failed to load slot {idx_slot}. Likely causes are: 1) File is partially corrupted, 2) You are trying to go back to a file that was recently removed from a slot.") if self._verbose > 0 else None
                 print(f"    Sleeping for 1s, then will try loading again. Decord error below:") if self._verbose > 0 else None
                 print(e)
                 time.sleep(1)
@@ -834,9 +834,6 @@ class BufferedVideoReader:
             def lazy_iterator():
                 while self._iterator_frame < self.num_frames_total:
                     ## Find slot for current frame idx
-                    # if self._iterator_frame > 3000:
-                    #     print(self._iterator_frame)
-                    #     time.sleep(0.1)
                     idx_video = np.searchsorted(self._cumulative_frame_start, self._iterator_frame, side='right') - 1
                     idx_slot_in_video = (self._iterator_frame - self._cumulative_frame_start[idx_video]) // self.buffer_size
                     idx_frame = self._iterator_frame - self._cumulative_frame_start[idx_video]
