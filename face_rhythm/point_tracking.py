@@ -224,6 +224,8 @@ class PointTracker(FR_Module):
             "contiguous": self._contiguous,
             "visualize_video": self._visualize_video,
             "params_optical_flow": self.params_optical_flow,
+            "params_outlier_handling": self._params_outlier_handling,
+            "params_visualization": self._params_visualization,
             "verbose": self._verbose,
         }
         self.run_info = {
@@ -308,7 +310,6 @@ class PointTracker(FR_Module):
             disable=self._verbose < 2, 
             total=len(self.videos)
         ):
-            # video.wait_for_loading()
             ## If the video is not contiguous, set the iterator to the first frame
             frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(0), mask=self.mask)[0] if not self._contiguous else frame_prev
 
@@ -319,15 +320,17 @@ class PointTracker(FR_Module):
                 frame_prev=frame_prev,
             )
             self.points_tracked.append(points)
+            self.violations.append(self.violations_currentVideo.tocoo())
 
         print(f"FR: Tracking complete") if self._verbose > 1 else None
         print(f"FR: Placing points_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
         self.points_tracked = {f"{ii}": points for ii, points in enumerate(self.points_tracked)}
         print(f"FR: Placing violations into dictionary self.violations where keys are video indices") if self._verbose > 1 else None
-        self.violations = {f"{ii}": violations for ii, violations in enumerate(self.violations)}
+        self.violations = {f"{ii}": {'row': v.row, 'col': v.col, 'data': v.data} for ii, v in enumerate(self.violations)}
 
         ## For FR_Module compatibility
         self.run_data["points_tracked"] = self.points_tracked
+        self.run_data["violations"] = self.violations
 
 
     def _track_points_singleVideo(

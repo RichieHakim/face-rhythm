@@ -413,7 +413,7 @@ class BufferedVideoReader:
             print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
             assert isinstance(video_readers, list), "video_readers must be list of decord.VideoReader objects"
             self.paths_videos = None
-            # assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
+            assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
         ## Assert that method_getitem is valid
         assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
         ## Check if backend is valid by trying to set it here (only works fully when used in the _load_frames method)
