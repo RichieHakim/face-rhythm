@@ -130,7 +130,8 @@ class PointTracker(FR_Module):
         self._params_outlier_handling = params_outlier_handling.copy()
 
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
-        type(buffered_video_reader)  ## For some reason this line is necessary for the next line to work
+        print(type(buffered_video_reader))  ## For some reason this line is necessary for the next line to work
+        print(isinstance(buffered_video_reader, BufferedVideoReader))  ## For some reason this line is necessary for the next line to work
         assert isinstance(buffered_video_reader, BufferedVideoReader), "buffered_video_reader must be a fr.helpers.BufferedVideoReader object."
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
         if isinstance(rois_points, np.ndarray):
@@ -290,6 +291,7 @@ class PointTracker(FR_Module):
         ## Set the initial frame_prev as the first frame of the video
         print("FR: Setting initial frame_prev") if self._verbose > 1 else None
         frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=self.buffered_video_reader.get_frames_from_continuous_index(0), mask=self.mask)[0]
+        self.buffered_video_reader.wait_for_loading()
         ## Set the inital points_prev as the original points
         points_prev = self.point_positions.copy()
 
@@ -304,6 +306,7 @@ class PointTracker(FR_Module):
             disable=self._verbose < 2, 
             total=len(self.videos)
         ):
+            # video.wait_for_loading()
             ## If the video is not contiguous, set the iterator to the first frame
             frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(0), mask=self.mask)[0] if not self._contiguous else frame_prev
 
@@ -386,11 +389,7 @@ class PointTracker(FR_Module):
                     )
                     frame_prev = frame_new
                     points_prev = points_tracked[i_frame]
-
-                    # print(i_frame)
-                    # print(np.where(self._pointIdx_violations_current)[0])
                     if self._violation_event:
-                        # print('FUCK')
                         self._violation_event = False
                         i_frame = max(i_frame - self._params_outlier_handling['framesHalted_before'], 0)
                         frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(max(i_frame-1,0)), mask=self.mask)[0]

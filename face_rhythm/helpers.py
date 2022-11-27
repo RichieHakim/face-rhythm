@@ -2,6 +2,7 @@ import multiprocessing as mp
 import threading
 from typing import Union
 import time
+import gc
 
 import numpy as np
 import decord
@@ -533,7 +534,8 @@ class BufferedVideoReader:
         if not isinstance(wait_for_load, list):
             wait_for_load = [wait_for_load] * len(idx_slots)
 
-        print(f"FR: Loading slots {idx_slots} in the background.") if self._verbose > 1 else None
+        print(f"FR: Loading slots {idx_slots} in the background. Waiting: {wait_for_load}") if self._verbose > 1 else None
+        print(f"FR: Loaded: {self.loaded}, Loading: {self.loading}") if self._verbose > 1 else None
         thread = None
         for idx_slot, wait in zip(idx_slots, wait_for_load):
             ## Check if slot is already loaded
@@ -585,7 +587,17 @@ class BufferedVideoReader:
         ## Load the slot
         idx_video, idx_buffer = idx_slot
         idx_frame_start, idx_frame_end = self.boundaries[idx_video][idx_buffer]
-        self.slots[idx_video][idx_buffer] = self.video_readers[idx_video][idx_frame_start:idx_frame_end+1]
+        loaded = False
+        while loaded == False:
+            try:
+                self.slots[idx_video][idx_buffer] = self.video_readers[idx_video][idx_frame_start:idx_frame_end+1]
+                loaded = True
+            except Exception as e:
+                print(f"FR WARNING: Failed to load slot {idx_slot}. File may be partially corrupted.") if self._verbose > 0 else None
+                print(f"    Sleeping for 1s, then will try loading again. Decord error below:") if self._verbose > 0 else None
+                print(e)
+                time.sleep(1)
+
         ## Mark the slot as loaded
         self.loaded.append(idx_slot)
         ## Remove the slot from the loading list
@@ -621,6 +633,14 @@ class BufferedVideoReader:
         """
         print(f"FR: Deleting all slots") if self._verbose > 1 else None
         self._delete_slots(self.loaded)
+
+    def wait_for_loading(self):
+        """
+        Wait for all slots to finish loading.
+        """
+        print(f"FR: Waiting for all slots to load") if self._verbose > 1 else None
+        while len(self.loading) > 0:
+            time.sleep(0.01)
         
 
     
@@ -686,7 +706,7 @@ class BufferedVideoReader:
         else:
             idx_slots_prefetch = []
         ## Load the slots
-        self._load_slots(idx_slots + idx_slots_prefetch, wait_for_load=[True]*len(idx_slots) + [False])
+        self._load_slots(idx_slots + idx_slots_prefetch, wait_for_load=[True]*len(idx_slots) + [False]*len(idx_slots_prefetch))
         ## Delete the slots that are no longer needed. 
         ### All slots from old videos should be deleted.
         self._delete_slots([idx_slot for idx_slot in self.loaded if idx_slot[0] < idx_video])
@@ -814,6 +834,9 @@ class BufferedVideoReader:
             def lazy_iterator():
                 while self._iterator_frame < self.num_frames_total:
                     ## Find slot for current frame idx
+                    # if self._iterator_frame > 3000:
+                    #     print(self._iterator_frame)
+                    #     time.sleep(0.1)
                     idx_video = np.searchsorted(self._cumulative_frame_start, self._iterator_frame, side='right') - 1
                     idx_slot_in_video = (self._iterator_frame - self._cumulative_frame_start[idx_video]) // self.buffer_size
                     idx_frame = self._iterator_frame - self._cumulative_frame_start[idx_video]
