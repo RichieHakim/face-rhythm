@@ -6,53 +6,62 @@ import numpy as np
 from .util import FR_Module
 from . import h5_handling
 
-class Trace_cleaner(FR_Module):
+class SpectralAnalayzer(FR_Module):
     """
-    Class for cleaning traces of tracked points.
-    This class finds frames where there are violations in the 
-     displacement or velocity of the tracked points. 
-     Displacements are frozen in place for a specified number 
-     of frames before and after the violation.
+    A class for generating normalized spectrograms for point
+     displacement traces.
+    The input data can either be the PointAnalyzer.h5 output
+     file, or a dictionary containing a similar structure:
+        {
+            'points_tracked': {
+                '1': traces of shape(n_frames, n_points, 2),
+                '2': traces,
+                ...
+            },
+            'point_positions': np.ndarray of shape(n_points, 2),
+        }
     RH 2022
     """
     def __init__(
         self,
-        
+
         path_traces: Union[str, Path]=None,
-        field_traces: str='points_tracked',
 
-        traces: Union[np.ndarray, dict]=None,
-        point_positions: np.ndarray=None,
-
-        thresh_displacement: float=25,
-        thresh_velocity: float=3,
-        framesHalted_before: int=25,
-        framesHalted_after: int=25,
+        dict_PointTracker: dict=None,
 
         verbose: int=1,
     ):
         super().__init__()
 
         ## Assertions
-        ### Assert that either traces or path_traces is specified
-        assert traces is not None or path_traces is not None, "FR ERROR: traces or path_traces must be specified"
-        ### Assert that if path traces is specified, that field_traces is also specified
-        if path_traces is not None:
-            assert field_traces is not None, "FR ERROR: If path_traces is specified, field_traces must also be specified"
+        ### Assert that either path_traces or dict_PointTracker is specified
+        assert path_traces is not None or dict_PointTracker is not None, "FR ERROR: path_traces or dict_PointTracker must be specified"
         ### Assert that if path_traces is specified, that it is a string or a pathlib.Path object
         if path_traces is not None:
             assert isinstance(path_traces, str) or isinstance(path_traces, Path), "FR ERROR: path_traces must be a string or pathlib.Path object"
-        ### Assert that if field_traces is specified, that it is a string
-        if field_traces is not None:
-            assert isinstance(field_traces, str), "FR ERROR: field_traces must be a string"
+        ### Assert that if dict_PointTracker is specified, that it is a dictionary
+        if dict_PointTracker is not None:
+            assert isinstance(dict_PointTracker, dict), "FR ERROR: dict_PointTracker must be a dictionary"
+            ### Assert that dict_PointTracker has the correct keys
+            assert 'points_tracked' in dict_PointTracker.keys(), "FR ERROR: dict_PointTracker must have the keys 'points_tracked' and 'point_positions'"
+            assert 'point_positions' in dict_PointTracker.keys(), "FR ERROR: dict_PointTracker must have the keys 'points_tracked' and 'point_positions'"
+            ### Assert that dict_PointTracker['points_tracked'] is a dictionary
+            assert isinstance(dict_PointTracker['points_tracked'], dict), "FR ERROR: dict_PointTracker['points_tracked'] must be a dictionary"
+            ### Assert that dict_PointTracker['point_positions'] is a numpy array
+            assert isinstance(dict_PointTracker['point_positions'], np.ndarray), "FR ERROR: dict_PointTracker['point_positions'] must be a numpy array"
+            ### Assert that dict_PointTracker['point_positions'] is of shape (n_points, 2)
+            assert dict_PointTracker['point_positions'].shape[1] == 2, "FR ERROR: dict_PointTracker['point_positions'] must be of shape (n_points, 2)"
+            ### Assert that dict_PointTracker['points_tracked'] contains only numpy arrays
+            assert all([isinstance(dict_PointTracker['points_tracked'][key], np.ndarray) for key in dict_PointTracker['points_tracked'].keys()]), "FR ERROR: dict_PointTracker['points_tracked'] must contain only numpy arrays"
+            ### Assert that dict_PointTracker['points_tracked'] contains only numpy arrays of shape (n_frames, n_points, 2)
+            assert all([dict_PointTracker['points_tracked'][key].shape[2] == 2 for key in dict_PointTracker['points_tracked'].keys()]), "FR ERROR: dict_PointTracker['points_tracked'] must contain only numpy arrays of shape (n_frames, n_points, 2)"
+            assert all([dict_PointTracker['points_tracked'][key].shape[1] == dict_PointTracker['point_positions'].shape[0] for key in dict_PointTracker['points_tracked'].keys()]), "FR ERROR: dict_PointTracker['points_tracked'] must contain only numpy arrays of shape (n_frames, n_points, 2)"
 
-        ## Set variables
-        self._path_traces = str(path_traces)
-        self._field_traces = str(field_traces)
-        self.thresh_position = float(thresh_displacement)
-        self.thresh_velocity = float(thresh_velocity)
-        self.framesHalted_before = int(framesHalted_before)
-        self.framesHalted_after = int(framesHalted_after)
+        ## Set attributes
+        self._path_traces = path_traces
+        
+
+
         self._verbose = int(verbose)
 
         ## Load traces
