@@ -9,7 +9,6 @@ import torch
 import scipy.sparse
 
 from .util import FR_Module
-from .data_importing import Dataset_videos
 from .rois import ROIs
 from .helpers import BufferedVideoReader
 from .video_playback import FrameVisualizer
