@@ -47,6 +47,8 @@ class VQT_Analyzer(FR_Module):
         self._verbose = int(verbose)
         self.spectrograms = None
 
+        self._demo_spectrogram = None
+
         ## Initalize VQT filters
         self.VQT = helpers.VQT(**params_VQT)
 
@@ -109,9 +111,9 @@ class VQT_Analyzer(FR_Module):
         ## Prepare traces
         print(f"Preparing traces. Reshaping and subtracting offsets...") if self._verbose > 1 else None
         self.point_positions = self._prepare_pointPositions(point_positions)
-        
         ## Compute spectrograms
-        self.spectrograms ={key: self._normalize_spectrogram(self.VQT(self._prepare_displacements(points, self.point_positions))).cpu().numpy() for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc="Computing spectrograms", leave=False)}
+        print(f"Computing spectrograms...") if self._verbose > 1 else None
+        self.spectrograms ={key: self._normalize_spectrogram(self.VQT(self._prepare_displacements(points, self.point_positions))) for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc="Computing spectrograms", leave=False)}
 
         ## Update self.run_data
         self.run_data.update({
@@ -151,21 +153,40 @@ class VQT_Analyzer(FR_Module):
             across all frequencies at each time point.
 
         Args:
-            spectrogram (torch.Tensor):
-                A spectrogram of shape: (n_points, n_freq_bins, n_frames)                    
+            spectrogram (tuple or torch.Tensor):
+                EITHER:
+                    - A 3-element tuple containing the spectrogram, x-axis, and
+                       frequency axis.
+                    - A single spectrogram
+                Spectrogram should be of shape: (n_points, n_freq_bins, n_frames)  
+
+        Returns:
+            spectrogram (tuple or torch.Tensor):
+                EITHER:
+                    - A 3-element tuple containing the normalized spectrogram,
+                       x-axis, and frequency axis.
+                    - A single normalized spectrogram
         """
-        if torch.is_complex(spectrogram) == False:
-            s_exp = spectrogram ** self._spectrogram_exponent
+        ## Check inputs
+        if isinstance(spectrogram, tuple):
+            spec, x_axis, freqs = spectrogram
+        elif isinstance(spectrogram, torch.Tensor):
+            spec = spectrogram
+
+        if torch.is_complex(spec) == False:
+            s_exp = spec ** self._spectrogram_exponent
             s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
-            return  s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
+            s_norm =  s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
         
-        elif torch.is_complex(spectrogram) == True:
-            s_mag = torch.abs(spectrogram)
-            s_phase = torch.angle(spectrogram)
+        elif torch.is_complex(spec) == True:
+            s_mag = torch.abs(spec)
+            s_phase = torch.angle(spec)
             s_exp = s_mag ** self._spectrogram_exponent
             s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
             s_mag_norm = s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
-            return torch.polar(s_mag_norm, s_phase)
+            s_norm = torch.polar(s_mag_norm, s_phase)
+        
+        return {'spec': s_norm.cpu().numpy(), 'x_axis': x_axis.cpu().numpy(), 'freqs': freqs} if isinstance(spectrogram, tuple) else s_norm
 
     def _prepare_displacements(self, traces, point_positions):
         """
@@ -181,7 +202,14 @@ class VQT_Analyzer(FR_Module):
         return torch.as_tensor(point_positions.reshape((-1,), order='F').T, dtype=torch.float32)
 
 
-    def test_transform(self, points_tracked: dict, point_positions: np.ndarray, idx_point: list=[0,], name_points: str='0', plot: bool=True):
+    def demo_transform(
+        self, 
+        points_tracked: dict, 
+        point_positions: np.ndarray, 
+        idx_point: list=[0,], 
+        name_points: str='0', 
+        plot: bool=True,
+    ):
         """
         Do a test transform to check that the spectrograms are being
          computed correctly and look good.
@@ -210,26 +238,35 @@ class VQT_Analyzer(FR_Module):
 
         ## Prepare traces
         point_positions = self._prepare_pointPositions(point_positions[idx_point,:])
-
         ## Compute spectrogram
-        spectrogram = self._normalize_spectrogram(self.VQT(self._prepare_displacements(points_tracked[name_points][:,idx_point,:], point_positions))).cpu().numpy()
+        spec, x_axis, freqs = self.VQT(self._prepare_displacements(points_tracked[name_points][:,idx_point,:], point_positions))
+        self._demo_spectrogram = self._normalize_spectrogram(spec).cpu().numpy()
 
         ## Plot
         if plot:
             import matplotlib.pyplot as plt
+            x_0 = x_axis[0] / self.VQT.Fs_sample
+            x_N = x_axis[-1] / self.VQT.Fs_sample
             fig, axs = plt.subplots(2, 1, figsize=(10, 5))
-            ## set the y axis to the frequency bins
-            # x_axis_max = spectrogram.shape[2]/(self.VQT.args['Fs_sample']/self.VQT.args['downsample_factor'])
-            x_axis_max = spectrogram.shape[2]/(self.VQT.args['Fs_sample'])
-            print(self.VQT.args['downsample_factor'])
-            axs[0].imshow(np.abs(spectrogram[0,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, x_axis_max, self.VQT.freqs[0], self.VQT.freqs[-1]])
-            axs[1].imshow(np.abs(spectrogram[1,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, x_axis_max, self.VQT.freqs[0], self.VQT.freqs[-1]])
+            axs[0].imshow(np.abs(spec[0,:,:]), extent=[x_0, x_N, freqs[0], freqs[-1]], aspect='auto', origin='lower', cmap='hot')
+            axs[1].imshow(np.abs(spec[1,:,:]), extent=[x_0, x_N, freqs[0], freqs[-1]], aspect='auto', origin='lower', cmap='hot')
             axs[0].set_title(f'Spectrogram of x and y displacements of point {idx_point}')
             axs[1].set_xlabel('Time (s)')
             axs[0].set_ylabel('Frequency')
             plt.show()
 
-        return spectrogram
+
+        ## Compute size of all output spectrograms
+        ### Get the output shape for each spectrogram
+        def _get_avgpool1d_downsample_length(length, kernel_size, stride, padding):
+            return int((length + 2 * padding - kernel_size) / stride + 1)
+        shapes_pt = [p.shape for p in points_tracked.values()]
+        shapes_spec = [(s[2], len(self.VQT.freqs), s[1], _get_avgpool1d_downsample_length(s[0], kernel_size=int(self.VQT.downsample_factor), stride=self.VQT.downsample_factor, padding=0)) for s in shapes_pt]
+        sizes_spec = [np.prod(s) * self._demo_spectrogram.itemsize / 1e9 for s in shapes_spec]
+        print(f'Total size of all spectrograms: {np.sum(sizes_spec):.8f} GB') if self._verbose > 1 else None
+        print(f'Individual spectrogram sizes (in GB): {sizes_spec}') if self._verbose > 1 else None            
+
+        return self._demo_spectrogram
 
     
     def __repr__(self): return f"{self.__class__.__name__}(VQT={self.VQT.args}, spectrogram_exponent={self._spectrogram_exponent}, normalization_factor={self._normalization_factor})"

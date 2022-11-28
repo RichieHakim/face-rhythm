@@ -1384,6 +1384,11 @@ class VQT():
             Spectrogram (Torch tensor):
                 Spectrogram of the input signal.
                 shape: (n_channels, n_samples_ds, n_freq_bins)
+            x_axis (Torch tensor):
+                New x-axis for the spectrogram in units of samples.
+                Get units of time by dividing by self.Fs_sample.
+            self.freqs (Torch tensor):
+                Frequencies of the spectrogram.
         """
         if type(X) is not torch.Tensor:
             X = torch.as_tensor(X, dtype=torch.float32, device=self.DEVICE_compute)
@@ -1391,9 +1396,11 @@ class VQT():
         if X.ndim==1:
             X = X[None,:]
 
+        ## Make iterator for batches
         batches = make_batches(X, batch_size=self.batch_size, length=X.shape[0])
 
-        test = [self._helper_ds(
+        ## Make spectrograms
+        specs = [self._helper_ds(
             X=self._helper_conv(
                 arr=arr, 
                 filters=self.filters, 
@@ -1403,8 +1410,16 @@ class VQT():
             ds_factor=self.downsample_factor,
             return_complex=self.return_complex,
             ).to(self.DEVICE_return) for arr in tqdm(batches, disable=(self.progressBar==False), leave=True, total=int(np.ceil(X.shape[0]/self.batch_size)))]
+        specs = torch.cat(specs, dim=0)
+
+        ## Make x_axis
+        x_axis = torch.nn.functional.avg_pool1d(
+            torch.arange(0, X.shape[-1])[None,:], 
+            kernel_size=[int(self.downsample_factor)], 
+            stride=self.downsample_factor, ceil_mode=True
+            ).squeeze()
         
-        return torch.cat(test, dim=0)
+        return specs, x_axis, self.freqs
 
     def __repr__(self):
         if self.using_custom_filters:
