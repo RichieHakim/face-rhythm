@@ -131,8 +131,7 @@ class PointTracker(FR_Module):
         self._params_outlier_handling = params_outlier_handling.copy()
 
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
-        print(type(buffered_video_reader))  ## For some reason this line is necessary for the next line to work
-        print(isinstance(buffered_video_reader, BufferedVideoReader))  ## For some reason this line is necessary for the next line to work
+        type(buffered_video_reader), isinstance(buffered_video_reader, BufferedVideoReader)  ## line needed sometimes for next assert to work
         assert isinstance(buffered_video_reader, BufferedVideoReader), "buffered_video_reader must be a fr.helpers.BufferedVideoReader object."
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
         if isinstance(rois_points, np.ndarray):
@@ -142,10 +141,15 @@ class PointTracker(FR_Module):
         assert isinstance(rois_points, list) and all([isinstance(roi, np.ndarray) for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
         assert all([roi.ndim == 2 for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
         assert all([roi.dtype == bool for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
+        ## Assert that params_optical_flow is a dict
+        assert isinstance(params_optical_flow, dict), "FR ERROR: params_optical_flow must be a dict"
+        ## Assert that params_outlier_handling is a dict
+        assert isinstance(params_outlier_handling, dict), "FR ERROR: params_outlier_handling must be a dict"
+        ## Assert that params_visualization is a dict
+        assert isinstance(params_visualization, dict), "FR ERROR: params_visualization must be a dict"
         
-        ## Set parameters for optical flow
-        print("FR: Setting parameters for optical flow") if self._verbose > 1 else None
-        params_default = {
+        ## Define default parameters
+        params_optFlow_default = {
                 "method": "lucas_kanade",
                 "point_spacing": 10,
                 "mesh_rigidity": 0.005,
@@ -157,16 +161,31 @@ class PointTracker(FR_Module):
                     "criteria": [cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03],
                 },
             }
-        if params_optical_flow is None:
-            self.params_optical_flow = params_default
-            print(f"FR: 'params_optical_flow' not provided. Using default parameters for optical flow: {self.params_optical_flow}") if self._verbose > 1 else None
-        else:
-            ## fill in missing parameters
-            for key, value in params_default.items():
-                if key not in params_optical_flow:
-                    print(f"FR: 'params_optical_flow' does not contain key '{key}', using default value: {value}") if self._verbose > 0 else None
-                    params_optical_flow[key] = value
-            self.params_optical_flow = params_optical_flow.copy()
+        params_outlierHandling_default = {
+                'threshold_displacement': 25,
+                'framesHalted_before': 30,
+                'framesHalted_after': 30,
+            }
+        params_visualization_default = {
+                'alpha':1.0,
+                'point_sizes':1,
+                'writer_cv2':None,
+            }
+
+        ## Fill in default parameters
+        ## if the parameter was passed as an arg then place it in the args dict, otherwise use the default
+        ### params_optical_flow
+        params_missing = {key: params_optFlow_default[key] for key in params_optFlow_default if key not in params_optical_flow}
+        print(f"FR WARNING: Following parameters for optical flow were not specified and will be set to default values: {params_missing}") if self._verbose > 0 else None
+        self.params_optical_flow = {**params_optical_flow, **params_missing}
+        ### params_outlier_handling
+        params_missing = {key: params_outlierHandling_default[key] for key in params_outlierHandling_default if key not in params_outlier_handling}
+        print(f"FR WARNING: Following parameters for outlier handling were not specified and will be set to default values: {params_missing}") if self._verbose > 0 else None
+        self.params_outlier_handling = {**params_outlier_handling, **params_missing}
+        ### params_visualization
+        params_missing = {key: params_visualization_default[key] for key in params_visualization_default if key not in params_visualization}
+        print(f"FR WARNING: Following parameters for visualization were not specified and will be set to default values: {params_missing}") if self._verbose > 0 else None
+        self.params_visualization = {**params_visualization, **params_missing}
 
         ## Make points within rois_points with spacing of point_spacing
         ##  First make a single ROI boolean image, then make points

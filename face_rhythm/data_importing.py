@@ -111,6 +111,7 @@ class Dataset_videos(FR_Module):
         ## Workflow if method is 'BufferedVideoReader'
         elif self._videoDataType == 'BufferedVideoReader':
             ## Assert that bufferedVideoReader is a BufferedVideoReader object
+            type(bufferedVideoReader), isinstance(bufferedVideoReader, BufferedVideoReader)  ## line needed sometimes for next assert to work
             assert isinstance(bufferedVideoReader, BufferedVideoReader), "FR ERROR: bufferedVideoReader must be a BufferedVideoReader object"
             ## Set self.videos to bufferedVideoReader
             self.videos = bufferedVideoReader.video_readers
