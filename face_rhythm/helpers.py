@@ -24,12 +24,13 @@ def prepare_cv2_imshow():
     import cv2
     test = np.zeros((1,300,400,3))
     for frame in test:
-        cv2.putText(frame, "Prepping CV2", (10,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-        cv2.putText(frame, "Calling this figure allows cv2.imshow ", (10,100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.putText(frame, "to work without crashing if this function", (10,120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.putText(frame, "is called before importing av and decord", (10,140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "WELCOME TO FACE RHYTHM!", (10,50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+        cv2.putText(frame, "Prepping CV2", (10,100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+        cv2.putText(frame, "Calling this figure allows cv2.imshow ", (10,150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "to work without crashing if this function", (10,170), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "is called before importing av and decord", (10,190), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
         cv2.imshow('startup', frame)
-        cv2.waitKey(100)
+        cv2.waitKey(1000)
     cv2.destroyWindow('startup')
 
 
@@ -103,9 +104,12 @@ def get_system_versions(verbose=False):
 
 
 
-###########################################################
-######################## FROM BNPM ########################
-###########################################################
+###################################################################
+############################## BNPM ###############################
+################### EVERYTHING BELOW IS FROM THE ##################
+######## BASIC NEURAL PROCESSING MODULES (BNPM) REPOSITORY ########
+## https://github.com/RichieHakim/basic_neural_processing_modules #
+###################################################################
 
 
 ###########################
@@ -292,31 +296,6 @@ class BufferedVideoReader:
 
     RH 2022
     """
-
-    # __slots__ = (
-    #     "__dict__",
-    #     "boundaries",
-    #     "buffer_size",
-    #     "loaded",
-    #     "loading",
-    #     "lookup",
-    #     "metadata",
-    #     "method_getitem",
-    #     "num_videos",
-    #     "paths_videos",
-    #     "prefetch",
-    #     "slots", 
-    #     "total_frames",
-    #     "video_readers",
-    #     "_cumulative_frame_end",
-    #     "_cumulative_frame_start",
-    #     "_decord_backend",
-    #     "_decord_ctx",
-    #     "_iterator_frame",
-    #     "_start_frame_continuous",
-    #     "_verbose",
-    #     )
-
     def __init__(
         self,
         video_readers: list=None,
