@@ -1,12 +1,18 @@
 from pathlib import Path
 import re
 import time
+from datetime import datetime
 
 import yaml
 
 from . import h5_handling
 
 class FR_Module:
+    """
+    The superclass for all of the Face Rhythm module classes.
+    Allows for saving run_data, run_info, and config files.
+    RH 2022
+    """
     def __init__(self):
         self.run_info = None
         self.run_data = None
@@ -24,7 +30,6 @@ class FR_Module:
     ):
         """
         Appends the self.run_info dictionary to the run_info.yaml file.
-        RH 2022
 
         Args:
             path_run_info (str):
@@ -130,6 +135,9 @@ class FR_Module:
         else:
             print(f"FR: Adding '{self.module_name}' to config.yaml") if verbose > 1 else None
             config[self.module_name] = self.config
+
+        ## Update the date_modified field
+        config["general"]["date_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         ## Save config.yaml file
         print(f'FR: Saving config.yaml to {path_config}') if verbose > 1 else None

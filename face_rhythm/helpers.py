@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 import scipy
 import scipy.sparse
+import scipy.signal
 
 def prepare_cv2_imshow():
     """
@@ -1051,3 +1052,367 @@ def cosine_kernel_2D(center=(5,5), image_size=(11,11), width=5):
     dist_scaled[np.abs(dist_scaled > np.pi)] = np.pi
     k_cos = (np.cos(dist_scaled) + 1)/2
     return k_cos
+
+
+################################
+######## MATH FUNCTIONS ########
+################################
+
+def bounded_logspace(start, stop, num,):
+    """
+    Like np.logspace, but with a defined start and
+     stop.
+    RH 2022
+    
+    Args:
+        start (float):
+            First value in output array
+        stop (float):
+            Last value in output array
+        num (int):
+            Number of values in output array
+            
+    Returns:
+        output (np.ndarray):
+            Array of values
+    """
+
+    exp = 2  ## doesn't matter what this is, just needs to be > 1
+
+    return exp ** np.linspace(np.log(start)/np.log(exp), np.log(stop)/np.log(exp), num, endpoint=True)
+
+def gaussian(x=None, mu=0, sig=1, plot_pref=False):
+    '''
+    A gaussian function (normalized similarly to scipy's function)
+    RH 2021
+    
+    Args:
+        x (np.ndarray): 1-D array of the x-axis of the kernel
+        mu (float): center position on x-axis
+        sig (float): standard deviation (sigma) of gaussian
+        plot_pref (boolean): True/False or 1/0. Whether you'd like the kernel plotted
+        
+    Returns:
+        gaus (np.ndarray): gaussian function (normalized) of x
+        params_gaus (dict): dictionary containing the input params
+    '''
+    import matplotlib.pyplot as plt
+
+    if x is None:
+        x = np.linspace(-sig*5, sig*5, sig*7, endpoint=True)
+
+    gaus = 1/(np.sqrt(2*np.pi)*sig)*np.exp((-((x-mu)/sig) **2)/2)
+
+    if plot_pref:
+        plt.figure()
+        plt.plot(x , gaus)
+        plt.xlabel('x')
+        plt.title(f'$\mu$={mu}, $\sigma$={sig}')
+
+    return gaus
+
+
+################################
+##### VARIABLE Q-TRANSFORM #####
+################################
+
+def torch_hilbert(x, dim=0):
+    """
+    Computes the analytic signal using the Hilbert transform.
+    Based on scipy.signal.hilbert
+    RH 2022
+    
+    Args:
+        x (nd tensor):
+            Signal data. Should be real.
+        dim (int):
+            Dimension along which to do the transformation.
+    
+    Returns:
+        xa (nd tensor):
+            Analytic signal of input x along dim
+    """
+    
+    xf = torch.fft.fft(x, dim=dim)
+    m = torch.zeros(x.shape[dim])
+    n = x.shape[dim]
+    if n % 2: ## then even
+        m[0] = m[n//2] = 1
+        m[1:n//2] = 2
+    else:
+        m[0] = 1 ## then odd
+        m[1:(n+1)//2] = 2
+
+    if x.ndim > 1:
+        ind = [np.newaxis] * x.ndim
+        ind[dim] = slice(None)
+        m = m[tuple(ind)]
+
+    return torch.fft.ifft(xf * m, dim=dim)
+
+
+def make_VQT_filters(    
+    Fs_sample=1000,
+    Q_lowF=3,
+    Q_highF=20,
+    F_min=10,
+    F_max=400,
+    n_freq_bins=55,
+    win_size=501,
+    plot_pref=False
+):
+    """
+    Creates a set of filters for use in the VQT algorithm.
+
+    Set Q_lowF and Q_highF to be the same value for a 
+     Constant Q Transform (CQT) filter set.
+    Varying these values will varying the Q factor 
+     logarithmically across the frequency range.
+
+    RH 2022
+
+    Args:
+        Fs_sample (float):
+            Sampling frequency of the signal.
+        Q_lowF (float):
+            Q factor to use for the lowest frequency.
+        Q_highF (float):
+            Q factor to use for the highest frequency.
+        F_min (float):
+            Lowest frequency to use.
+        F_max (float):
+            Highest frequency to use (inclusive).
+        n_freq_bins (int):
+            Number of frequency bins to use.
+        win_size (int):
+            Size of the window to use, in samples.
+        plot_pref (bool):
+            Whether to plot the filters.
+
+    Returns:
+        filters (Torch ndarray):
+            Array of complex sinusoid filters.
+            shape: (n_freq_bins, win_size)
+        freqs (Torch array):
+            Array of frequencies corresponding to the filters.
+        wins (Torch ndarray):
+            Array of window functions (gaussians)
+             corresponding to each filter.
+            shape: (n_freq_bins, win_size)
+    """
+    import matplotlib.pyplot as plt
+
+    assert win_size%2==1, "RH Error: win_size should be an odd integer"
+    
+    freqs = bounded_logspace(
+        start=F_min,
+        stop=F_max,
+        num=n_freq_bins,
+    )
+
+    periods = 1 / freqs
+    periods_inSamples = Fs_sample * periods
+
+    sigma_all = bounded_logspace(
+        start=Q_lowF,
+        stop=Q_highF,
+        num=n_freq_bins,
+    )
+    sigma_all = sigma_all * periods_inSamples / 4
+
+    wins = torch.stack([gaussian(torch.arange(-win_size//2, win_size//2), 0, sig=sigma) for sigma in sigma_all])
+
+    filts = torch.stack([torch.cos(torch.linspace(-np.pi, np.pi, win_size) * freq * (win_size/Fs_sample)) * win for freq, win in zip(freqs, wins)], dim=0)    
+    filts_complex = torch_hilbert(filts.T, dim=0).T
+    
+    if plot_pref:
+        plt.figure()
+        plt.plot(freqs)
+        plt.xlabel('filter num')
+        plt.ylabel('frequency (Hz)')
+
+        plt.figure()
+        plt.imshow(wins / torch.max(wins, 1, keepdims=True)[0], aspect='auto')
+        plt.title('windows (gaussian)')
+
+        plt.figure()
+        plt.plot(sigma_all)
+        plt.xlabel('filter num')
+        plt.ylabel('window width (sigma of gaussian)')    
+
+        plt.figure()
+        plt.imshow(filts / torch.max(filts, 1, keepdims=True)[0], aspect='auto', cmap='bwr', vmin=-1, vmax=1)
+        plt.title('filters (real component)')
+
+
+        worN=win_size*4
+        filts_freq = np.array([scipy.signal.freqz(
+            b=filt,
+            fs=Fs_sample,
+            worN=worN,
+        )[1] for filt in filts_complex])
+
+        filts_freq_xAxis = scipy.signal.freqz(
+            b=filts_complex[0],
+            worN=worN,
+            fs=Fs_sample
+        )[0]
+
+        plt.figure()
+        plt.plot(filts_freq_xAxis, np.abs(filts_freq.T));
+        plt.xscale('log')
+        plt.xlabel('frequency (Hz)')
+        plt.ylabel('magnitude')
+
+    return filts_complex, freqs, wins
+
+class VQT():
+    def __init__(
+        self,
+        Fs_sample=1000,
+        Q_lowF=3,
+        Q_highF=20,
+        F_min=10,
+        F_max=400,
+        n_freq_bins=55,
+        win_size=501,
+        downsample_factor=4,
+        DEVICE_compute='cpu',
+        DEVICE_return='cpu',
+        return_complex=False,
+        filters=None,
+        plot_pref=False,
+        progressBar=True,
+        ):
+        """
+        Variable Q Transform.
+        Class for applying the variable Q transform to signals.
+
+        This function works differently than the VQT from 
+         librosa or nnAudio. This one does not use iterative
+         lowpass filtering. Instead, it uses a fixed set of 
+         filters, and a Hilbert transform to compute the analytic
+         signal. It can then take the envelope and downsample.
+        
+        Uses Pytorch for GPU acceleration, and allows gradients
+         to pass through.
+
+        Q: quality factor; roughly corresponds to the number 
+         of cycles in a filter. Here, Q is the number of cycles
+         within 4 sigma (95%) of a gaussian window.
+
+        RH 2022
+
+        Args:
+            Fs_sample (float):
+                Sampling frequency of the signal.
+            Q_lowF (float):
+                Q factor to use for the lowest frequency.
+            Q_highF (float):
+                Q factor to use for the highest frequency.
+            F_min (float):
+                Lowest frequency to use.
+            F_max (float):
+                Highest frequency to use.
+            n_freq_bins (int):
+                Number of frequency bins to use.
+            win_size (int):
+                Size of the window to use, in samples.
+            downsample_factor (int):
+                Factor to downsample the signal by.
+                If the length of the input signal is not
+                 divisible by downsample_factor, the signal
+                 will be zero-padded at the end so that it is.
+            DEVICE_compute (str):
+                Device to use for computation.
+            DEVICE_return (str):
+                Device to use for returning the results.
+            return_complex (bool):
+                Whether to return the complex version of 
+                 the transform. If False, then returns the
+                 absolute value (envelope) of the transform.
+                downsample_factor must be 1 if this is True.
+            filters (Torch tensor):
+                Filters to use. If None, will make new filters.
+                Should be complex sinusoids.
+                shape: (n_freq_bins, win_size)
+            plot_pref (bool):
+                Whether to plot the filters.
+        """
+
+        assert all((return_complex==True, downsample_factor!=1))==False, "RH Error: if return_complex==True, then downsample_factor must be 1"
+
+        if filters is not None:
+            self.filters = filters
+        else:
+            self.filters, self.freqs, self.wins = make_VQT_filters(
+                Fs_sample=Fs_sample,
+                Q_lowF=Q_lowF,
+                Q_highF=Q_highF,
+                F_min=F_min,
+                F_max=F_max,
+                n_freq_bins=n_freq_bins,
+                win_size=win_size,
+                plot_pref=plot_pref,
+            )
+
+        self.progBar = tqdm if progressBar else lambda x: x
+        
+        self.args = {}
+        self.args['Fs_sample'] = Fs_sample
+        self.args['Q_lowF'] = Q_lowF
+        self.args['Q_highF'] = Q_highF
+        self.args['F_min'] = F_min
+        self.args['F_max'] = F_max
+        self.args['n_freq_bins'] = n_freq_bins
+        self.args['win_size'] = win_size
+        self.args['downsample_factor'] = downsample_factor
+        self.args['DEVICE_compute'] = DEVICE_compute
+        self.args['DEVICE_return'] = DEVICE_return
+        self.args['return_complex'] = return_complex
+        self.args['plot_pref'] = plot_pref
+
+    def _helper_ds(self, X, ds_factor):
+        if ds_factor == 1:
+            return X
+        else:
+            return torch.nn.functional.avg_pool1d(X, kernel_size=ds_factor, stride=ds_factor, ceil_mode=True)
+
+    def _helper_conv(self, arr, filters, take_abs, DEVICE):
+        out = torch.complex(
+            torch.nn.functional.conv1d(arr.to(DEVICE)[None,None,:],  torch.real(filters.T).to(DEVICE).T[:,None,:], padding='same'),
+            torch.nn.functional.conv1d(arr.to(DEVICE)[None,None,:], -torch.imag(filters.T).to(DEVICE).T[:,None,:], padding='same')
+        )[0]
+        if take_abs:
+            return torch.abs(out)
+        else:
+            return out
+
+    def __call__(self, X):
+        """
+        Forward pass of VQT.
+
+        Args:
+            X (Torch tensor):
+                Input signal.
+                shape: (n_channels, n_samples)
+
+        Returns:
+            Spectrogram (Torch tensor):
+                Spectrogram of the input signal.
+                shape: (n_channels, n_samples_ds, n_freq_bins)
+        """
+        if type(X) is not torch.Tensor:
+            X = torch.as_tensor(X, dtype=torch.float32, device=self.args['DEVICE_compute'])
+
+        if X.ndim==1:
+            X = X[None,:]
+            
+        return torch.stack([self._helper_ds(
+            self._helper_conv(
+                arr=arr, 
+                filters=self.filters, 
+                take_abs=(self.args['return_complex']==False),
+                DEVICE=self.args['DEVICE_compute']
+                ), 
+            self.args['downsample_factor']).to(self.args['DEVICE_return']) for arr in self.progBar(X)], dim=0)

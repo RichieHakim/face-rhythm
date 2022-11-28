@@ -9,6 +9,7 @@ __all__=[
     'point_tracking',
     'project',
     'rois',
+    'spectral_analysis',
     'tests',
     'util',
     'video_playback',

@@ -173,6 +173,7 @@ class PointTracker(FR_Module):
         print("FR: Making points to track") if self._verbose > 1 else None
         rois_all = np.stack(rois_points, axis=0).all(axis=0)
         self.point_positions = self._make_points(rois_all, self.params_optical_flow["point_spacing"])
+        self.num_points = self.point_positions.shape[0]
         print(f"FR: {self.point_positions.shape[0]} points will be tracked") if self._verbose > 1 else None
 
         ## Collapse masks into single mask
@@ -206,8 +207,6 @@ class PointTracker(FR_Module):
 
         ## Prepare violation tracker
         self._pointIdx_violations_current = np.zeros((self.point_positions.shape[0]), dtype=bool)
-        self._pointIdx_violations_countdown = np.zeros((self.point_positions.shape[0]), dtype=int)
-        self._duration_violation_frames = self._params_outlier_handling["framesHalted_before"] + self._params_outlier_handling["framesHalted_after"]
         self._violation_event = False
         
         ## Prepare a playback visualizer
@@ -238,7 +237,6 @@ class PointTracker(FR_Module):
         }
         ## Append the self.run_info data to self.run_data
         self.run_data.update(self.run_info)
-
 
     def _make_points(self, roi, point_spacing):
         """
@@ -281,6 +279,19 @@ class PointTracker(FR_Module):
         points = np.fliplr(points)
 
         return points
+
+    def cleanup(self):
+        """
+        Delete the large data objects that are no longer needed.
+        """
+        import gc
+        print(f"FR: Deleting all attributes")
+        while len(self.__dict__.keys()) > 0:
+            key = list(self.__dict__.keys())[0]
+            del self.__dict__[key]
+        gc.collect()
+        gc.collect()
+
 
     def track_points(self):
         """
@@ -326,11 +337,19 @@ class PointTracker(FR_Module):
         print(f"FR: Placing points_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
         self.points_tracked = {f"{ii}": points for ii, points in enumerate(self.points_tracked)}
         print(f"FR: Placing violations into dictionary self.violations where keys are video indices") if self._verbose > 1 else None
-        self.violations = {f"{ii}": {'row': v.row, 'col': v.col, 'data': v.data, 'shape': v.shape} for ii, v in enumerate(self.violations)}
+        self.violations_sparseCOO = {f"{ii}": {'row': v.row, 'col': v.col, 'data': v.data, 'shape': v.shape} for ii, v in enumerate(self.violations)}
+
+        self.violation_fraction = [np.array(v.max(1).toarray()).squeeze().mean() for v in self.violations]
 
         ## For FR_Module compatibility
+        self.run_info["num_videos"] = int(len(self.videos))
+        self.run_info["num_frames"] = [int(v.num_frames_total) for v in self.videos]
+        self.run_info["num_frames_total"] = int(sum(self.run_info["num_frames"]))
+        self.run_info["num_points"] = int(self.num_points)
+        self.run_info["violation_fraction"] = [int(v) for v in self.violation_fraction]
+
         self.run_data["points_tracked"] = self.points_tracked
-        self.run_data["violations"] = self.violations
+        self.run_data["violations"] = self.violations_sparseCOO
 
 
     def _track_points_singleVideo(
@@ -374,16 +393,6 @@ class PointTracker(FR_Module):
         points_tracked = np.zeros((len(video), points_prev.shape[0], 2), dtype=np.float32)
         self.violations_currentVideo = scipy.sparse.lil_matrix((len(video), points_prev.shape[0]), dtype=np.bool)
 
-        ## Iterate through frames
-        # video.set_iterator_frame_idx(0)
-        # for i_frame, frame in tqdm(
-        #     enumerate(video),
-        #     desc='frame #',
-        #     position=1,
-        #     leave=False,
-        #     disable=self._verbose < 2,
-        #     total=len(video)
-        # ):
         self.i_frame = 0
         video.set_iterator_frame_idx(0)
         with tqdm(total=len(video), desc='frame #', position=1, leave=False, disable=self._verbose < 2) as pbar:
@@ -468,20 +477,6 @@ class PointTracker(FR_Module):
                 A 2D array of np.float32, where each row is a point
                  to track.
         """
-        # displacement = points_new - self.point_positions
-        # pointIdx_violations_new = np.linalg.norm(displacement, axis=1) > self._params_outlier_handling['threshold_displacement']
-        # ## Find violating neighbors
-        # pointIdx_violations_new[np.unique(self.neighbors.numpy()[pointIdx_violations_new].reshape(-1))] = True
-        # ## Determine if a violation event has occurred
-        # self._violation_event = np.any(pointIdx_violations_new)
-        # ## Update violation countdowns
-        # if self._violation_event:
-        #     self._pointIdx_violations_countdown[self._pointIdx_violations_current] += self._params_outlier_handling['framesHalted_before'] + 1
-        # self._pointIdx_violations_countdown[pointIdx_violations_new] = self._duration_violation_frames + 1
-        # self._pointIdx_violations_countdown -= 1
-        # ## Find all points that are currently violating
-        # self._pointIdx_violations_current = self._pointIdx_violations_countdown > 0
-
         displacement = points_new - self.point_positions
         pointIdx_violations_new = np.linalg.norm(displacement, axis=1) > self._params_outlier_handling['threshold_displacement']
         ## Find violating neighbors
