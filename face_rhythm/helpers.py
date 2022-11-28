@@ -1266,6 +1266,7 @@ def make_VQT_filters(
 
     return filts_complex, freqs, wins
 
+
 class VQT():
     def __init__(
         self,
@@ -1279,6 +1280,7 @@ class VQT():
         downsample_factor=4,
         DEVICE_compute='cpu',
         DEVICE_return='cpu',
+        batch_size=1000,
         return_complex=False,
         filters=None,
         plot_pref=False,
@@ -1327,6 +1329,9 @@ class VQT():
                 Device to use for computation.
             DEVICE_return (str):
                 Device to use for returning the results.
+            batch_size (int):
+                Number of signals to process at once.
+                Use a smaller batch size if you run out of memory.
             return_complex (bool):
                 Whether to return the complex version of 
                  the transform. If False, then returns the
@@ -1339,8 +1344,6 @@ class VQT():
             plot_pref (bool):
                 Whether to plot the filters.
         """
-
-        assert all((return_complex==True, downsample_factor!=1))==False, "RH Error: if return_complex==True, then downsample_factor must be 1"
 
         if filters is not None:
             self.filters = filters
@@ -1356,33 +1359,47 @@ class VQT():
                 plot_pref=plot_pref,
             )
 
-        self.progBar = tqdm if progressBar else lambda x: x
-        
-        self.args = {}
-        self.args['Fs_sample'] = Fs_sample
-        self.args['Q_lowF'] = Q_lowF
-        self.args['Q_highF'] = Q_highF
-        self.args['F_min'] = F_min
-        self.args['F_max'] = F_max
-        self.args['n_freq_bins'] = n_freq_bins
-        self.args['win_size'] = win_size
-        self.args['downsample_factor'] = downsample_factor
-        self.args['DEVICE_compute'] = DEVICE_compute
-        self.args['DEVICE_return'] = DEVICE_return
-        self.args['return_complex'] = return_complex
-        self.args['plot_pref'] = plot_pref
+        ## Fill in missing parameters
+        args_default = {
+            'Fs_sample': 1000,
+            'Q_lowF': 3,
+            'Q_highF': 20,
+            'F_min': 10,
+            'F_max': 400,
+            'n_freq_bins': 55,
+            'win_size': 501,
+            'downsample_factor': 4,
+            'DEVICE_compute': 'cpu',
+            'DEVICE_return': 'cpu',
+            'batch_size': 1000,
+            'return_complex': False,
+            'filters': None,
+            'plot_pref': False,
+            'progressBar': True,            
+        }
 
-    def _helper_ds(self, X, ds_factor):
+        ## if the parameter was passed as an arg then place it in the args dict, otherwise use the default
+        self.args = {key: locals()[key] if key in locals() else val for key, val in args_default.items()}
+
+
+    def _helper_ds(self, X: torch.Tensor, ds_factor: int=4, return_complex: bool=False):
         if ds_factor == 1:
             return X
-        else:
-            return torch.nn.functional.avg_pool1d(X, kernel_size=ds_factor, stride=ds_factor, ceil_mode=True)
+        elif return_complex == False:
+            return torch.nn.functional.avg_pool1d(X, kernel_size=[int(ds_factor)], stride=ds_factor, ceil_mode=True)
+        elif return_complex == True:
+            ## Unfortunately, torch.nn.functional.avg_pool1d does not support complex numbers. So we have to split it up.
+            ### Split X, shape: (batch_size, n_freq_bins, n_samples) into real and imaginary parts, shape: (batch_size, n_freq_bins, n_samples, 2)
+            Y = torch.view_as_real(X)
+            ### Downsample each part separately, then stack them and make them complex again.
+            Z = torch.view_as_complex(torch.stack([torch.nn.functional.avg_pool1d(y, kernel_size=[int(ds_factor)], stride=ds_factor, ceil_mode=True) for y in [Y[...,0], Y[...,1]]], dim=-1))
+            return Z
 
     def _helper_conv(self, arr, filters, take_abs, DEVICE):
         out = torch.complex(
-            torch.nn.functional.conv1d(arr.to(DEVICE)[None,None,:],  torch.real(filters.T).to(DEVICE).T[:,None,:], padding='same'),
-            torch.nn.functional.conv1d(arr.to(DEVICE)[None,None,:], -torch.imag(filters.T).to(DEVICE).T[:,None,:], padding='same')
-        )[0]
+            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:],  torch.real(filters.T).to(DEVICE).T[:,None,:], padding='same'),
+            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:], -torch.imag(filters.T).to(DEVICE).T[:,None,:], padding='same')
+        )
         if take_abs:
             return torch.abs(out)
         else:
@@ -1407,12 +1424,18 @@ class VQT():
 
         if X.ndim==1:
             X = X[None,:]
-            
-        return torch.stack([self._helper_ds(
-            self._helper_conv(
+
+        batches = make_batches(X, batch_size=self.args['batch_size'], length=X.shape[0])
+
+        test = [self._helper_ds(
+            X=self._helper_conv(
                 arr=arr, 
                 filters=self.filters, 
                 take_abs=(self.args['return_complex']==False),
                 DEVICE=self.args['DEVICE_compute']
                 ), 
-            self.args['downsample_factor']).to(self.args['DEVICE_return']) for arr in self.progBar(X)], dim=0)
+            ds_factor=self.args['downsample_factor'],
+            return_complex=self.args['return_complex'],
+            ).to(self.args['DEVICE_return']) for arr in tqdm(batches, disable=(self.args['progressBar']==False), leave=True, total=int(np.ceil(X.shape[0]/self.args['batch_size'])))]
+        
+        return torch.cat(test, dim=0)

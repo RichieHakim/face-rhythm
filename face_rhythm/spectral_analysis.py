@@ -155,9 +155,18 @@ class VQT_Analyzer(FR_Module):
             spectrogram (torch.Tensor):
                 A spectrogram of shape: (n_points, n_freq_bins, n_frames)                    
         """
-        s_exp = spectrogram ** self._spectrogram_exponent
-        s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
-        return  s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
+        if torch.is_complex(spectrogram) == False:
+            s_exp = spectrogram ** self._spectrogram_exponent
+            s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
+            return  s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
+        
+        elif torch.is_complex(spectrogram) == True:
+            s_mag = torch.abs(spectrogram)
+            s_phase = torch.angle(spectrogram)
+            s_exp = s_mag ** self._spectrogram_exponent
+            s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
+            s_mag_norm = s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
+            return torch.polar(s_mag_norm, s_phase)
 
     def _prepare_displacements(self, traces, point_positions):
         """
@@ -211,8 +220,8 @@ class VQT_Analyzer(FR_Module):
             import matplotlib.pyplot as plt
             fig, axs = plt.subplots(2, 1, figsize=(10, 5))
             ## set the y axis to the frequency bins
-            axs[0].imshow(spectrogram[0,:,:], aspect='auto', origin='lower', cmap='hot', extent=[0, spectrogram.shape[2], self.VQT.freqs[0], self.VQT.freqs[-1]])
-            axs[1].imshow(spectrogram[1,:,:], aspect='auto', origin='lower', cmap='hot', extent=[0, spectrogram.shape[2], self.VQT.freqs[0], self.VQT.freqs[-1]])
+            axs[0].imshow(np.abs(spectrogram[0,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, spectrogram.shape[2], self.VQT.freqs[0], self.VQT.freqs[-1]])
+            axs[1].imshow(np.abs(spectrogram[1,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, spectrogram.shape[2], self.VQT.freqs[0], self.VQT.freqs[-1]])
             axs[0].set_title(f'Spectrogram of x and y displacements of point {idx_point}')
             axs[1].set_xlabel('Time')
             axs[0].set_ylabel('Frequency')

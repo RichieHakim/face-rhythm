@@ -16,6 +16,8 @@ __all__=[
     'data_importing',
 ]
 
+import torch  ## For some reason, it crashes if I don't import torch before other packages... RH 20221128
+
 for pkg in __all__:
     exec('from . import ' + pkg)
 
