@@ -58,7 +58,6 @@ class VQT_Analyzer(FR_Module):
             'verbose': verbose,
         }
         self.run_info = {
-            'VQT_args': self.VQT.args,
         }
         self.run_data = {
             'VQT': {key: self.VQT.__dict__[key] for key in ['filters', 'wins']},
@@ -220,10 +219,13 @@ class VQT_Analyzer(FR_Module):
             import matplotlib.pyplot as plt
             fig, axs = plt.subplots(2, 1, figsize=(10, 5))
             ## set the y axis to the frequency bins
-            axs[0].imshow(np.abs(spectrogram[0,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, spectrogram.shape[2], self.VQT.freqs[0], self.VQT.freqs[-1]])
-            axs[1].imshow(np.abs(spectrogram[1,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, spectrogram.shape[2], self.VQT.freqs[0], self.VQT.freqs[-1]])
+            # x_axis_max = spectrogram.shape[2]/(self.VQT.args['Fs_sample']/self.VQT.args['downsample_factor'])
+            x_axis_max = spectrogram.shape[2]/(self.VQT.args['Fs_sample'])
+            print(self.VQT.args['downsample_factor'])
+            axs[0].imshow(np.abs(spectrogram[0,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, x_axis_max, self.VQT.freqs[0], self.VQT.freqs[-1]])
+            axs[1].imshow(np.abs(spectrogram[1,:,:]), aspect='auto', origin='lower', cmap='hot', extent=[0, x_axis_max, self.VQT.freqs[0], self.VQT.freqs[-1]])
             axs[0].set_title(f'Spectrogram of x and y displacements of point {idx_point}')
-            axs[1].set_xlabel('Time')
+            axs[1].set_xlabel('Time (s)')
             axs[0].set_ylabel('Frequency')
             plt.show()
 
