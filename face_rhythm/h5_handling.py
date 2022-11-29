@@ -109,13 +109,16 @@ def show_item_tree(hObj=None , path=None, show_metadata=True , print_metadata=Fa
                     print(f'{indent}{ii+1}. {val}:   type={type(hObj[val])}')
 
 
-def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False):
+def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False, track_order=True):
     '''
     This function is meant to be called by write_dict_to_h5. It probably shouldn't be called alone.
     This function creates an h5 group and dataset tree structure based on the hierarchy and values within a python dict.
     There is a recursion in this function.
     RH 2021
     '''
+    ## Set track_order to True to keep track of the order of the items in the dict
+    ##  This is useful for reading the dict back in from the h5 file
+    h5py.get_config().track_order = track_order
     for ii,(key,val) in enumerate(dict_obj.items()):
         if group_string=='':
             group_string='/'
@@ -126,10 +129,17 @@ def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False):
         else:
             # print(f'saving:  {group_string}: {key}')
             if use_compression:
-                h5_obj[group_string].create_dataset(key , data=val, track_order=True, compression='gzip', compression_opts=9)
+                h5_obj[group_string].create_dataset(key , data=val, compression='gzip', compression_opts=9)
             else:
-                h5_obj[group_string].create_dataset(key , data=val, track_order=True)
-def write_dict_to_h5(path_save, input_dict, use_compression=False, write_mode='w-', show_item_tree_pref=True):
+                h5_obj[group_string].create_dataset(key , data=val)
+def write_dict_to_h5(
+    path_save, 
+    input_dict, 
+    use_compression=False, 
+    track_order=True, 
+    write_mode='w-', 
+    show_item_tree_pref=True
+):
     '''
     Writes an h5 file that matches the hierarchy and data within a python dict.
     This function calls the function 'make_h5_tree'
@@ -140,13 +150,17 @@ def write_dict_to_h5(path_save, input_dict, use_compression=False, write_mode='w
             Full path name of file to write
         input_dict (dict): 
             Dict containing only variables that can be written as a 'dataset' in an h5 file (generally np.ndarrays and strings)
+        use_compression (bool):
+            Whether or not to use compression when writing the h5 file
+        track_order (bool):
+            Whether or not to keep track of the order of the items in the dict
         write_mode ('w' or 'w-'): 
             The priveleges of the h5 file object. 'w' will overwrite. 'w-' will not overwrite
         show_item_tree_pref (bool): 
             Whether you'd like to print the item tree or not
     '''
     with h5py.File(path_save , write_mode) as hf:
-        make_h5_tree(input_dict , hf , '', use_compression=use_compression)
+        make_h5_tree(input_dict , hf , '', use_compression=use_compression, track_order=track_order)
         if show_item_tree_pref:
             print(f'==== Successfully wrote h5 file. Displaying h5 hierarchy ====')
             show_item_tree(hf)
@@ -180,7 +194,14 @@ def simple_load(path=None, verbose=False):
     return h5Obj
 
 
-def simple_save(dict_to_save, path=None, use_compression=False, write_mode='w-', verbose=False):
+def simple_save(
+    dict_to_save, 
+    path=None, 
+    use_compression=False, 
+    track_order=True, 
+    write_mode='w-', 
+    verbose=False
+):
     """
     Saves a python dict to an hdf file.
     Also allows for adding new data to
@@ -197,8 +218,19 @@ def simple_save(dict_to_save, path=None, use_compression=False, write_mode='w-',
             'w' will overwrite.
             'w-' will not overwrite.
             'a' will append/add a new dataset to the h5 file.
+        use_compression (bool):
+            Whether or not to use compression when writing the h5 file
+        track_order (bool):
+            Whether or not to keep track of the order of the items in the dict
         verbose (bool):
             Whether or not to print out the h5 file hierarchy.
     """
 
-    write_dict_to_h5(path, dict_to_save, use_compression=use_compression, write_mode=write_mode, show_item_tree_pref=verbose)
+    write_dict_to_h5(
+        path, 
+        dict_to_save, 
+        use_compression=use_compression, 
+        track_order=track_order,
+        write_mode=write_mode, 
+        show_item_tree_pref=verbose
+    )
