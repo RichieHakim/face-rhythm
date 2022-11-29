@@ -111,7 +111,7 @@ class Dataset_videos(FR_Module):
         ## Workflow if method is 'BufferedVideoReader'
         elif self._videoDataType == 'BufferedVideoReader':
             ## Assert that bufferedVideoReader is a BufferedVideoReader object
-            type(bufferedVideoReader), isinstance(bufferedVideoReader, BufferedVideoReader)  ## line needed sometimes for next assert to work
+            type(bufferedVideoReader), BufferedVideoReader.__class__, isinstance(bufferedVideoReader, BufferedVideoReader)  ## line needed sometimes for next assert to work
             assert isinstance(bufferedVideoReader, BufferedVideoReader), "FR ERROR: bufferedVideoReader must be a BufferedVideoReader object"
             ## Set self.videos to bufferedVideoReader
             self.videos = bufferedVideoReader.video_readers
@@ -133,6 +133,7 @@ class Dataset_videos(FR_Module):
         self.num_frames_total = int(np.sum(self.metadata["num_frames"]))
         self.frame_height_width = self.metadata["frame_height_width"][0]
         self.num_channels = self.metadata["num_channels"][0]
+        self.paths_videos = [str(path) for path in self.paths_videos]  ## ensure paths are strings
 
         ## For FR_Module compatibility
         self.config = {
@@ -146,12 +147,13 @@ class Dataset_videos(FR_Module):
             "num_frames_total": self.num_frames_total,
             "frame_height_width": self.frame_height_width,
             "num_channels": self.num_channels,
+            "metadata": self.metadata,
         }
         self.run_data = {
-            "metadata": self.metadata,  ## this should be a lazy reference to the self.metadata 
+            # "metadata": self.metadata,  ## this should be a lazy reference to the self.metadata 
         }
         ## Append the self.run_info data to self.run_data
-        self.run_data.update(self.run_info)
+        # self.run_data.update(self.run_info)
 
     def __repr__(self):
         return f"Dataset_videos, num_videos={len(self.paths_videos)}, num_frames_total={self.num_frames_total}, frame_rate={self.frame_rate}, frame_height_width={self.frame_height_width}, num_channels={self.num_channels}"
