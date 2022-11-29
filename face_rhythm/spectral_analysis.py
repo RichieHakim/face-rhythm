@@ -82,7 +82,29 @@ class VQT_Analyzer(FR_Module):
         gc.collect()
 
 
-    def transform(self, points_tracked: dict, point_positions: np.ndarray):
+    def transform(self, points_tracked: np.ndarray, point_positions: np.ndarray):
+        """
+        Transform a single batch of points into spectrograms.
+
+        Args:
+            points_tracked (np.ndarray):
+                A 3D numpy array of shape(n_frames, n_points, 2)
+                 containing the tracked points.
+            point_positions (np.ndarray):
+                A 2D numpy array of shape(n_points, 2) containing the positions
+
+        Returns:
+            spectrograms (np.ndarray):
+                A 4D numpy array of shape(n_points, n_freq_bins, n_frames, 2)
+        """
+        ## Prepare traces
+        point_positions = self._prepare_pointPositions(point_positions)
+        ## Compute spectrograms
+        out = self._normalize_spectrogram(self.VQT(self._prepare_displacements(points_tracked, point_positions)))
+        return out
+
+
+    def transform_all(self, points_tracked: dict, point_positions: np.ndarray):
         """
         Generate spectrograms from the tracked points.
         Reshape the inputs, run the VQT, and normalize the spectrograms.
@@ -94,16 +116,12 @@ class VQT_Analyzer(FR_Module):
             point_positions (np.ndarray):
                 A 2D numpy array of shape(n_points, 2) containing the positions
                  of the tracked points.
-            name_pointsTracked (str):
-                A string to use to index the points_tracked dict.
-            idx_point (list):
-                Index of point to transform and return or plot.
-            plot (bool):
-                Whether to plot the spectrograms.
 
-        Returns:
-            spectrograms (dict):
+        Set Attributes:
+            self.spectrograms (dict):
                 A list of spectrograms for each element in idx_points.
+            self.run_data (dict):
+                Updates with self.spectrograms and self.point_positions.
         """
         ## Check inputs
         self._check_inputs(points_tracked, point_positions)
@@ -113,7 +131,7 @@ class VQT_Analyzer(FR_Module):
         self.point_positions = self._prepare_pointPositions(point_positions)
         ## Compute spectrograms
         print(f"Computing spectrograms...") if self._verbose > 1 else None
-        self.spectrograms ={key: self._normalize_spectrogram(self.VQT(self._prepare_displacements(points, self.point_positions))) for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc="Computing spectrograms", leave=False)}
+        self.spectrograms = {key: self.transform(points, point_positions) for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc="Computing spectrograms", leave=False)}
 
         ## Update self.run_data
         self.run_data.update({
@@ -173,6 +191,7 @@ class VQT_Analyzer(FR_Module):
         elif isinstance(spectrogram, torch.Tensor):
             spec = spectrogram
 
+
         if torch.is_complex(spec) == False:
             s_exp = spec ** self._spectrogram_exponent
             s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
@@ -186,14 +205,30 @@ class VQT_Analyzer(FR_Module):
             s_mag_norm = s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
             s_norm = torch.polar(s_mag_norm, s_phase)
         
-        return {'spec': s_norm.cpu().numpy(), 'x_axis': x_axis.cpu().numpy(), 'freqs': freqs} if isinstance(spectrogram, tuple) else s_norm
+        s_norm_rs = s_norm.reshape(2, int(s_norm.shape[0]/2), s_norm.shape[1], s_norm.shape[2])
+        return {'spec': s_norm_rs.cpu().numpy(), 'x_axis': x_axis.cpu().numpy(), 'freqs': freqs} if isinstance(spectrogram, tuple) else s_norm
 
     def _prepare_displacements(self, traces, point_positions):
         """
         A function to reshape and subtract offsets from traces.
         Reshape from (n_frames, n_points, 2) to (n_points * 2, n_frames)
+        Subtract the point_positions from the traces.
+
+        Args:
+            traces (np.ndarray):
+                A 3D numpy array of shape(n_frames, n_points, 2) containing the
+                 tracked points.
+            point_positions (np.ndarray):
+                A 2D numpy array of shape(n_points * 2) containing the positions
+                 of the tracked points.
+
+        Returns:
+            displacements (np.ndarray):
+                A 2D numpy array of shape(n_points * 2, n_frames) containing the
+                 displacements of the tracked points.
         """
-        return torch.as_tensor(traces.reshape((traces.shape[0], -1), order='F').T, dtype=torch.float32) - point_positions[:,None]
+        out = torch.as_tensor(traces.reshape((traces.shape[0], -1), order='F').T, dtype=torch.float32) - point_positions[:,None]
+        return out
 
     def _prepare_pointPositions(self, point_positions):
         """
@@ -236,11 +271,21 @@ class VQT_Analyzer(FR_Module):
         ## Check inputs
         self._check_inputs(points_tracked, point_positions)
 
-        ## Prepare traces
-        point_positions = self._prepare_pointPositions(point_positions[idx_point,:])
-        ## Compute spectrogram
-        spec, x_axis, freqs = self.VQT(self._prepare_displacements(points_tracked[name_points][:,idx_point,:], point_positions))
-        self._demo_spectrogram = self._normalize_spectrogram(spec).cpu().numpy()
+        ## Transform
+        # spectrograms = self.transform(points_tracked[name_points][idx_point,:,:][None,...], point_positions[idx_point,:][None,...])
+        out = self.transform(points_tracked[name_points][:,idx_point,:][:,None,:], point_positions[idx_point,:][None,...])
+        # out = self.transform(points_tracked[name_points], point_positions)
+        spec, x_axis, freqs = out['spec'][:,0,:,:], out['x_axis'], out['freqs']
+        print('test', spec.shape)
+
+        # ## Prepare traces
+        # point_positions = self._prepare_pointPositions(point_positions[idx_point,:])
+        # ## Compute spectrogram using self.transform
+        # self._demo_spectrogram = self.transform({'demo': points_tracked[name_points][idx_point,:,:]}, point_positions)
+        print(f"Demo spectrogram shape: {spec.shape}")
+
+        # spec, x_axis, freqs = self.VQT(self._prepare_displacements(points_tracked[name_points][:,idx_point,:], point_positions))
+        # self._demo_spectrogram = self._normalize_spectrogram(spec).cpu().numpy()
 
         ## Plot
         if plot:
@@ -262,11 +307,11 @@ class VQT_Analyzer(FR_Module):
             return int((length + 2 * padding - kernel_size) / stride + 1)
         shapes_pt = [p.shape for p in points_tracked.values()]
         shapes_spec = [(s[2], len(self.VQT.freqs), s[1], _get_avgpool1d_downsample_length(s[0], kernel_size=int(self.VQT.downsample_factor), stride=self.VQT.downsample_factor, padding=0)) for s in shapes_pt]
-        sizes_spec = [np.prod(s) * self._demo_spectrogram.itemsize / 1e9 for s in shapes_spec]
+        sizes_spec = [np.prod(s) * spec.itemsize / 1e9 for s in shapes_spec]
         print(f'Total size of all spectrograms: {np.sum(sizes_spec):.8f} GB') if self._verbose > 1 else None
         print(f'Individual spectrogram sizes (in GB): {sizes_spec}') if self._verbose > 1 else None            
 
-        return self._demo_spectrogram
+        return spec
 
     
     def __repr__(self): return f"{self.__class__.__name__}(VQT={self.VQT.args}, spectrogram_exponent={self._spectrogram_exponent}, normalization_factor={self._normalization_factor})"
