@@ -21,6 +21,58 @@ class FR_Module:
         self.module_name = self.__class__.__name__
 
 
+    def save_config(
+        self, 
+        path_config=None, 
+        overwrite=True, 
+        verbose=1
+    ):
+        """
+        Appends the self.config dictionary to the config.yaml file.
+        This dictionary is created by the subclass and should contain
+         all the parameters used to run the module.
+        RH 2022
+
+        Args:
+            path_config (str):
+                Path to config.yaml file.
+            overwrite (bool):
+                If True, overwrites fields within the config.yaml file.
+            verbose (int):
+                Verbosity level. 0 is silent. 1 is print warnings. 2 is print all.
+        """
+        ## Assert if self.config is not None
+        assert self.config is not None, 'FR ERROR: self.config is None. Module likely did not run properly. Please set self.config before saving.'
+
+        ## Assert that path_config is a string, exists, is a file, is a yaml file, and is named properly
+        assert isinstance(path_config, str), "FR ERROR: path_config must be a string"
+        assert Path(path_config).exists(), "FR ERROR: path_config must exist"
+        assert Path(path_config).is_file(), "FR ERROR: path_config must be a file"
+        assert Path(path_config).suffix == ".yaml", "FR ERROR: path_config must be a yaml file"
+        assert Path(path_config).name == "config.yaml", "FR ERROR: path_config must be named config.yaml"
+
+        config = load_yaml_safe(path_config)
+            
+        ## Append self.config to module_name key in config.yaml
+        if (self.module_name in config.keys()) and not overwrite:
+            print(f"FR Warning: Not saving anything. Field exists in dictionary and overwrite==False. '{self.module_name}' is already a field in config.yaml.") if verbose > 0 else None
+            return None
+        elif (self.module_name in config.keys()) and overwrite:
+            print(f"FR Warning: Overwriting field. '{self.module_name}' already in config.yaml.") if verbose > 0 else None
+            config[self.module_name] = self.config
+        else:
+            print(f"FR: Adding '{self.module_name}' to config.yaml") if verbose > 1 else None
+            config[self.module_name] = self.config
+
+        ## Update the date_modified field
+        config["general"]["date_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        ## Save config.yaml file
+        print(f'FR: Saving config.yaml to {path_config}') if verbose > 1 else None
+        with open(path_config, 'w') as f:
+            yaml.dump(config, f, Dumper=yaml.Dumper, sort_keys=False)
+
+
     def save_run_info(
         self, 
         path_run_info=None, 
@@ -91,58 +143,6 @@ class FR_Module:
         print(f'FR: Saving run_info.yaml to {path_run_info}') if verbose > 1 else None
         with open(path_run_info, 'w') as f:
             yaml.dump(run_info, f, Dumper=yaml.Dumper, sort_keys=False)
-
-
-    def save_config(
-        self, 
-        path_config=None, 
-        overwrite=True, 
-        verbose=1
-    ):
-        """
-        Appends the self.config dictionary to the config.yaml file.
-        This dictionary is created by the subclass and should contain
-         all the parameters used to run the module.
-        RH 2022
-
-        Args:
-            path_config (str):
-                Path to config.yaml file.
-            overwrite (bool):
-                If True, overwrites fields within the config.yaml file.
-            verbose (int):
-                Verbosity level. 0 is silent. 1 is print warnings. 2 is print all.
-        """
-        ## Assert if self.config is not None
-        assert self.config is not None, 'FR ERROR: self.config is None. Module likely did not run properly. Please set self.config before saving.'
-
-        ## Assert that path_config is a string, exists, is a file, is a yaml file, and is named properly
-        assert isinstance(path_config, str), "FR ERROR: path_config must be a string"
-        assert Path(path_config).exists(), "FR ERROR: path_config must exist"
-        assert Path(path_config).is_file(), "FR ERROR: path_config must be a file"
-        assert Path(path_config).suffix == ".yaml", "FR ERROR: path_config must be a yaml file"
-        assert Path(path_config).name == "config.yaml", "FR ERROR: path_config must be named config.yaml"
-
-        config = load_yaml_safe(path_config)
-            
-        ## Append self.config to module_name key in config.yaml
-        if (self.module_name in config.keys()) and not overwrite:
-            print(f"FR Warning: Not saving anything. Field exists in dictionary and overwrite==False. '{self.module_name}' is already a field in config.yaml.") if verbose > 0 else None
-            return None
-        elif (self.module_name in config.keys()) and overwrite:
-            print(f"FR Warning: Overwriting field. '{self.module_name}' already in config.yaml.") if verbose > 0 else None
-            config[self.module_name] = self.config
-        else:
-            print(f"FR: Adding '{self.module_name}' to config.yaml") if verbose > 1 else None
-            config[self.module_name] = self.config
-
-        ## Update the date_modified field
-        config["general"]["date_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        ## Save config.yaml file
-        print(f'FR: Saving config.yaml to {path_config}') if verbose > 1 else None
-        with open(path_config, 'w') as f:
-            yaml.dump(config, f, Dumper=yaml.Dumper, sort_keys=False)
             
 
     def save_run_data(
@@ -151,6 +151,7 @@ class FR_Module:
         path_config=None,
         overwrite=True, 
         use_compression=True,
+        track_order=True,
         verbose=1
     ):
         """
@@ -175,6 +176,10 @@ class FR_Module:
                  .../config['paths']['project']/analysis_files/'object method name'.h5
             overwrite (bool):
                 If True, overwrites fields within the .h5 file.
+            use_compression (bool):
+                If True, uses compression when saving the .h5 file.
+            track_order (bool):
+                If True, tracks the order of the data in the .h5 file.
             verbose (int):
                 Verbosity level. 
                 0: silent
@@ -219,12 +224,26 @@ class FR_Module:
         ## Try to save run_data to .h5 file. If we get an error that it failed because the ile is already open, then search for all open h5py.File objects and close them.
         print(f'FR: Saving run_data to {path_run_data}') if verbose > 1 else None
         try:
-            h5_handling.simple_save(dict_to_save=self.run_data, path=path_run_data, use_compression=use_compression, write_mode=('w' if overwrite else 'w-'), verbose=verbose>1)
+            h5_handling.simple_save(
+                dict_to_save=self.run_data, 
+                path=path_run_data, 
+                use_compression=use_compression, 
+                track_order=track_order,
+                write_mode=('w' if overwrite else 'w-'), 
+                verbose=verbose>1
+            )
         except OSError as e:
             if re.search('Unable.*already open', str(e)):
                 print(f'FR Warning: {path_run_data} is already open. Closing all open h5py.File objects and trying again.') if verbose > 0 else None
                 h5_handling.close_all_h5()
-                h5_handling.simple_save(dict_to_save=self.run_data, path=path_run_data, use_compression=use_compression, write_mode=('w' if overwrite else 'w-'), verbose=verbose>1)
+                h5_handling.simple_save(
+                    dict_to_save=self.run_data, 
+                    path=path_run_data, 
+                    use_compression=use_compression, 
+                    track_order=track_order,
+                    write_mode=('w' if overwrite else 'w-'), 
+                    verbose=verbose>1
+                )
             else:
                 raise e
         
