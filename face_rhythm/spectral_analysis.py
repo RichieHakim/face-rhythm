@@ -314,7 +314,7 @@ class VQT_Analyzer(FR_Module):
         return spec
 
     
-    def __repr__(self): return f"{self.__class__.__name__}(VQT={self.VQT.args}, spectrogram_exponent={self._spectrogram_exponent}, normalization_factor={self._normalization_factor})"
+    def __repr__(self): return f"{self.__class__.__name__}( normalization_factor={self._normalization_factor}, spectrogram_exponent={self._spectrogram_exponent}, VQT={self.VQT}, verbose={self._verbose} )"
     def __getitem__(self, index): return self.spectrograms(index)
     def __len__(self): return len(self.spectrograms)
     def __iter__(self): return iter(self.spectrograms.items())    
