@@ -126,9 +126,9 @@ def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False):
         else:
             # print(f'saving:  {group_string}: {key}')
             if use_compression:
-                h5_obj[group_string].create_dataset(key , data=val, compression='gzip', compression_opts=9)
+                h5_obj[group_string].create_dataset(key , data=val, track_order=True, compression='gzip', compression_opts=9)
             else:
-                h5_obj[group_string].create_dataset(key , data=val)
+                h5_obj[group_string].create_dataset(key , data=val, track_order=True)
 def write_dict_to_h5(path_save, input_dict, use_compression=False, write_mode='w-', show_item_tree_pref=True):
     '''
     Writes an h5 file that matches the hierarchy and data within a python dict.
