@@ -3,6 +3,8 @@ import threading
 from typing import Union
 import time
 import gc
+import json
+from pathlib import Path
 
 import numpy as np
 import decord
@@ -187,6 +189,74 @@ def find_paths(
     if natsorted:
         paths = natsort.natsorted(paths, alg=alg_ns)
     return paths
+
+
+###########################
+###### FILE HELPERS #######
+###########################
+
+def prepare_filepath_for_saving(path, mkdir=False, allow_overwrite=True):
+    """
+    Checks if a file path is valid.
+    RH 2022
+
+    Args:
+        path (str):
+            Path to check.
+        mkdir (bool):
+            If True, creates parent directory if it does not exist.
+        allow_overwrite (bool):
+            If True, allows overwriting of existing file.
+    """
+    Path(path).parent.mkdir(parents=True, exist_ok=True) if mkdir else None
+    assert allow_overwrite or not Path(path).exists(), f'{path} already exists.'
+    assert Path(path).parent.exists(), f'{Path(path).parent} does not exist.'
+    assert Path(path).parent.is_dir(), f'{Path(path).parent} is not a directory.'
+
+
+def json_save(obj, path_save, indent=4, mode='w', mkdir=False, allow_overwrite=True):
+    """
+    Saves an object to a json file.
+    Uses json.dump.
+    RH 2022
+
+    Args:
+        obj (object):
+            Object to save.
+        path_save (str):
+            Path to save object to.
+        mode (str):
+            Mode to open file in.
+            Can be:
+                'wb' (write binary)
+                'ab' (append binary)
+                'xb' (exclusive write binary. Raises FileExistsError if file already exists.)
+        mkdir (bool):
+            If True, creates parent directory if it does not exist.
+        allow_overwrite (bool):
+            If True, allows overwriting of existing file.        
+    """
+    prepare_filepath_for_saving(path_save, mkdir=mkdir, allow_overwrite=allow_overwrite)
+    with open(path_save, mode) as f:
+        json.dump(obj, f, indent=indent)
+
+def json_load(filename, mode='r'):
+    """
+    Loads a json file.
+    RH 2022
+
+    Args:
+        filename (str):
+            Path to pickle file.
+        mode (str):
+            Mode to open file in.
+
+    Returns:
+        obj (object):
+            Object loaded from pickle file.
+    """
+    with open(filename, mode) as f:
+        return json.load(f)
         
 
 ###########################
@@ -392,14 +462,14 @@ class BufferedVideoReader:
         else:
             print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
             assert isinstance(video_readers, list), "video_readers must be list of decord.VideoReader objects"
-            self.paths_videos = None
+            self.paths_videos = [v.path for v in video_readers]
             assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
         ## Assert that method_getitem is valid
         assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
         ## Check if backend is valid by trying to set it here (only works fully when used in the _load_frames method)
         decord.bridge.set_bridge(self._decord_backend)
 
-
+        self.paths_videos = [str(path) for path in self.paths_videos]  ## ensure paths are str
         self.video_readers = video_readers
         self._cumulative_frame_end = np.cumsum([len(video_reader) for video_reader in self.video_readers])
         self._cumulative_frame_start = np.concatenate([[0], self._cumulative_frame_end[:-1]])
