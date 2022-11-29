@@ -8,6 +8,7 @@ from .helpers import get_system_versions, prepare_cv2_imshow
 def prepare_project(
     directory_project='./',
     overwrite_config=False,
+    mkdir=True,
     initialize_visualization=True,
     verbose=1,
 ):
@@ -22,6 +23,8 @@ def prepare_project(
             If './' is passed, the current working directory is used
         overwrite_config (bool): 
             Whether to overwrite the config
+        mkdir (bool):
+            Whether to create the project directory if it doesn't exist
         initialize_visualization (bool):
             Whether to initialize cv2.imshow visualization. If on a server,
              this should be set to False.
@@ -64,6 +67,14 @@ def prepare_project(
         ## Write to file with overwriting
         with open(path_config, 'w') as f:
             yaml.dump(contents_basic, f, sort_keys=False)
+    
+    ## Check if directory_project exists
+    if mkdir:
+        if not Path(directory_project).exists():
+            print(f"FR: Creating project directory: {directory_project}") if verbose > 1 else None
+            Path(directory_project).mkdir(parents=True, exist_ok=True)
+    else:
+        raise FileNotFoundError(f"FR ERROR: directory_project does not exist: {directory_project}")
 
     path_config = str(Path(directory_project) / 'config.yaml')
     path_run_info = str(Path(directory_project) / 'run_info.yaml')
