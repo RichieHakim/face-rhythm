@@ -6,6 +6,7 @@ from datetime import datetime
 import yaml
 
 from . import h5_handling
+from . import helpers
 
 class FR_Module:
     """
@@ -106,13 +107,12 @@ class FR_Module:
         ## Get the one that is not None
         path = path_run_info if path_run_info is not None else path_config
 
-        ## Assert that path is a string, exists, is a file, is a yaml file, and is named properly
+        ## Assert that path is a string, exists, is a file, is a json file, and is named properly
         assert isinstance(path, str), "FR ERROR: path_run_info must be a string"
         assert Path(path).exists(), "FR ERROR: path_run_info must exist"
         assert Path(path).is_file(), "FR ERROR: path_run_info must be a file"
-        assert Path(path).suffix == ".yaml", "FR ERROR: path_run_info must be a yaml file"
         if path_run_info is not None:
-            assert Path(path_run_info).name == "run_info.yaml", "FR ERROR: path_run_info must be named run_info.yaml"
+            assert Path(path_run_info).name == "run_info.json", "FR ERROR: path_run_info must be named run_info.json"
         if path_config is not None:
             assert Path(path_config).name == "config.yaml", "FR ERROR: path_config must be named config.yaml"
 
@@ -122,27 +122,26 @@ class FR_Module:
         ## Check if file exists and load it if it does
         ## If directory to file does not exist, create it
         if Path(path_run_info).exists()==False:
-            print(f'FR: No existing run_info.yaml file found in {path_run_info}. \n Creating new run_info.yaml at {path_run_info}') if verbose > 0 else None
+            print(f'FR: No existing run_info.json file found in {path_run_info}. \n Creating new run_info.json at {path_run_info}') if verbose > 0 else None
             Path(path_run_info).parent.mkdir(parents=True, exist_ok=True)
             run_info = {}
         else:
             print(f'FR: Loading file {path_run_info}') if verbose > 1 else None
-            run_info = load_yaml_safe(path_run_info)
+            run_info = helpers.json_load(path_run_info, mode='r')
             
-        ## Append self.run_info to module_name key in run_info.yaml
+        ## Append self.run_info to module_name key in run_info.json
         if (self.module_name in run_info.keys()) and not overwrite:
-            print(f"FR Warning: Not saving anything. Field exists in dictionary and overwrite==False. '{self.module_name}' is already a field in run_info.yaml.") if verbose > 0 else None
+            print(f"FR Warning: Not saving anything. Field exists in dictionary and overwrite==False. '{self.module_name}' is already a field in run_info.json.") if verbose > 0 else None
         elif (self.module_name in run_info.keys()) and overwrite:
-            print(f"FR Warning: Overwriting field. '{self.module_name}' is already a field in the run_info.yaml dictionary.") if verbose > 0 else None
+            print(f"FR Warning: Overwriting field. '{self.module_name}' is already a field in the run_info.json dictionary.") if verbose > 0 else None
             run_info[self.module_name] = self.run_info
         else:
-            print(f"FR: Adding '{self.module_name}' field to run_info.yaml") if verbose > 1 else None
+            print(f"FR: Adding '{self.module_name}' field to run_info.json") if verbose > 1 else None
             run_info[self.module_name] = self.run_info
-
-        ## Save run_info.yaml file
-        print(f'FR: Saving run_info.yaml to {path_run_info}') if verbose > 1 else None
-        with open(path_run_info, 'w') as f:
-            yaml.dump(run_info, f, Dumper=yaml.Dumper, sort_keys=False)
+        
+        ## Save run_info.json file
+        print(f'FR: Saving run_info.json to {path_run_info}') if verbose > 1 else None
+        helpers.json_save(run_info, path_run_info, mode='w')
             
 
     def save_run_data(
