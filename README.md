@@ -44,8 +44,6 @@ jupyter notebook
 If you run into a kernel error at this stage and are a Windows user, check out: 
 https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-issues
 
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
-
 
 # Repository Organization
 ------------
@@ -80,7 +78,7 @@ https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-i
 
     Project Directory
     ├── config.yaml           <- Configuration parameters to run each module in the pipeline. Dictionary.
-    ├── run_info.yaml         <- Output information from each module. Dictionary.
+    ├── run_info.json         <- Output information from each module. Dictionary.
     │
     ├── run_data              <- Output data from each module.
     │   ├── point_tracking.h5 <- Output data from optic flow module.
