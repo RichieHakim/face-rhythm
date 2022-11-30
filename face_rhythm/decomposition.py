@@ -1,6 +1,7 @@
 from typing import Union
 import time
 from functools import partial
+import gc
 
 import numpy as np
 from tqdm import tqdm
@@ -9,6 +10,7 @@ import cv2
 import torch
 import scipy.sparse
 import tensorly as tl
+import tensorly.decomposition
 import einops
 
 from .util import FR_Module
@@ -167,10 +169,10 @@ class TCA(FR_Module):
                 dims_out[dims_out.index(dims[1])] = f'({dims[0]} {dims[1]})'
 
                 pattern = f"{''.join([d + ' ' for d in dims_in])} -> {''.join([d + ' ' for d in dims_out])}"
-                data = einops.rearrange(data, pattern)
+                data_out = einops.rearrange(data, pattern)
                 
                 names_dims_array_new = dims_out
-            return data
+            return data_out
         cat = concatenate_array_dimensions
 
         ## Find new names for the dimensions. Just take some code from the above function.
@@ -195,8 +197,8 @@ class TCA(FR_Module):
                 ## Get the indices of the window
                 idx_window = [self._idx_window_dictElements[0], self._idx_window_dictElements[1] + 1]
                 ## Window the data
-                data = data.take(indices=range(*idx_window), axis=data.shape.index(self._name_dim_window_dictElements))
-                return data
+                data_out = data.take(indices=range(*idx_window), axis=data.shape.index(self._name_dim_window_dictElements))
+                return data_out
         win = window_data
 
         ## Rearrange the dict elements
@@ -210,9 +212,9 @@ class TCA(FR_Module):
                 axis=self._names_dims_array_new.index(self._name_dim_dictElements_concat),
             )}
             self._names_dims_array_new[self._names_dims_array_new.index(self._name_dim_dictElements_concat)] = '(' + self._name_dim_dictElements_concat + ' ' + self._name_dim_dictElements + ')'
-            self.name_dim_dictElements_new = '0'
+            self._name_dim_dictElements_new = '0'
             print(f"New names for the array dimensions: {self._names_dims_array_new}") if self._verbose > 1 else None
-            print(f"New name for the dict dimension: '{self.name_dim_dictElements_new}'") if self._verbose > 1 else None
+            print(f"New name for the dict dimension: '{self._name_dim_dictElements_new}'") if self._verbose > 1 else None
         elif self._method_handling_dictElements == 'stack':
             ### Stack the different elements of the dictionary
             ###  along the specified dimension
@@ -221,26 +223,40 @@ class TCA(FR_Module):
                 axis=0,
             )}
             self._names_dims_array_new.insert(0, self._name_dim_dictElements)
-            self.name_dim_dictElements_new = '0'
+            self._name_dim_dictElements_new = '0'
         elif self._method_handling_dictElements == 'separate':
             ### Separate the different elements of the dictionary
             ###  into different arrays
-            data = {key: cat(win(data[key])) for key in data.keys()}
-            self.name_dim_dictElements_new = self._name_dim_dictElements
+            data_out = {key: cat(win(data[key])) for key in data.keys()}
+            self._name_dim_dictElements_new = self._name_dim_dictElements
         
         ## Set the data
         self.data = data_out
         ## Set the names of the dimensions of the data arrays
         self.names_dims_array = self._names_dims_array_new
         ## Set the name of the dimension of the dictionary elements
-        self.name_dim_dictElements = self.name_dim_dictElements_new
+        self.name_dim_dictElements = self._name_dim_dictElements_new
             
 
     def fit(
         self,
-        data: dict,
-        method: str='non_negative_parafac_hals',
-        params_method: dict={},
+        data: dict=None,
+        method: str='CP_NN_HALS',
+        params_method: dict={
+            'rank': 6, 
+            'n_iter_max': 100, 
+            'init': 'svd', 
+            'svd': 'truncated_svd', 
+            'tol': 1e-07, 
+            'sparsity_coefficients': None, 
+            'fixed_modes': None, 
+            'nn_modes': 'all', 
+            'exact': False, 
+            'verbose': False, 
+            'cvg_criterion': 'abs_rec_error', 
+        },
+        backend: str='pytorch',
+        DEVICE: str='cpu',
         verbose: Union[bool, int]=1,
     ):
         """
@@ -252,10 +268,66 @@ class TCA(FR_Module):
                 Each array should have the same shape.
 
         """
+        ## Assert that method is valid
+        assert isinstance(method, str), f"Argument 'method' must be a string."
+        assert method in (valid_methods:=['CP_NN_HALS', 'CP', 'RandomizedCP', 'ConstrainedCP',]), f"Method '{method}' is not valid. Valid methods are: {valid_methods}"
+        ## Assert that backend is valid
+        assert isinstance(backend, str), f"Argument 'backend' must be a string."
+        assert backend in (valid_backends:=['pytorch', 'numpy',]), f"Backend '{backend}' is not valid. Valid backends are: {valid_backends}"
+
         ## Set attributes
         self.method = method
+        self._backend = backend
         self.params_method = params_method
+        self.data = data if data is not None else self.data
+        self._DEVICE = torch.device(DEVICE)
         self._verbose = int(verbose)
+
+        print(f"Using device: {self._DEVICE}") if self._verbose > 1 else None
+        print(f"Using method: {tl.decomposition.__dict__[method]}") if self._verbose > 1 else None
+
+        # ## Make sure data is not complex if method is CP_NN_HALS
+        # def abs_if_needed(data):
+        #     if self.backend == 'pytorch':
+        #         abs = torch.abs
+        #     elif self.backend == 'numpy':
+        #         abs = np.abs
+        #     if self.method == 'CP_NN_HALS':
+        #         return abs(data)
+        #     else:
+        #         return data
+        # def prep_array(data):
+        #     if self.backend == 'pytorch':
+        #         ## Check if data is complex
+        #         if np.iscomplexobj(data):
+        #         return torch.as_tensor(data).to(self._DEVICE)
+
+        ## Run the TCA model
+        tl.set_backend('pytorch')
+        print(f"Running the TCA model with method '{self.method}'.") if self._verbose > 1 else None
+        self._model = tl.decomposition.__dict__[method](**self.params_method)
+        # cp_all = [self._model.fit_transform(abs_if_needed(torch.as_tensor(d, device=self._DEVICE))) for d in self.data.values()]
+        cp_all = [self._model.fit_transform(torch.as_tensor(d, device=self._DEVICE)) for d in self.data.values()]
+        self.factors = [{key: cp.factors[ii].cpu().numpy() for ii, key in enumerate(self.names_dims_array)} for cp in cp_all]
+
+        ## Clean up
+        self._cleanup()
+
+
+    def _cleanup(self):
+        """
+        Clear the CUDA cache and garbage collect.
+        """
+        if 'cuda' in self._DEVICE.type:
+            for ii in range(5):
+                torch.cuda.empty_cache()
+                time.sleep(0.1)
+                gc.collect()
+                time.sleep(0.1)
+        else:
+            [gc.collect() for ii in range(5)]
+            
+            
 
 
     def _check_inputs(self, data):
@@ -263,6 +335,13 @@ class TCA(FR_Module):
         Check the inputs for type and value.
         data is passed in because it is large and not set as
          an attribute until after this function is called.
+
+        Args:
+            data (dict of np.ndarray):
+                Dictionary of data arrays.
+                Each element of the dictionary should be a numpy
+                 array. Number of dimensions should be the same
+                 as the number of names in self.names_dims_array.
         """
         ## Assertions
         ### Assert that for each argument, the type matches the expected type
