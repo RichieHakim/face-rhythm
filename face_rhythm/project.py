@@ -77,7 +77,7 @@ def prepare_project(
         raise FileNotFoundError(f"FR ERROR: directory_project does not exist: {directory_project}")
 
     path_config = str(Path(directory_project) / 'config.yaml')
-    path_run_info = str(Path(directory_project) / 'run_info.yaml')
+    path_run_info = str(Path(directory_project) / 'run_info.json')
     ## Check if project exists
     if (Path(path_config)).exists():
         print(f'FR: Found config.yaml file at {path_config}') if verbose > 1 else None
