@@ -292,15 +292,15 @@ def load_config_file(path, verbose=0):
     return load_yaml_safe(path, verbose=verbose)
 def load_run_info_file(path, verbose=0):
     """
-    Loads run_info.yaml file
+    Loads run_info.json file
 
     Args:
         path (str): 
-            path to run_info.yaml file
+            path to run_info.json file
 
     Returns:
         (dict): 
-            run_info.yaml file as a dictionary
+            run_info.json file as a dictionary
 
     """
-    return load_yaml_safe(path, verbose=verbose)
+    return helpers.json_load(path, mode='r')
