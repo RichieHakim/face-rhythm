@@ -29,6 +29,9 @@ Learn more at https://face-rhythm.readthedocs.io/
 ```
 pip install -e . 
 ```
+<!-- ```
+python -m pip install --upgrade 'tensorly @ git+https://github.com/tensorly/tensorly'
+``` -->
 4. Create a "project directory" where we will save intermediate files, videos, and config files.
 This project directory should ideally be outside of the repo, and you'll create a new one each time
 you analyze a new dataset. You may want to save a copy of the .ipynb file you use for the run there.
