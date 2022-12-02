@@ -50,12 +50,12 @@ class TCA(FR_Module):
         names_dims_array: list=['xy', 'points', 'frequency', 'time'],
         names_dims_concat_array: list=[('xy', 'points')],
 
+        concat_complexDim: bool=True,
+        name_dim_concat_complexDim: str='time',
+
         name_dim_dictElements: str='trials',
         method_handling_dictElements: str='concatenate',
         name_dim_concat_dictElements: str='time',
-
-        concat_complexDim: bool=True,
-        name_dim_concat_complexDim: str='time',
 
         idx_windows: list=None,
         name_dim_array_window: str='time',
@@ -94,6 +94,12 @@ class TCA(FR_Module):
                 New dimension names will be joined with underscore:
                     example: ('dim1', 'dim2') -> 'dim1_dim2'
 
+            concat_complexDim (str):
+                Whether to concatenate the complex dimension.
+            name_dim_concat_complexDim (str):
+                Name of the array dimension to concatenate the complex
+                 dimension along. Typically this should be 'time'.
+
             name_dim_dictElements (str):
                 What the different elements of the dictionary correspond
                  to. Typically this is 'trials', but it could be 'videos'.
@@ -116,12 +122,6 @@ class TCA(FR_Module):
             name_dim_concat_dictElements (str):
                 Name of the dimension to concatenate the dictElements
                  along. Only used if method_handling_dictElements is 'concatenate'.
-
-            concat_complexDim (str):
-                Whether to concatenate the complex dimension.
-            name_dim_concat_complexDim (str):
-                Name of the array dimension to concatenate the complex
-                 dimension along. Typically this should be 'time'.
 
             idx_windows (list of 2-tuples of int):
                 Indices of the start and end of the window to use for
@@ -226,7 +226,6 @@ class TCA(FR_Module):
             """
             Window the data. Assume numpy input.
             """
-            print(data.shape)
             if self._idx_windows[win_idx] is None:
                 return data
             else:
@@ -261,10 +260,11 @@ class TCA(FR_Module):
             )}
             self._names_dims_array_new.insert(0, self._name_dim_dictElements)
             self._name_dim_dictElements_new = '0'
+            print(data_out['0'].shape)
         elif self._method_handling_dictElements == 'separate':
             ### Separate the different elements of the dictionary
             ###  into different arrays
-            data_out = {key: cat(win(data[key])) for key in data.keys()}
+            data_out = {key: cat(win(data[key],ii)) for ii,key in enumerate(data.keys())}
             self._name_dim_dictElements_new = self._name_dim_dictElements
         
         ## Set the data
@@ -382,7 +382,7 @@ class TCA(FR_Module):
                 return factor[0:len_factor:2] + 1j*factor[1:len_factor:2]
 
             ## Check if the complexDim dimension is a dictionary
-            if self._method_handling_dictElements == 'separate':
+            if self._method_handling_dictElements in ['separate', 'stack']:
                 ## Make new name for the complexDim dimension
                 idx_complexDimConcat = np.where(['complex' in n for n in self.names_dims_array_preDecomp])[0]
                 assert len(idx_complexDimConcat) == 1, f"FR ERROR: There should be exactly one complexDim dimension. Found {len(idx_complexDimConcat)} dim names with 'complex' in it."
