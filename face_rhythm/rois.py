@@ -127,6 +127,7 @@ class ROIs(FR_Module):
         
         if select_mode == "file":
             file = h5_handling.simple_load(self._file_path)
+            file.unlazy()
             ## Check that the file has the correct format
             assert "mask_images" in file, "FR ERROR: 'mask_images' not found in file."
             self.mask_images = file["mask_images"]
@@ -135,9 +136,11 @@ class ROIs(FR_Module):
             assert all([isinstance(mask, np.ndarray) for mask in self.mask_images.values()]), "FR ERROR: 'mask_images' from file is expected to be a 3D or list of 2D boolean np.ndarray."
             assert all([mask.shape == self.mask_images[list(self.mask_images.keys())[0]].shape for mask in self.mask_images.values()]), "FR ERROR: 'mask_images' must all have the same shape."
             assert all([mask.dtype == bool for mask in self.mask_images.values()]), "FR ERROR: 'mask_images' must be boolean."
+            self.mask_images = {k: np.array(v, dtype=np.bool_) for k, v in self.mask_images.items()}  ## Ensure that the masks are boolean np arrays
             ## Check that the file has the correct format
             assert "points" in file, "FR ERROR: 'points' not found in file."
             self.points = file["points"]
+            self.points = {k: np.array(v, dtype=np.float32) for k, v in self.points.items()}  ## Ensure that the points are float np arrays
             ## Check that the points have the correct format
 
         elif select_mode == "mask":
