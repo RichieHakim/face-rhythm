@@ -147,11 +147,11 @@ class FrameVisualizer:
                 assert points[0].dtype == np.int, 'points must be a list of numpy arrays of int.'
                 assert points[0].ndim == 2, 'points must be a list of 2D numpy arrays.'
                 assert points[0].shape[1] == 2, 'points must be a list of 2D numpy arrays with 2 columns.'
-                ## all points must be non-negative
-                assert np.all([np.all(points[i] >= 0) for i in range(len(points))]), 'points must be non-negative.'
-                ## all points must be within image
-                assert np.all([np.all(points[i][:,0] < image.shape[1]) for i in range(len(points))]), 'points must be within image.'
-                assert np.all([np.all(points[i][:,1] < image.shape[0]) for i in range(len(points))]), 'points must be within image.'
+                # ## all points must be non-negative
+                # assert np.all([np.all(points[i] >= 0) for i in range(len(points))]), f'points must be non-negative. {points[0][points[0]<0], points[1][points[1]<0]}'
+                # ## all points must be within image
+                # assert np.all([np.all(points[i][:,0] < image.shape[1]) for i in range(len(points))]), 'points must be within image.'
+                # assert np.all([np.all(points[i][:,1] < image.shape[0]) for i in range(len(points))]), 'points must be within image.'
 
             ## Check points_sizes
             assert isinstance(point_sizes, (int, list)), 'points_sizes must be an integer or a list.'
