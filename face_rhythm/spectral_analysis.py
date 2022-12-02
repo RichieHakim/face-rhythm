@@ -37,6 +37,7 @@ class VQT_Analyzer(FR_Module):
         },
         normalization_factor: float=0.99,
         spectrogram_exponent: float=1.0,
+        one_over_f_exponent: float=1.0,
         verbose: int=1,
     ):
         super().__init__()
@@ -44,6 +45,7 @@ class VQT_Analyzer(FR_Module):
         ## Set attributes
         self._normalization_factor = float(normalization_factor)
         self._spectrogram_exponent = float(spectrogram_exponent)
+        self._one_over_f_exponent = float(one_over_f_exponent)
         self._verbose = int(verbose)
         self.spectrograms = None
 
@@ -205,6 +207,8 @@ class VQT_Analyzer(FR_Module):
             s_mag_norm = s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
             s_norm = torch.polar(s_mag_norm, s_phase)
         
+        ## Do 1/f correction
+        s_norm = s_norm * torch.as_tensor(self.VQT.freqs[None,:,None] ** self._one_over_f_exponent, dtype=torch.float32) if self._one_over_f_exponent != 0 else s_norm
         s_norm_rs = s_norm.reshape(2, int(s_norm.shape[0]/2), s_norm.shape[1], s_norm.shape[2])
         return {'spec': s_norm_rs.cpu().numpy(), 'x_axis': x_axis.cpu().numpy(), 'freqs': freqs} if isinstance(spectrogram, tuple) else s_norm
 
@@ -276,7 +280,6 @@ class VQT_Analyzer(FR_Module):
         out = self.transform(points_tracked[name_points][:,idx_point,:][:,None,:], point_positions[idx_point,:][None,...])
         # out = self.transform(points_tracked[name_points], point_positions)
         spec, x_axis, freqs = out['spec'][:,0,:,:], out['x_axis'], out['freqs']
-        print('test', spec.shape)
 
         # ## Prepare traces
         # point_positions = self._prepare_pointPositions(point_positions[idx_point,:])
