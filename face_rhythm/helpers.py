@@ -379,7 +379,7 @@ def deep_update_dict(dictionary, key, new_val=None, new_key=None, in_place=False
         helper_deep_update_dict(d, key)
         return d
 
-def find_subDict_key(d: dict, s: str, max_depth: int=999):
+def find_subDict_key(d: dict, s: str, max_depth: int=9999999):
     """
     Recursively search for a sub-dictionary that contains the given string.
     Yield the result.
