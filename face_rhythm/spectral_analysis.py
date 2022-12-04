@@ -48,6 +48,8 @@ class VQT_Analyzer(FR_Module):
         self._one_over_f_exponent = float(one_over_f_exponent)
         self._verbose = int(verbose)
         self.spectrograms = None
+        self.x_axis = None
+        self.freqs = None
 
         self._demo_spectrogram = None
 
@@ -102,8 +104,9 @@ class VQT_Analyzer(FR_Module):
         ## Prepare traces
         point_positions = self._prepare_pointPositions(point_positions)
         ## Compute spectrograms
-        out = self._normalize_spectrogram(self.VQT(self._prepare_displacements(points_tracked, point_positions)))
-        return out
+        spec, x_axis, freqs = self.VQT(self._prepare_displacements(points_tracked, point_positions))
+        spec_rs = self._normalize_spectrogram(spec)
+        return spec_rs.cpu().numpy(), x_axis.cpu().numpy(), freqs
 
 
     def transform_all(self, points_tracked: dict, point_positions: np.ndarray):
@@ -133,11 +136,15 @@ class VQT_Analyzer(FR_Module):
         self.point_positions = self._prepare_pointPositions(point_positions)
         ## Compute spectrograms
         print(f"Computing spectrograms...") if self._verbose > 1 else None
-        self.spectrograms = {key: self.transform(points, point_positions) for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc="Computing spectrograms", leave=False)}
+        self.spectrograms, self.x_axis, self.freqs = {}, {}, {}
+        for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc='Computing spectrograms', leave=False):
+            self.spectrograms[key], self.x_axis[key], self.freqs[key] = self.transform(points, point_positions)
 
         ## Update self.run_data
         self.run_data.update({
             'spectrograms': self.spectrograms,
+            'x_axis': self.x_axis,
+            'freqs': self.freqs,
             'point_positions': self.point_positions,
         })
         
@@ -173,35 +180,25 @@ class VQT_Analyzer(FR_Module):
             across all frequencies at each time point.
 
         Args:
-            spectrogram (tuple or torch.Tensor):
-                EITHER:
-                    - A 3-element tuple containing the spectrogram, x-axis, and
-                       frequency axis.
-                    - A single spectrogram
+            spectrogram (torch.Tensor):
+                A single spectrogram
                 Spectrogram should be of shape: (n_points, n_freq_bins, n_frames)  
 
         Returns:
             spectrogram (tuple or torch.Tensor):
-                EITHER:
-                    - A 3-element tuple containing the normalized spectrogram,
-                       x-axis, and frequency axis.
-                    - A single normalized spectrogram
+                A single normalized spectrogram of same shape as input.
         """
         ## Check inputs
-        if isinstance(spectrogram, tuple):
-            spec, x_axis, freqs = spectrogram
-        elif isinstance(spectrogram, torch.Tensor):
-            spec = spectrogram
+        s = spectrogram
 
-
-        if torch.is_complex(spec) == False:
-            s_exp = spec ** self._spectrogram_exponent
+        if torch.is_complex(s) == False:
+            s_exp = s ** self._spectrogram_exponent
             s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
             s_norm =  s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
         
-        elif torch.is_complex(spec) == True:
-            s_mag = torch.abs(spec)
-            s_phase = torch.angle(spec)
+        elif torch.is_complex(s) == True:
+            s_mag = torch.abs(s)
+            s_phase = torch.angle(s)
             s_exp = s_mag ** self._spectrogram_exponent
             s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
             s_mag_norm = s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
@@ -210,7 +207,7 @@ class VQT_Analyzer(FR_Module):
         ## Do 1/f correction
         s_norm = s_norm * torch.as_tensor(self.VQT.freqs[None,:,None] ** self._one_over_f_exponent, dtype=torch.float32) if self._one_over_f_exponent != 0 else s_norm
         s_norm_rs = s_norm.reshape(2, int(s_norm.shape[0]/2), s_norm.shape[1], s_norm.shape[2])
-        return {'spec': s_norm_rs.cpu().numpy(), 'x_axis': x_axis.cpu().numpy(), 'freqs': freqs} if isinstance(spectrogram, tuple) else s_norm
+        return s_norm_rs
 
     def _prepare_displacements(self, traces, point_positions):
         """
@@ -276,19 +273,10 @@ class VQT_Analyzer(FR_Module):
         self._check_inputs(points_tracked, point_positions)
 
         ## Transform
-        # spectrograms = self.transform(points_tracked[name_points][idx_point,:,:][None,...], point_positions[idx_point,:][None,...])
-        out = self.transform(points_tracked[name_points][:,idx_point,:][:,None,:], point_positions[idx_point,:][None,...])
-        # out = self.transform(points_tracked[name_points], point_positions)
-        spec, x_axis, freqs = out['spec'][:,0,:,:], out['x_axis'], out['freqs']
-
-        # ## Prepare traces
-        # point_positions = self._prepare_pointPositions(point_positions[idx_point,:])
-        # ## Compute spectrogram using self.transform
-        # self._demo_spectrogram = self.transform({'demo': points_tracked[name_points][idx_point,:,:]}, point_positions)
+        spec, x_axis, freqs = self.transform(points_tracked[name_points][:,idx_point,:][:,None,:], point_positions[idx_point,:][None,...])
+        spec = spec.squeeze(1)
+        # spec, x_axis, freqs = out['spec'][:,0,:,:], out['x_axis'], out['freqs']
         print(f"Demo spectrogram shape: {spec.shape}")
-
-        # spec, x_axis, freqs = self.VQT(self._prepare_displacements(points_tracked[name_points][:,idx_point,:], point_positions))
-        # self._demo_spectrogram = self._normalize_spectrogram(spec).cpu().numpy()
 
         ## Plot
         if plot:
