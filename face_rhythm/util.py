@@ -306,66 +306,125 @@ def load_run_info_file(path, verbose=0):
     return helpers.json_load(path, mode='r')
 
 
-def save_figure(
-    fig,
-    name_file: str=None,
-    path_config: str=None,
-    dir_save: str=None,
-    format: list=['png'],
-    overwrite: bool=True,
-    kwargs_savefig: dict={
+class Figure_Saver:
+    """
+    Class for saving figures
+    RH 2022
+    """
+    def __init__(
+        self,
+        path_config: str=None,
+        dir_save: str=None,
+        format_save: str=['png'],
+        kwargs_savefig: dict={
             'bbox_inches': 'tight',
             'pad_inches': 0.1,
             'transparent': True,
             'dpi': 300,
-            'format': format,
         },
-    verbose: int=1,
-):
-    """
-    Save the figures.
+        overwrite: bool=False,
+        verbose: int=1,
+    ):
+        """
+        Initializes Figure_Saver object
 
-    Args:
-        fig (matplotlib.figure.Figure):
-            Figure to save.
-        name_file (str):
-            Name of the file to save. If None, then the name of 
-             the figure is used.
-        path_config (str):
-            Path to config.yaml file. If None, then path_save must
-             be specified.
-        dir_save (str):
-            Directory to save the figure. Used if path_config is None.
-            Must be specified if path_config is None.
-        format (list of str):
-            Format(s) to save the figure. Default is 'png'.
-            Others: ['png', 'svg', 'eps', 'pdf']
-        overwrite (bool):
-            If True, then overwrite the file if it exists.
-        kwargs_savefig (dict):
-            Keyword arguments to pass to fig.savefig().
-        verbose (int):
-            Verbosity level.
-            0: No output.
-            1: Warning.
-            2: All info.
+        Args:
+            path_config (str):
+                Path to config.yaml file. If None, then path_save must
+                be specified.
+            dir_save (str):
+                Directory to save the figure. Used if path_config is None.
+                Must be specified if path_config is None.
+            format (list of str):
+                Format(s) to save the figure. Default is 'png'.
+                Others: ['png', 'svg', 'eps', 'pdf']
+            overwrite (bool):
+                If True, then overwrite the file if it exists.
+            kwargs_savefig (dict):
+                Keyword arguments to pass to fig.savefig().
+            verbose (int):
+                Verbosity level.
+                0: No output.
+                1: Warning.
+                2: All info.
+        """
+        self._path_config = path_config
+        ## Get dir_save from path_config if it is not specified
+        assert (self._path_config is not None) or (dir_save is not None), "FR ERROR: path_config or dir_save must be specified"
+        self.dir_save = str(Path(load_config_file(self._path_config)['paths']['project']) / 'visualizations') if dir_save is None else dir_save
 
-    """
-    ## Get figure title
-    name_file = '.'.join([a.get_text() for a in fig.get_axes() if a.get_title() != ''][0] if name_file is None else name_file)
-    if dir_save is None:
-        assert path_config is not None, "FR ERROR: Must provide a path_config if save=True and dir_save=None."
-        path_save = [str(Path(load_config_file(path_config)['paths']['project']) / 'visualizations' / name_file + '.' + f) for f in format]
-    else:
-        path_save = [str(Path(dir_save) / name_file + '.' + f) for f in format]
+        assert isinstance(format_save, list), "FR ERROR: format_save must be a list of strings"
+        assert all([isinstance(f, str) for f in format_save]), "FR ERROR: format_save must be a list of strings"
+        self.format_save = format_save
 
-    ## Save figure
-    for path in path_save:
-        print(f'FR: Saving figure {path}') if verbose > 1 else None
-        if Path(path).exists():
-            if overwrite:
-                print(f'FR Warning: Overwriting file. File: {path} already exists.') if verbose > 0 else None
-            else:
-                print(f'FR Warning: Not saving anything. File exists and overwrite==False. {path} already exists.') if verbose > 0 else None
-                return None
-        fig.savefig(path, **kwargs_savefig)
+        assert isinstance(kwargs_savefig, dict), "FR ERROR: kwargs_savefig must be a dictionary"
+        self.kwargs_savefig = kwargs_savefig
+
+        self.overwrite = overwrite
+        self.verbose = verbose
+
+    def save(
+        self,
+        fig,
+        name_file: str=None,
+    ):
+        """
+        Save the figures.
+
+        Args:
+            fig (matplotlib.figure.Figure):
+                Figure to save.
+            name_file (str):
+                Name of the file to save. If None, then the name of 
+                the figure is used.
+        """
+        import matplotlib.pyplot as plt
+        assert isinstance(fig, plt.Figure), "FR ERROR: fig must be a matplotlib.figure.Figure"
+        ## Get figure title
+        name_file = '.'.join([a.get_text() for a in fig.get_axes() if a.get_title() != ''][0] if name_file is None else name_file)
+        path_save = [str(Path(self.dir_save) / name_file + '.' + f) for f in format]
+
+        ## Save figure
+        for path in path_save:
+            print(f'FR: Saving figure {path}') if self.verbose > 1 else None
+            if Path(path).exists():
+                if self.overwrite:
+                    print(f'FR Warning: Overwriting file. File: {path} already exists.') if self.verbose > 0 else None
+                else:
+                    print(f'FR Warning: Not saving anything. File exists and overwrite==False. {path} already exists.') if self.verbose > 0 else None
+                    return None
+            fig.savefig(path, format=format, **self.kwargs_savefig)
+
+    def save_all(
+        self,
+        figs,
+        names_files: str=None,
+    ):
+        """
+        Save all figures in a list.
+
+        Args:
+            figs (list of matplotlib.figure.Figure):
+                Figures to save.
+            name_file (str):
+                Name of the file to save. If None, then the name of 
+                the figure is used.
+        """
+        import matplotlib.pyplot as plt
+        assert isinstance(figs, list), "FR ERROR: figs must be a list of matplotlib.figure.Figure"
+        assert all([isinstance(fig, plt.Figure) for fig in figs]), "FR ERROR: figs must be a list of matplotlib.figure.Figure"
+        for fig, name_file in zip(figs, names_files):
+            self.save(fig, name_file=name_file)
+
+    def __call__(
+        self,
+        fig,
+        name_file: str=None,
+    ):
+        """
+        Calls save() method.
+        """
+        self.save(fig, name_file=name_file)
+
+    def __repr__(self):
+        return f"Figure_Saver(path_config={self._path_config}, dir_save={self.dir_save}, format={self.format_save}, overwrite={self.overwrite}, kwargs_savefig={self.kwargs_savefig}, verbose={self.verbose})"
