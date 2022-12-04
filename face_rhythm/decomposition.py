@@ -3,6 +3,7 @@ import time
 from functools import partial
 import gc
 import copy
+import re
 
 import numpy as np
 from tqdm import tqdm
@@ -16,6 +17,7 @@ import einops
 
 from .util import FR_Module
 from .video_playback import FrameVisualizer
+from . import helpers
 
 ## Define TCA class as a subclass of utils.FR_Module
 class TCA(FR_Module):
@@ -226,6 +228,8 @@ class TCA(FR_Module):
             """
             Window the data. Assume numpy input.
             """
+            if self._idx_windows is None:
+                return data
             if self._idx_windows[win_idx] is None:
                 return data
             else:
@@ -371,45 +375,6 @@ class TCA(FR_Module):
 
         self.factors_rearranged = copy.deepcopy(self.factors)
         self.names_dims_array_postDecomp = copy.deepcopy(self.names_dims_array_preDecomp)
-        if undo_concat_complexDim:
-            ## Undo the concatenation of the complexDim dimension
-
-            def undo_concat_complexDim(factor: np.ndarray):
-                """
-                Undo the concatenation of the complexDim dimension.
-                """
-                len_factor = factor.shape[0]
-                return factor[0:len_factor:2] + 1j*factor[1:len_factor:2]
-
-            ## Check if the complexDim dimension is a dictionary
-            if self._method_handling_dictElements in ['separate', 'stack']:
-                ## Make new name for the complexDim dimension
-                idx_complexDimConcat = np.where(['complex' in n for n in self.names_dims_array_preDecomp])[0]
-                assert len(idx_complexDimConcat) == 1, f"FR ERROR: There should be exactly one complexDim dimension. Found {len(idx_complexDimConcat)} dim names with 'complex' in it."
-                name_dim_complexDimConcat = self.names_dims_array_preDecomp[idx_complexDimConcat[0]]
-                name_dim_complexDim_new = name_dim_complexDimConcat.replace(' complex)', '')[1:]
-                print(f"Rearranging the complex dimension at index {idx_complexDimConcat[0]} called: '{name_dim_complexDimConcat}' into a complex valued array of half the length called: '{name_dim_complexDim_new}'.") if self._verbose > 1 else None
-                ## If it is, then undo the concatenation of the complexDim dimension for each factor
-                for ii, (key,factor) in enumerate(self.factors_rearranged.items()):
-                    self.factors_rearranged[key][name_dim_complexDim_new] = undo_concat_complexDim(factor[name_dim_complexDimConcat]) 
-                    del self.factors_rearranged[key][name_dim_complexDimConcat]
-                self.names_dims_array_postDecomp[idx_complexDimConcat[0]] = name_dim_complexDim_new
-                print(f"New names_dims_array_postDecomp: {self.names_dims_array_postDecomp}") if self._verbose > 1 else None
-            elif self._method_handling_dictElements == 'concatenate':
-                ## Make new name for the complexDim dimension
-                idx_complexDimConcat = np.where(['complex' in n for n in self.names_dims_array_preDecomp])[0]
-                name_dim_complexDimConcat = self.names_dims_array_preDecomp[idx_complexDimConcat[0]]
-                name_dim_complexDim_new = name_dim_complexDimConcat.replace(' complex)', '')[1:]
-                print(f"Rearranging the complex dimension called: '{name_dim_complexDimConcat}' into a complex valued array of half the length called: '{name_dim_complexDim_new}'.") if self._verbose > 1 else None
-                ## If it is not, then undo the concatenation of the complexDim dimension
-                for ii, (key,factor) in enumerate(self.factors_rearranged.items()):
-                    self.factors_rearranged[key][name_dim_complexDim_new] = undo_concat_complexDim(factor[name_dim_complexDimConcat]) 
-                    del self.factors_rearranged[key][name_dim_complexDimConcat]
-                self.names_dims_array_postDecomp[idx_complexDimConcat[0]] = name_dim_complexDim_new
-                print(f"New names_dims_array_postDecomp: {self.names_dims_array_postDecomp}") if self._verbose > 1 else None
-                # self.factors_rearranged[name_dim_complexDim_new] = undo_concat_complexDim(self.factors_rearranged[name_dim_complexDimConcat])
-                # del self.factors_rearranged[name_dim_complexDimConcat]
-
 
         if undo_concat_dictElements:
             assert self._method_handling_dictElements == 'concatenate', f"FR ERROR: Cannot undo concatenation of dictElements dimension because it was not concatenated in the first place."
@@ -424,17 +389,67 @@ class TCA(FR_Module):
             print(f"Rearranging the dictElements dimension called: '{name_dim_dictElementConcat}' of shape {self.factors_rearranged['0'][name_dim_dictElementConcat].shape} into a list of chunks of lengths {lens_dictElements}.") if self._verbose > 1 else None 
 
             ## Fix names_dims_array
-            self.names_dims_array_postDecomp[idx_dictElementConcat] = self.names_dims_array_postDecomp[idx_dictElementConcat].replace(self._name_dim_dictElements, '')[1:-2]  ## Remove dictElement name from names_dims_array
+            name_dim_sansDictElement = self.names_dims_array_postDecomp[idx_dictElementConcat].replace(self._name_dim_dictElements, '')[1:-2]
+            self.names_dims_array_postDecomp[idx_dictElementConcat] = name_dim_sansDictElement  ## Remove dictElement name from names_dims_array
             self.name_dim_dictElements_postDecomp = self._name_dim_dictElements  ## Replace name_dim_dictElements with the original name
             print(f"New names_dims_array in self.factors_rearranged: {self.names_dims_array_postDecomp}, new name_dim_dictElements: '{self.name_dim_dictElements_postDecomp}'") if self._verbose > 1 else None
 
             ### Prepare the new factor
-            factor_postDecomp = {name: np.take(self.factors_rearranged['0'][name_dim_dictElementConcat], np.arange(lens_cumsum_dictElements[ii], lens_cumsum_dictElements[ii+1]), axis=0) for ii,name in enumerate(self._names_dictElements)}  ## Split the concatenated factor into a list of chunks
+            factor_postDecomp = {name_dim_sansDictElement + '_' + name: np.take(self.factors_rearranged['0'][name_dim_dictElementConcat], np.arange(lens_cumsum_dictElements[ii], lens_cumsum_dictElements[ii+1]), axis=0) for ii,name in enumerate(self._names_dictElements)}  ## Split the concatenated factor into a list of chunks
 
             ## Make a new dict of factors with the new factor
             self.factors_rearranged['0'][self.name_dim_dictElements_postDecomp] = factor_postDecomp  ## Replace the concatenated factor with the new factor
             del self.factors_rearranged['0'][name_dim_dictElementConcat]  ## Delete the concatenated factor
 
+        if undo_concat_complexDim:
+            ## Undo the concatenation of the complexDim dimension
+            def undo_concat_complexDim(factor: np.ndarray):
+                """
+                Undo the concatenation of the complexDim dimension.
+                """
+                len_factor = factor.shape[0]
+                return factor[0:len_factor:2] + 1j*factor[1:len_factor:2]
+
+            print(f"Rearranging the complexDim") if self._verbose > 1 else None
+            for ii, (path, val) in enumerate(helpers.find_subDict_key(s='.*complex.*', d=self.factors_rearranged)):
+                new_key = re.sub(r' complex\x29', '', path[-1])[1:]  ## Remove the 'complex)' from the key. \x29 is the ascii code for ')'. The [1:] is to remove the leading '(' in the name.
+                helpers.deep_update_dict(
+                    dictionary=self.factors_rearranged, 
+                    key=path, 
+                    new_val=undo_concat_complexDim(val),
+                    new_key=new_key,
+                    in_place=True,
+                )
+
+    def plot_factors(
+        self, 
+        factors: dict=None,
+        concatenate_subDicts: bool=True,
+        ):
+        """
+        Plot the factors.
+        """
+        import matplotlib.pyplot as plt
+        ## Set attributes
+        if factors is None:
+            if self.factors_rearranged is None:
+                if self.factors is None:
+                    raise Exception("FR ERROR: No factors to plot.")
+                factors = self.factors
+                name_factors = 'factors'
+            else:
+                factors = self.factors_rearranged
+                name_factors = 'factors_rearranged'
+        else:
+            name_factors = 'factors'
+
+        ## Concatenate subDicts
+        if concatenate_subDicts:
+            ## Find the first level where there are arrays
+            for ii, (path, val) in enumerate(helpers.find_subDict_key(s='.*', d=factors)):
+                if isinstance(val, np.ndarray):
+                    break
+            
 
     def _cleanup(self):
         """

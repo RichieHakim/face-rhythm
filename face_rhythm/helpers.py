@@ -5,6 +5,8 @@ import time
 import gc
 import json
 from pathlib import Path
+import copy
+import re
 
 import numpy as np
 import decord
@@ -106,17 +108,17 @@ def get_system_versions(verbose=False):
 
 
 
-###################################################################
-############################## BNPM ###############################
-################### EVERYTHING BELOW IS FROM THE ##################
-######## BASIC NEURAL PROCESSING MODULES (BNPM) REPOSITORY ########
-## https://github.com/RichieHakim/basic_neural_processing_modules #
-###################################################################
+#############################################################################################################################################################################
+################################################################################### BNPM ####################################################################################
+######################################################################## EVERYTHING BELOW IS FROM THE #######################################################################
+############################################################# BASIC NEURAL PROCESSING MODULES (BNPM) REPOSITORY #############################################################
+####################################################### https://github.com/RichieHakim/basic_neural_processing_modules ######################################################
+#############################################################################################################################################################################
 
 
-###########################
-###### PATH HELPERS #######
-###########################
+#####################################################################################################################################
+########################################################### PATH HELPERS ############################################################
+#####################################################################################################################################
 
 def find_paths(
     dir_outer, 
@@ -191,9 +193,9 @@ def find_paths(
     return paths
 
 
-###########################
-###### FILE HELPERS #######
-###########################
+#####################################################################################################################################
+########################################################### FILE HELPERS ############################################################
+#####################################################################################################################################
 
 def prepare_filepath_for_saving(path, mkdir=False, allow_overwrite=True):
     """
@@ -259,9 +261,9 @@ def json_load(filename, mode='r'):
         return json.load(f)
         
 
-###########################
-######## INDEXING #########
-########################### 
+#####################################################################################################################################
+############################################################# INDEXING ##############################################################
+#####################################################################################################################################
 
 def make_batches(
     iterable, 
@@ -318,9 +320,107 @@ def make_batches(
                 yield iterable[start:end]
 
 
-###########################
-######### VIDEO ###########
-###########################
+#####################################################################################################################################
+######################################################### CONTAINER HELPERS #########################################################
+#####################################################################################################################################
+
+def deep_update_dict(dictionary, key, new_val=None, new_key=None, in_place=False):
+    """
+    Updates a dictionary with a new value.
+    RH 2022
+
+    Args:
+        dictionary (Dict):
+            dictionary to update
+        key (list of str):
+            Key to update
+            List elements should be strings.
+            Each element should be a hierarchical
+             level of the dictionary.
+            DEMO:
+                deep_update_dict(params, ['dataloader_kwargs', 'prefetch_factor'], val)
+        new_val (any):
+            If not None, the value to update with this
+            If None, then new_key must be specified and will only
+             be used to update the key.
+        new_key (str):
+            If not None, the key will be updated with this key.
+             [key[-1]] will be deleted and replaced with new_key.
+            If None, then [key[-1]] will be updated with new_val.
+             
+        in_place (bool):
+            whether to update in place
+
+    Returns:
+        output (Dict):
+            updated dictionary
+    """
+    def helper_deep_update_dict(d, key):
+        if type(key) is str:
+            key = [key]
+
+        assert key[0] in d, f"RH ERROR, key: '{key[0]}' is not found"
+
+        if type(key) is list:
+            if len(key) > 1:
+                helper_deep_update_dict(d[key[0]], key[1:])
+            elif len(key) == 1:
+                val = d[key[0]] if new_val is None else new_val
+                if new_key is None:
+                    d[key[0]] = val
+                else:
+                    d[new_key] = val
+                    del d[key[0]]
+
+    if in_place:
+        helper_deep_update_dict(dictionary, key)
+    else:
+        d = copy.deepcopy(dictionary)
+        helper_deep_update_dict(d, key)
+        return d
+
+def find_subDict_key(d: dict, s: str, max_depth: int=999):
+    """
+    Recursively search for a sub-dictionary that contains the given string.
+    Yield the result.
+
+    Args:
+        d (dict):
+            dictionary to search
+        s (str):
+            string of the key to search for using regex
+        max_depth (int):
+            maximum depth to search.
+            1 means only search the keys in the top level of
+             the dictionary. 2 means the first and second level.
+
+    Returns:
+        k_all (list of tuples):
+            List of 2-tuples: (list of tuples containing:
+             list of strings of keys to sub-dictionary, value
+             of sub-dictionary)
+    """
+    def helper_find_subDict_key(d, s, depth=999, _k_all=[]):
+        """
+        _k_all: 
+            Used for recursion. List of keys. Set to [] on first call.
+        depth: 
+            Used for recursion. Decrements by 1 each call. At 0, stops
+             recursion.
+        """
+        if depth > 0:    
+            depth -= 1
+            for k, v in d.items():
+                if re.search(s, k):
+                    yield _k_all + [k], v
+                if isinstance(v, dict):
+                    yield from helper_find_subDict_key(v, s, depth, _k_all + [k])
+    return list(helper_find_subDict_key(d, s, depth=max_depth, _k_all=[]))
+
+
+#####################################################################################################################################
+############################################################## VIDEO ################################################################
+#####################################################################################################################################
 
 class VideoReaderWrapper(decord.VideoReader):
     """
@@ -907,9 +1007,9 @@ class BufferedVideoReader:
         return iter(lazy_iterator())
 
 
-##############################
-######## CONVOLUTION #########
-##############################
+########################################################################################################################################
+############################################################# CONVOLUTION ##############################################################
+########################################################################################################################################
 
 class Toeplitz_convolution2d:
     """
@@ -1103,9 +1203,9 @@ def cosine_kernel_2D(center=(5,5), image_size=(11,11), width=5):
     return k_cos
 
 
-################################
-######## MATH FUNCTIONS ########
-################################
+##########################################################################################################################################
+############################################################# MATH FUNCTIONS #############################################################
+##########################################################################################################################################
 
 def bounded_logspace(start, stop, num,):
     """
@@ -1161,11 +1261,11 @@ def gaussian(x=None, mu=0, sig=1, plot_pref=False):
     return gaus
 
 
-################################
-##### VARIABLE Q-TRANSFORM #####
-################################
+##########################################################################################################################################
+########################################################### SPECTRAL ANALYSIS ############################################################
+##########################################################################################################################################
 
-def torch_hilbert(x, dim=0):
+def torch_hilbert(x, N=None, dim=0):
     """
     Computes the analytic signal using the Hilbert transform.
     Based on scipy.signal.hilbert
@@ -1173,7 +1273,10 @@ def torch_hilbert(x, dim=0):
     
     Args:
         x (nd tensor):
-            Signal data. Should be real.
+            Signal data. Must be real.
+        N (int):
+            Number of Fourier components to use.
+            If None, then N = x.shape[dim]
         dim (int):
             Dimension along which to do the transformation.
     
@@ -1181,10 +1284,12 @@ def torch_hilbert(x, dim=0):
         xa (nd tensor):
             Analytic signal of input x along dim
     """
-    
-    xf = torch.fft.fft(x, dim=dim)
-    m = torch.zeros(x.shape[dim])
-    n = x.shape[dim]
+    assert x.is_complex() == False, "x should be real"
+    n = x.shape[dim] if N is None else N
+    assert n >= 0, "N must be non-negative"
+
+    xf = torch.fft.fft(input=x, n=n, dim=dim)
+    m = torch.zeros(n, dtype=xf.dtype, device=xf.device)
     if n % 2: ## then even
         m[0] = m[n//2] = 1
         m[1:n//2] = 2
