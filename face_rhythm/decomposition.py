@@ -15,12 +15,12 @@ import tensorly as tl
 import tensorly.decomposition
 import einops
 
-from .util import FR_Module
+from . import util
 from .video_playback import FrameVisualizer
 from . import helpers
 
-## Define TCA class as a subclass of utils.FR_Module
-class TCA(FR_Module):
+## Define TCA class as a subclass of util.FR_Module
+class TCA(util.FR_Module):
     """
     Class for performing Tensor Component Analysis (TCA).
     RH 2022
@@ -424,10 +424,21 @@ class TCA(FR_Module):
     def plot_factors(
         self, 
         factors: dict=None,
-        concatenate_subDicts: bool=True,
-        ):
+        figure_saver: util.Figure_Saver=None,
+        show_figures: bool=True,
+    ):
         """
         Plot the factors.
+
+        Args:
+            factors (dict): 
+                The factors to plot. If None, then uses self.factors_rearranged
+                 if not None, and self.factors as last resort.
+            figure_saver (util.Figure_Saver):
+                If None, then figures are not saved.
+                Should be an instance of util.Figure_Saver.
+            show_figures (bool):
+                If True, then figures are shown.
         """
         import matplotlib.pyplot as plt
         ## Set attributes
@@ -443,12 +454,30 @@ class TCA(FR_Module):
         else:
             name_factors = 'factors'
 
-        ## Concatenate subDicts
-        if concatenate_subDicts:
-            ## Find the first level where there are arrays
-            for ii, (path, val) in enumerate(helpers.find_subDict_key(s='.*', d=factors)):
-                if isinstance(val, np.ndarray):
-                    break
+        ## Toggle interactive mode
+        ### Check if interactive mode is on
+        existing_interactive_mode = plt.isinteractive()
+        ### Set interactive mode to on if show_figures is True
+        plt.ion() if show_figures else plt.ioff()
+
+        ## Plot the factors
+        ftp = factors_to_plot = [d for d in helpers.find_subDict_key(s='.*', d=factors) if isinstance(d[1], dict)==False]
+        for ii, (path, val) in enumerate(ftp):
+            ## Get the name of the factor
+            name_factor = path[-1]
+            title_figure = f"{name_factors}_[{name_factor}]"
+            ## Plot the factor
+            fig, ax = plt.subplots()
+            ax.plot(val)
+            ax.set_title(title_figure)
+            ax.set_xlabel(name_factor[1:])
+
+            ## Save the figure
+            if figure_saver is not None:
+                figure_saver.save(fig, title_figure)
+
+        ## Toggle interactive mode back to original state
+        plt.ion() if existing_interactive_mode else plt.ioff()
             
 
     def _cleanup(self):
@@ -463,8 +492,6 @@ class TCA(FR_Module):
                 time.sleep(0.1)
         else:
             [gc.collect() for ii in range(5)]
-            
-            
 
 
     def _check_inputs(self, data):
