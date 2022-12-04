@@ -397,7 +397,7 @@ class Figure_Saver:
             print(f'FR: Saving figure {path} as format(s): {form}') if self.verbose > 1 else None
             fig.savefig(path, format=form, **self.kwargs_savefig)
 
-    def save_all(
+    def save_batch(
         self,
         figs,
         names_files: str=None,
