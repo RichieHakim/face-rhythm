@@ -304,3 +304,59 @@ def load_run_info_file(path, verbose=0):
 
     """
     return helpers.json_load(path, mode='r')
+
+
+def save_figure(
+    fig,
+    name_file: str=None,
+    path_config: str=None,
+    dir_save: str=None,
+    format: list=['png'],
+    overwrite: bool=True,
+    verbose: int=1,
+):
+    """
+    Save the figures.
+
+    Args:
+        fig (matplotlib.figure.Figure):
+            Figure to save.
+        name_file (str):
+            Name of the file to save. If None, then the name of 
+             the figure is used.
+        path_config (str):
+            Path to config.yaml file. If None, then path_save must
+             be specified.
+        dir_save (str):
+            Directory to save the figure. Used if path_config is None.
+            Must be specified if path_config is None.
+        format (list of str):
+            Format(s) to save the figure. Default is 'png'.
+            Others: ['png', 'svg', 'eps', 'pdf']
+        overwrite (bool):
+            If True, then overwrite the file if it exists.
+        verbose (int):
+            Verbosity level.
+            0: No output.
+            1: Warning.
+            2: All info.
+
+    """
+    ## Get figure title
+    name_file = '.'.join([a.get_text() for a in fig.get_axes() if a.get_title() != ''][0] if name_file is None else name_file)
+    if dir_save is None:
+        assert path_config is not None, "FR ERROR: Must provide a path_config if save=True and dir_save=None."
+        path_save = [str(Path(load_config_file(path_config)['paths']['project']) / 'visualizations' / name_file + '.' + f) for f in format]
+    else:
+        path_save = [str(Path(dir_save) / name_file + '.' + f) for f in format]
+
+    ## Save figure
+    for path in path_save:
+        print(f'FR: Saving figure {path}') if verbose > 1 else None
+        if Path(path).exists():
+            if overwrite:
+                print(f'FR Warning: Overwriting file. File: {path} already exists.') if verbose > 0 else None
+            else:
+                print(f'FR Warning: Not saving anything. File exists and overwrite==False. {path} already exists.') if verbose > 0 else None
+                return None
+        fig.savefig(path, dpi=300, bbox_inches='tight', pad_inches=0.1)
