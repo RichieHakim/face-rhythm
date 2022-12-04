@@ -313,6 +313,13 @@ def save_figure(
     dir_save: str=None,
     format: list=['png'],
     overwrite: bool=True,
+    kwargs_savefig: dict={
+            'bbox_inches': 'tight',
+            'pad_inches': 0.1,
+            'transparent': True,
+            'dpi': 300,
+            'format': format,
+        },
     verbose: int=1,
 ):
     """
@@ -335,6 +342,8 @@ def save_figure(
             Others: ['png', 'svg', 'eps', 'pdf']
         overwrite (bool):
             If True, then overwrite the file if it exists.
+        kwargs_savefig (dict):
+            Keyword arguments to pass to fig.savefig().
         verbose (int):
             Verbosity level.
             0: No output.
@@ -359,4 +368,4 @@ def save_figure(
             else:
                 print(f'FR Warning: Not saving anything. File exists and overwrite==False. {path} already exists.') if verbose > 0 else None
                 return None
-        fig.savefig(path, dpi=300, bbox_inches='tight', pad_inches=0.1)
+        fig.savefig(path, **kwargs_savefig)
