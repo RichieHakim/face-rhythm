@@ -315,7 +315,7 @@ class Figure_Saver:
         self,
         path_config: str=None,
         dir_save: str=None,
-        format_save: str=['png'],
+        format_save: list=['png'],
         kwargs_savefig: dict={
             'bbox_inches': 'tight',
             'pad_inches': 0.1,
@@ -381,19 +381,21 @@ class Figure_Saver:
         import matplotlib.pyplot as plt
         assert isinstance(fig, plt.Figure), "FR ERROR: fig must be a matplotlib.figure.Figure"
         ## Get figure title
-        name_file = '.'.join([a.get_text() for a in fig.get_axes() if a.get_title() != ''][0] if name_file is None else name_file)
-        path_save = [str(Path(self.dir_save) / name_file + '.' + f) for f in format]
+        if name_file is None:
+            titles = [a.get_title() for a in fig.get_axes() if a.get_title() != '']
+            name_file = '.'.join(titles)
+        path_save = [str(Path(self.dir_save) / (name_file + '.' + f)) for f in self.format_save]
 
         ## Save figure
-        for path in path_save:
-            print(f'FR: Saving figure {path}') if self.verbose > 1 else None
+        for path, form in zip(path_save, self.format_save):
             if Path(path).exists():
                 if self.overwrite:
                     print(f'FR Warning: Overwriting file. File: {path} already exists.') if self.verbose > 0 else None
                 else:
                     print(f'FR Warning: Not saving anything. File exists and overwrite==False. {path} already exists.') if self.verbose > 0 else None
                     return None
-            fig.savefig(path, format=format, **self.kwargs_savefig)
+            print(f'FR: Saving figure {path} as format(s): {form}') if self.verbose > 1 else None
+            fig.savefig(path, format=form, **self.kwargs_savefig)
 
     def save_all(
         self,
