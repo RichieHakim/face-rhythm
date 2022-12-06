@@ -144,7 +144,6 @@ class VQT_Analyzer(FR_Module):
         self.run_data.update({
             'spectrograms': self.spectrograms,
             'x_axis': self.x_axis,
-            'freqs': self.freqs,
             'point_positions': self.point_positions,
         })
         
