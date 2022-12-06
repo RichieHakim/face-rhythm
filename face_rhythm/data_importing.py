@@ -111,7 +111,7 @@ class Dataset_videos(FR_Module):
         ## Workflow if method is 'BufferedVideoReader'
         elif self._videoDataType == 'BufferedVideoReader':
             ## Assert that bufferedVideoReader is a BufferedVideoReader object
-            type(bufferedVideoReader), BufferedVideoReader.__class__, isinstance(bufferedVideoReader, BufferedVideoReader)  ## line needed sometimes for next assert to work
+            print(type(bufferedVideoReader), BufferedVideoReader.__class__, isinstance(bufferedVideoReader, BufferedVideoReader)) if self.verbose > 1 else None   ## line needed sometimes for next assert to work
             assert isinstance(bufferedVideoReader, BufferedVideoReader), "FR ERROR: bufferedVideoReader must be a BufferedVideoReader object"
             ## Set self.videos to bufferedVideoReader
             self.videos = bufferedVideoReader.video_readers
@@ -135,6 +135,8 @@ class Dataset_videos(FR_Module):
         self.num_channels = self.metadata["num_channels"][0]
         self.paths_videos = [str(path) for path in self.paths_videos]  ## ensure paths are strings
 
+        self.example_image = self.videos[0][0]
+
         ## For FR_Module compatibility
         self.config = {
             "paths_videos": paths_videos,
@@ -150,7 +152,7 @@ class Dataset_videos(FR_Module):
             "metadata": self.metadata,
         }
         self.run_data = {
-            # "metadata": self.metadata,  ## this should be a lazy reference to the self.metadata 
+            "example_image": self.example_image,
         }
         ## Append the self.run_info data to self.run_data
         # self.run_data.update(self.run_info)
