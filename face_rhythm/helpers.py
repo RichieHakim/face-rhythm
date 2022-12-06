@@ -1601,3 +1601,154 @@ class VQT():
             return f"VQT with custom filters"
         else:
             return f"VQT object with parameters: Fs_sample={self.Fs_sample}, Q_lowF={self.Q_lowF}, Q_highF={self.Q_highF}, F_min={self.F_min}, F_max={self.F_max}, n_freq_bins={self.n_freq_bins}, win_size={self.win_size}, downsample_factor={self.downsample_factor}, DEVICE_compute={self.DEVICE_compute}, DEVICE_return={self.DEVICE_return}, batch_size={self.batch_size}, return_complex={self.return_complex}, plot_pref={self.plot_pref}"
+
+
+############################################################################################################################################################################
+################################################################## PLOTTING HELPERS ########################################################################################
+############################################################################################################################################################################
+
+def simple_cmap(
+    colors=[
+        [1,0,0],
+        [1,0.6,0],
+        [0.9,0.9,0],
+        [0.6,1,0],
+        [0,1,0],
+        [0,1,0.6],
+        [0,0.8,0.8],
+        [0,0.6,1],
+        [0,0,1],
+        [0.6,0,1],
+        [0.8,0,0.8],
+        [1,0,0.6],
+    ],
+    under=[0,0,0],
+    over=[0.5,0.5,0.5],
+    bad=[0.9,0.9,0.9],
+    name='none'):
+    """Create a colormap from a sequence of rgb values.
+    Stolen with love from Alex (https://gist.github.com/ahwillia/3e022cdd1fe82627cbf1f2e9e2ad80a7ex)
+    
+    Args:
+        colors (list):
+            List of RGB values
+        name (str):
+            Name of the colormap
+
+    Returns:
+        cmap:
+            Colormap
+
+    Demo:
+    cmap = simple_cmap([(1,1,1), (1,0,0)]) # white to red colormap
+    cmap = simple_cmap(['w', 'r'])         # white to red colormap
+    cmap = simple_cmap(['r', 'b', 'r'])    # red to blue to red
+    """
+    from matplotlib.colors import LinearSegmentedColormap, colorConverter
+
+    # check inputs
+    n_colors = len(colors)
+    if n_colors <= 1:
+        raise ValueError('Must specify at least two colors')
+
+    # convert colors to rgb
+    colors = [colorConverter.to_rgb(c) for c in colors]
+
+    # set up colormap
+    r, g, b = colors[0]
+    cdict = {'red': [(0.0, r, r)], 'green': [(0.0, g, g)], 'blue': [(0.0, b, b)]}
+    for i, (r, g, b) in enumerate(colors[1:]):
+        idx = (i+1) / (n_colors-1)
+        cdict['red'].append((idx, r, r))
+        cdict['green'].append((idx, g, g))
+        cdict['blue'].append((idx, b, b))
+
+    cmap = LinearSegmentedColormap(name, {k: tuple(v) for k, v in cdict.items()})
+                                   
+    cmap.set_bad(bad)
+    cmap.set_over(over)
+    cmap.set_under(under)
+
+    return cmap
+
+
+class Cmap_conjunctive:
+    """
+    Combines multiple colormaps into a single colormap by
+     multiplying their values together.
+    RH 2022
+    """
+    def __init__(
+        self, 
+        cmaps, 
+        dtype_out=int, 
+        normalize=False,
+        normalization_range=[0,255],
+        name='cmap_conjunctive',
+    ):
+        """
+        Initialize the colormap transformer.
+
+        Args:
+            cmaps (list):
+                List of colormaps to combine.
+                Should be a list of matplotlib.colors.LinearSegmentedColormap objects.
+            dtype (np.dtype):
+                Data type of the output colormap.
+            normalize (bool):
+                Whether to normalize the inputs to (0,1) for the input to cmaps.
+            normalization_range (list):
+                Range to normalize the outputs to.
+                Should be a list of two numbers.
+            name (str):
+                Name of the colormap.
+        """
+        import matplotlib
+
+        ## Check inputs
+        assert isinstance(cmaps, list), 'cmaps must be a list.'
+        assert all([isinstance(cmap, matplotlib.colors.LinearSegmentedColormap) for cmap in cmaps]), 'All elements of cmaps must be matplotlib.colors.LinearSegmentedColormap objects.'
+
+        self.cmaps = cmaps
+        self.dtype_out = dtype_out
+        self.name = name
+        self.normalize = normalize
+        self.normalization_range = normalization_range
+
+        self.n_cmaps = len(self.cmaps)
+
+        self.fn_conj_cmap = lambda x: np.prod(np.stack([cmap(x_i) for cmap,x_i in zip(self.cmaps, x.T)], axis=0), axis=0)
+
+    def __call__(self, x):
+        """
+        Apply the colormap to the input data.
+
+        Args:
+            x (np.ndarray):
+                Input data.
+                Should be a numpy array of shape (n_samples, n_cmaps).
+                If normalize==True, then normalization is applied to
+                 each column of x separately.
+
+        Returns:
+            (np.ndarray):
+                Colormapped data.
+                Will be a numpy array of shape (n_samples, 4).
+        """
+        assert isinstance(x, np.ndarray), 'x must be a numpy array of shape (n_samples, n_cmaps).'
+
+        ## Make array 2D
+        if x.ndim == 1:
+            x = x[None,:]
+        assert x.shape[1] == self.n_cmaps, 'x.shape[1] must match the number of cmaps.'
+
+        ## Normalize x
+        if self.normalize:
+            assert x.shape[1] > 1, 'x must have more than one row to normalize.'
+            x = (x - x.min(axis=0, keepdims=True)) / (x.max(axis=0, keepdims=True) - x.min(axis=0, keepdims=True))
+
+        ## Get colors
+        colors = self.fn_conj_cmap(x)
+        colors = (colors * (self.normalization_range[1] - self.normalization_range[0]) + self.normalization_range[0]).astype(self.dtype_out)
+
+        return colors
