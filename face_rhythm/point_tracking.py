@@ -11,7 +11,7 @@ import scipy.sparse
 from .util import FR_Module
 from .rois import ROIs
 from .helpers import BufferedVideoReader
-from .video_playback import FrameVisualizer
+from .visualization import FrameVisualizer
 
 ## Define class for performing point tracking using optical flow
 class PointTracker(FR_Module):
@@ -111,7 +111,7 @@ class PointTracker(FR_Module):
                         'point_sizes':1,
                         'writer_cv2':None,
                     }
-                See fr.video_playback.FrameVisualizer for more information.
+                See fr.visualization.FrameVisualizer for more information.
                 Leave out 'points_colors' as this is reserved for outlier coloring.
             verbose (bool or int, optional):
                 Whether or not to print progress updates.

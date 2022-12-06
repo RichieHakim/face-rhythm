@@ -13,7 +13,7 @@ __all__=[
     'spectral_analysis',
     'tests',
     'util',
-    'video_playback',
+    'visualization',
     'data_importing',
 ]
 
