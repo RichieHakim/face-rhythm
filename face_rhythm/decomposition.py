@@ -313,7 +313,35 @@ class TCA(util.FR_Module):
             data (dict of np.ndarray):
                 Dictionary of data arrays.
                 Each array should have the same shape.
+                The arrays should be numpy arrays.
+            method (str):
+                Method for fitting the TCA model.
+                See Tensorly's documentation for the params_method
+                 argument inputs.
+                Good options are from Tensorly's decomposition methods:
+                    - 'CP_NN_HALS': non-negative CP decomposition
+                        using the efficient HALS algorithm.
+                    - 'CP': Standard CP decomposition.
+                    - 'Randomized_CP': Randomized CP decomposition.
+                        Allows for large input tensors.
+            params_method (dict):
+                Parameters for the method. See Tensorly's documentation
+                 for the params_method argument inputs for the method.
+            backend (str):
+                Backend for the tensorly package. Use 'pytorch' for
+                 most applications.
+            DEVICE (str):
+                Device for the tensorly package. Set to 'cuda' if you
+                 have a GPU and want to use it. Otherwise, set to 'cpu'.
+            verbose (bool or int):
+                Verbosity level. Set to 0 for no output. Set to 1 for
+                 warnings. Set to 2 for info.
 
+        Set Attributes:
+            self._model (tensorly.decomposition.candecomp_parafac.CP):
+                Fitted TCA model.
+            self.factors (list of np.ndarray):
+                List of the factors of the TCA model.
         """
         ## Assert that method is valid
         assert isinstance(method, str), f"Argument 'method' must be a string."
