@@ -367,6 +367,7 @@ class Figure_Saver:
         self,
         fig,
         name_file: str=None,
+        dir_save: str=None,
     ):
         """
         Save the figures.
@@ -377,14 +378,21 @@ class Figure_Saver:
             name_file (str):
                 Name of the file to save. If None, then the name of 
                 the figure is used.
+            dir_save (str):
+                Directory to save the figure. If None, then the directory
+                 specified in the initialization is used.
         """
         import matplotlib.pyplot as plt
         assert isinstance(fig, plt.Figure), "FR ERROR: fig must be a matplotlib.figure.Figure"
+
+        ## Get dir_save
+        dir_save = self.dir_save if dir_save is None else str(Path(dir_save).resolve())
+
         ## Get figure title
         if name_file is None:
             titles = [a.get_title() for a in fig.get_axes() if a.get_title() != '']
             name_file = '.'.join(titles)
-        path_save = [str(Path(self.dir_save) / (name_file + '.' + f)) for f in self.format_save]
+        path_save = [str(Path(dir_save) / (name_file + '.' + f)) for f in self.format_save]
 
         ## Save figure
         for path, form in zip(path_save, self.format_save):
@@ -401,6 +409,7 @@ class Figure_Saver:
         self,
         figs,
         names_files: str=None,
+        dir_save: str=None,
     ):
         """
         Save all figures in a list.
@@ -411,22 +420,30 @@ class Figure_Saver:
             name_file (str):
                 Name of the file to save. If None, then the name of 
                 the figure is used.
+            dir_save (str):
+                Directory to save the figure. If None, then the directory
+                 specified in the initialization is used.
         """
         import matplotlib.pyplot as plt
         assert isinstance(figs, list), "FR ERROR: figs must be a list of matplotlib.figure.Figure"
         assert all([isinstance(fig, plt.Figure) for fig in figs]), "FR ERROR: figs must be a list of matplotlib.figure.Figure"
+
+        ## Get dir_save
+        dir_save = self.dir_save if dir_save is None else str(Path(dir_save).resolve())
+
         for fig, name_file in zip(figs, names_files):
-            self.save(fig, name_file=name_file)
+            self.save(fig, name_file=name_file, dir_save=dir_save)
 
     def __call__(
         self,
         fig,
         name_file: str=None,
+        dir_save: str=None,
     ):
         """
         Calls save() method.
         """
-        self.save(fig, name_file=name_file)
+        self.save(fig, name_file=name_file, dir_save=dir_save)
 
     def __repr__(self):
         return f"Figure_Saver(path_config={self._path_config}, dir_save={self.dir_save}, format={self.format_save}, overwrite={self.overwrite}, kwargs_savefig={self.kwargs_savefig}, verbose={self.verbose})"
