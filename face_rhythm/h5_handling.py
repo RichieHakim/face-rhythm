@@ -166,7 +166,7 @@ def write_dict_to_h5(
             show_item_tree(hf)
 
 
-def simple_load(path=None, verbose=False):
+def simple_load(path=None, return_lazy=True, verbose=False):
     """
     Returns a lazy dictionary object (specific
     to hdfdict package) containing the groups
@@ -177,6 +177,9 @@ def simple_load(path=None, verbose=False):
     Args:
         path (string or Path): 
             Full path name of file to read.
+        return_lazy (bool):
+            Whether or not to return a LazyHdfDict object (True)
+             or a regular dict object (False)
         verbose (bool):
             Whether or not to print out the h5 file hierarchy.
     
@@ -187,6 +190,9 @@ def simple_load(path=None, verbose=False):
     import hdfdict
     
     h5Obj = hdfdict.load(str(path), **{'mode': 'r'})
+    
+    if return_lazy==False:
+        h5Obj = LazyHdfDict_to_dict(h5Obj)
     
     if verbose:
         show_item_tree(hObj=h5Obj)
@@ -234,3 +240,31 @@ def simple_save(
         write_mode=write_mode, 
         show_item_tree_pref=verbose
     )
+
+
+def LazyHdfDict_to_dict(hdfdictObj):
+    """
+    Converts an hdfdict object to a python dict.
+
+    Args:
+        hdfdictObj (LazyHdfDict):
+            LazyHdfDict object to convert to a python dict.
+            
+    Returns:
+        dict (dict):
+            Python dict where all hierarchical groups are
+             converted to nested dicts.
+    """
+    import hdfdict
+    assert isinstance(hdfdictObj, hdfdict.hdfdict.LazyHdfDict), "RH ERROR: Input must be an hdfdict LazyHdfDict object."
+
+    hdfdictObj.unlazy()
+
+    for ii, (key, val) in enumerate(hdfdictObj.items()):
+        if isinstance(val, hdfdict.hdfdict.LazyHdfDict):
+            hdfdictObj[key] = LazyHdfDict_to_dict(val)
+        else:
+            hdfdictObj[key] = val
+        
+    return dict(hdfdictObj)
+            
