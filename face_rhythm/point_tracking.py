@@ -567,7 +567,6 @@ class PointTracker(FR_Module):
 
         ## Apply relaxation force
         points_new -= (points_new-self.point_positions)*self.params_optical_flow['relaxation']
-        
 
         return points_new
     
