@@ -86,9 +86,13 @@ class FrameVisualizer:
                 Used as argument for cv2.circle.
                 If tuple: All points will be this color.
                     Elements of tuple should be 3 integers between 0 and 255.
-                If list: Each element is a color for a batch of points.
+                If list: Each element is a color or colors for a batch of 
+                    points.
                     Length of list must match the first dimension of points.
                     points must be 3D array.
+                    Each element should either be a tuple of 3 integers or
+                     a 2D array of integers between 0 and 255. Shape should
+                     be (N, 3) where N is the number of points.
             alpha (float):
                 Transparency of points.
                 Note that values other than 1 will be slow for now.
@@ -166,10 +170,20 @@ class FrameVisualizer:
                     assert all([isinstance(c, int) for c in points_colors]), 'points_colors must be a tuple of 3 integers.'
                     assert all([c >= 0 and c <= 255 for c in points_colors]), 'points_colors must be a tuple of 3 integers between 0 and 255.'
                 elif isinstance(points_colors, list):
-                    assert all([isinstance(c, tuple) for c in points_colors]), 'points_colors must be a list of tuples.'
-                    assert all([len(c) == 3 for c in points_colors]), 'points_colors must be a list of tuples of 3 integers.'
-                    assert all([all([isinstance(c_, int) for c_ in c]) for c in points_colors]), 'points_colors must be a list of tuples of 3 integers.'
-                    assert all([all([c_ >= 0 and c_ <= 255 for c_ in c]) for c in points_colors]), 'points_colors must be a list of tuples of 3 integers between 0 and 255.'
+                    if isinstance(points_colors[0], tuple):
+                        assert all([isinstance(c, tuple) for c in points_colors]), 'points_colors must be a list of tuples.'
+                        assert all([len(c) == 3 for c in points_colors]), 'points_colors must be a list of tuples of 3 integers.'
+                        assert all([all([isinstance(c_, int) for c_ in c]) for c in points_colors]), 'points_colors must be a list of tuples of 3 integers.'
+                        assert all([all([c_ >= 0 and c_ <= 255 for c_ in c]) for c in points_colors]), 'points_colors must be a list of tuples of 3 integers between 0 and 255.'
+                    elif isinstance(points_colors[0], np.ndarray):
+                        assert all([isinstance(c, np.ndarray) for c in points_colors]), 'points_colors must be a list of numpy arrays.'
+                        assert all([c.dtype == np.int for c in points_colors]), 'points_colors must be a list of numpy arrays of int.'
+                        assert all([c.ndim == 2 for c in points_colors]), 'points_colors must be a list of 2D numpy arrays.'
+                        assert all([c.shape[1] == 3 for c in points_colors]), 'points_colors must be a list of 2D numpy arrays with 3 columns.'
+                        assert all([np.all(c >= 0) for c in points_colors]), 'points_colors must be a list of 2D numpy arrays with values between 0 and 255.'
+                        assert all([np.all(c <= 255) for c in points_colors]), 'points_colors must be a list of 2D numpy arrays with values between 0 and 255.'
+                    else:
+                        raise ValueError('points_colors must be a list of tuples or a list of numpy arrays.')
 
             ## Check text
             if text is not None:
@@ -203,6 +217,11 @@ class FrameVisualizer:
                 assert len(text_thickness) == len(text), 'Length of text_thickness must match the length of text.'
                 assert all([isinstance(thickness, int) for thickness in text_thickness]), 'All elements of text_thickness must be integers.'
 
+        if isinstance(points_colors[0], np.ndarray):
+            points_colors = [[tuple([int(c_i) for c_i in c]) for c in color_batch] for color_batch in points_colors]
+            # import matplotlib.pyplot as plt
+            # plt.figure()
+            # plt.plot(np.array(points_colors[0])[:,0])
 
         ## Make a copy of image
         image_out = image.copy()
@@ -234,15 +253,25 @@ class FrameVisualizer:
         ## Plot points
         if points is not None:
             ## Plot points
-            for i_batch, (p, s, color) in enumerate(zip(points, point_sizes, points_colors)):
-                for i_point in range(p.shape[0]):
+            for i_batch, (points_batch, size_batch, colors_batch) in enumerate(zip(points, point_sizes, points_colors)):
+                if isinstance(colors_batch, tuple):
+                    colors_batch = [colors_batch] * len(points_batch)
+                # print(np.array(colors_batch)[:,0].max())
+                for ii,(points, color) in enumerate(zip(points_batch, colors_batch)):
+                    # print(hash(tuple(points_colors[i_batch][i_point])), hash((0,0,0)))
                     cv2.circle(
                         img=image_out,
-                        center=tuple(p[i_point]),
-                        radius=int(s),
-                        color=points_colors[i_batch],
+                        center=tuple(points),
+                        radius=int(size_batch),
+                        color=color,
                         thickness=-1,
                     )
+                    # print(ii)
+                    # if ii == 823:
+                    #     print(color[0])
+                #     if color[i_point][0] > 253:
+                #         print(color[i_point])
+                # print(color)
             ## Do weighted addition
             image_out = cv2.addWeighted(image_out, alpha, image, (1-alpha), 0.0)
 
