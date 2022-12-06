@@ -2,9 +2,9 @@ from typing import Union
 
 import numpy as np
 import cv2
-import scipy.sparse
+# import scipy.sparse
 
-from .helpers import BufferedVideoReader, Toeplitz_convolution2d
+# from .helpers import BufferedVideoReader, Toeplitz_convolution2d
 
 class FrameVisualizer:
     """
@@ -217,12 +217,6 @@ class FrameVisualizer:
                 assert len(text_thickness) == len(text), 'Length of text_thickness must match the length of text.'
                 assert all([isinstance(thickness, int) for thickness in text_thickness]), 'All elements of text_thickness must be integers.'
 
-        if isinstance(points_colors[0], np.ndarray):
-            points_colors = [[tuple([int(c_i) for c_i in c]) for c in color_batch] for color_batch in points_colors]
-            # import matplotlib.pyplot as plt
-            # plt.figure()
-            # plt.plot(np.array(points_colors[0])[:,0])
-
         ## Make a copy of image
         image_out = image.copy()
 
@@ -254,24 +248,24 @@ class FrameVisualizer:
         if points is not None:
             ## Plot points
             for i_batch, (points_batch, size_batch, colors_batch) in enumerate(zip(points, point_sizes, points_colors)):
-                if isinstance(colors_batch, tuple):
-                    colors_batch = [colors_batch] * len(points_batch)
-                # print(np.array(colors_batch)[:,0].max())
-                for ii,(points, color) in enumerate(zip(points_batch, colors_batch)):
-                    # print(hash(tuple(points_colors[i_batch][i_point])), hash((0,0,0)))
-                    cv2.circle(
-                        img=image_out,
-                        center=tuple(points),
-                        radius=int(size_batch),
-                        color=color,
-                        thickness=-1,
-                    )
-                    # print(ii)
-                    # if ii == 823:
-                    #     print(color[0])
-                #     if color[i_point][0] > 253:
-                #         print(color[i_point])
-                # print(color)
+                if isinstance(colors_batch, (list, tuple)):
+                    for ii,points in enumerate(points_batch):
+                        cv2.circle(
+                            img=image_out,
+                            center=tuple(points),
+                            radius=int(size_batch),
+                            color=colors_batch,
+                            thickness=-1,
+                        )
+                else:
+                    for ii,(points, color) in enumerate(zip(points_batch, colors_batch)):
+                        cv2.circle(
+                            img=image_out,
+                            center=tuple(points),
+                            radius=int(size_batch),
+                            color=color.tolist(),
+                            thickness=-1,
+                        )
             ## Do weighted addition
             image_out = cv2.addWeighted(image_out, alpha, image, (1-alpha), 0.0)
 
