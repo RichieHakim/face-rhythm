@@ -16,7 +16,6 @@ import tensorly.decomposition
 import einops
 
 from . import util
-from .video_playback import FrameVisualizer
 from . import helpers
 
 ## Define TCA class as a subclass of util.FR_Module
@@ -44,6 +43,13 @@ class TCA(util.FR_Module):
 
         ## Set variables
         self._verbose = int(verbose)
+
+        ## For FR_Module compatibility
+        self.config = {
+            'verbose': self._verbose,
+        }
+        self.run_info = {}
+        self.run_data = {}
 
     def rearrange_data(
         self,
@@ -282,7 +288,6 @@ class TCA(util.FR_Module):
     def fit(
         self,
         data: dict=None,
-        reshape_arrays_to_original_shape: bool=True,
         method: str='CP_NN_HALS',
         params_method: dict={
             'rank': 6, 
@@ -322,7 +327,6 @@ class TCA(util.FR_Module):
         self._backend = backend
         self.params_method = params_method
         self.data = data if data is not None else self.data
-        self._reshape_arrays_to_original_shape = reshape_arrays_to_original_shape
         self._DEVICE = torch.device(DEVICE)
         self._verbose = int(verbose)
 
@@ -341,7 +345,13 @@ class TCA(util.FR_Module):
         ## Clean up
         self._cleanup()
 
-    
+        ## Place config into run_config
+        self.config['method'] = method
+        self.config['backend'] = backend
+        self.config['params_method'] = params_method
+        self.config['device'] = DEVICE
+
+
     def rearrange_factors(
         self,
         factors: dict=None,
@@ -420,6 +430,18 @@ class TCA(util.FR_Module):
                     new_key=new_key,
                     in_place=True,
                 )
+
+        ## Place factors into run_data
+        self.run_data['factors'] = self.factors
+        self.run_data['names_dims_array_preDecomp'] = self.names_dims_array_preDecomp
+        self.run_data['name_dim_dictElements_preDecomp'] = self.name_dim_dictElements_preDecomp
+        self.run_data['factors_rearranged'] = self.factors_rearranged
+        self.run_data['names_dims_array'] = self.names_dims_array_postDecomp
+        self.run_data['name_dim_dictElements'] = self.name_dim_dictElements_postDecomp
+        ## Place info into run_info
+        self.run_info['names_dims_array'] = self.names_dims_array_postDecomp
+        self.run_info['name_dim_dictElements'] = self.name_dim_dictElements_postDecomp
+        self.run_info['num_dictElements'] = self.num_dictElements
 
     def plot_factors(
         self, 
