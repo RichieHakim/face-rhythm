@@ -61,7 +61,7 @@ def test_python_version(
         print(f'FR Error: PYTHON VERSION {version_system} does not match specification: {version_test}. Please check your environment.')
         return False
     print(f'FR: PYTHON VERSION on system: {version_system} matches specification: {version_test}') if verbose > 1 else None
-    return True
+    # return True
 
 
 def test_torch_cuda(verbose=1, device='cuda'):
@@ -88,4 +88,4 @@ def test_torch_cuda(verbose=1, device='cuda'):
 
     else:
         print(f'FR Error: CUDA is not available. Environment using PyTorch version: {torch.__version__}') if verbose > 0 else None
-        return True
+        # return True

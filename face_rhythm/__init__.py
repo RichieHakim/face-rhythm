@@ -15,6 +15,7 @@ __all__=[
     'util',
     'visualization',
     'data_importing',
+    'tests',
 ]
 
 import torch  ## For some reason, it crashes if I don't import torch before other packages... RH 20221128
