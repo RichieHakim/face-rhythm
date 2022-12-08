@@ -906,7 +906,8 @@ class BufferedVideoReader:
                 A tensor of shape (num_frames, height, width, num_channels)
         """
         ## Assert that idx is an int or a slice
-        assert isinstance(idx, int) or isinstance(idx, slice), f"idx must be an int or a slice. Got {type(idx)}"
+        assert isinstance(idx, (int, np.int_)) or isinstance(idx, slice), f"idx must be an int or a slice. Got {type(idx)}"
+        idx = int(idx) if isinstance(idx, (np.int_)) else idx
         ## If idx is a single integer, convert it to a slice
         idx = slice(idx, idx+1) if isinstance(idx, int) else idx
         ## Assert that the slice is not empty
