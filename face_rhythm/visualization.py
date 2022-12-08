@@ -435,6 +435,15 @@ def play_video_with_points(
             bufferedVideoReader (BufferedVideoReader): 
                 BufferedVideoReader object.
                 Made using the fr.helpers.BufferedVideoReader class.
+            frameVisualizer (FrameVisualizer, optional):
+                FrameVisualizer object.
+                Made using the fr.visualization.FrameVisualizer class.
+            points (np.ndarray, optional):
+                Points to overlay on the video.
+                Shape: (num_frames, num_points, 2)
+            idx_frames (np.ndarray, optional):
+                Indices of frames to play.
+                Defaults to np.arange(len(bufferedVideoReader))
         """
         ## Check arguments
         print(type(bufferedVideoReader)) if frameVisualizer._verbose > 1 else None
