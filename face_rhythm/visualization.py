@@ -443,6 +443,9 @@ def play_video_with_points(
 
         ## Prep idx_frames
         idx_frames = np.arange(bufferedVideoReader.num_frames_total) if idx_frames is None else idx_frames
+        if idx_frames.max() > bufferedVideoReader.num_frames_total:
+            idx_frames = idx_frames[idx_frames < bufferedVideoReader.num_frames_total]
+            print(f'Warning: idx_frames contained frames that were out of bounds. Truncating to {idx_frames.max()}.') if frameVisualizer._verbose > 0 else None
         ## Prep points
         points_int = points.astype(int) if points is not None else None
 
