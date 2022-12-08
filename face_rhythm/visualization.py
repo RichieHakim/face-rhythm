@@ -1,10 +1,13 @@
 from typing import Union
+from pathlib import Path
+import copy
 
 import numpy as np
 import cv2
+import torch
 # import scipy.sparse
 
-# from .helpers import BufferedVideoReader, Toeplitz_convolution2d
+from .helpers import BufferedVideoReader
 
 class FrameVisualizer:
     """
@@ -15,36 +18,141 @@ class FrameVisualizer:
     def __init__(
         self,
         ## can be tuple of int or list of int
-        image_height_width: Union[tuple, list],
+        display=False,
+        
+        handle_cv2Imshow='FaceRhythmPointVisualizer',
+        path_save=None,
+        frame_height_width=(480, 640),
+        frame_rate=None,
+        error_checking=False,
         verbose: int=1,
+
+        point_sizes=None,
+        points_colors=None,
+        alpha=None,
+        text=None,
+        text_positions=None,
+        text_color=None,
+        text_size=None,
+        text_thickness=None,
+
     ):
         """
         Initialize the VideoPlayback object.
         This class wraps the primary function which is:
          self.visualize_image_with_points. It is used to visualize
          single frame inputs of images and overlayed points.
-        The reason why this is a class is to initialize the
-         Toeplitz convolution object which is used to control the
-         size of the points being visualized.
 
         Args:
-            image_height_width (tuple or list):
-                The height and width of the images to be played back.
+            display (bool):
+                If True: Display image using cv2.imshow.
+            handle_cv2Imshow (str):
+                Used as argument for cv2.imshow.
+                Can be used to close window later.
+            path_save (str):
+                If not None: Save video to this path.
+                Use .avi extension: 'directory/filename.avi'
+            frame_rate (int):
+                Frame rate of played back and/or saved video.
+                If None, will playback at top speed, and saved videos
+                 will have frame rate of 60.
+            error_checking (bool):
+                If True: Perform error checking.
+            verbose (bool or int):
+                Whether to print progress messages.
+                0: No messages
+                1: Warnings
+                2: Info
+
+            point_sizes (int or list):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Used as argument for cv2.circle.
+                If int: All points will be this size.
+                If list: Each element is a size for a batch of points.
+                    Length of list must match the first dimension of points.
+                    points must be 3D array.
+            points_colors (tuple of int or list of tuple of int):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Used as argument for cv2.circle.
+                If tuple: All points will be this color.
+                    Elements of tuple should be 3 integers between 0 and 255.
+                If list: Each element is a color or colors for a batch of 
+                    points.
+                    Length of list must match the first dimension of points.
+                    points must be 3D array.
+                    Each element should either be a tuple of 3 integers or
+                     a 2D array of integers between 0 and 255. Shape should
+                     be (N, 3) where N is the number of points.
+            alpha (float):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Transparency of points.
+                Note that values other than 1 will be slow for now.
+            text (str or list):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Used as argument for cv2.putText.
+                If None: No text will be plotted.
+                If str: All text will be this string.
+                If list: Each element is a string for a batch of text.
+                    text_positions must be 3D array.
+            text_positions (np.ndarray, np.float32):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Must be specified if text is not None.
+                2D array: Each row is a text position. Order (x,y).
+            text_color (str or list):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Used as argument for cv2.putText.
+                If str: All text will be this color.
+                If list: Each element is a color for a different text.
+                    Length of list must match the length of text.
+            text_size (int or list):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Used as argument for cv2.putText.
+                If int: All text will be this size.
+                If list: Each element is a size for a different text.
+                    Length of list must match the length of text.
+            text_thickness (int or list):
+                OPTIONAL. Can be set during call to visualize_image_with_points.
+                Used as argument for cv2.putText.
+                If int: All text will be this thickness.
+                If list: Each element is a thickness for a different text.
+                    Length of list must match the length of text.
         """
-        ## Assertions
-        assert isinstance(image_height_width, (tuple, list)), "FR ERROR: image_height_width must be a tuple or list of ints"
-        assert len(image_height_width) == 2, "FR ERROR: image_height_width must be a tuple or list of length 2: (height, width)"
-        assert isinstance(image_height_width[0], int), "FR ERROR: image_height_width must be a tuple or list of ints"
-        assert isinstance(verbose, int), "FR ERROR: verbose must be an int"
+        ## Stor arguments
+        self.point_sizes = point_sizes if point_sizes is not None else None
+        self.points_colors = points_colors if points_colors is not None else None
+        self.alpha = alpha if alpha is not None else None
+        self.text = text if text is not None else None
+        self.text_positions = text_positions if text_positions is not None else None
+        self.text_color = text_color if text_color is not None else None
+        self.text_size = text_size if text_size is not None else None
+        self.text_thickness = text_thickness if text_thickness is not None else None
 
         ## Set variables
-        self.image_height_width = tuple(image_height_width)
+        self.display = bool(display)
+        self.error_checking = bool(error_checking)
+        self.handle_cv2Imshow = str(handle_cv2Imshow)
+        self.path_save = str(Path(path_save).resolve()) if path_save is not None else None
+        self.frame_height_width = tuple(frame_height_width)
+        self.frame_rate = int(frame_rate) if frame_rate is not None else None
         self._verbose = int(verbose)
+
+        ## Make video writer
+        if self.path_save is not None:
+            print(f'Initializing video writer with frame_rate={self.frame_rate}, fourcc="MJPG", frame_height_width={self.frame_height_width}, path_save={self.path_save}') if self._verbose > 1 else None
+            self.video_writer = cv2.VideoWriter(
+                    self.path_save,
+                    cv2.VideoWriter_fourcc(*'MJPG'),
+                    frame_rate,
+                    frame_height_width[::-1],
+                ) 
+        else:
+            self.video_writer = None
 
     def visualize_image_with_points(
         self,
         image,
         points=None,
+
         point_sizes=None,
 
         points_colors=(0, 255, 255),
@@ -55,12 +163,6 @@ class FrameVisualizer:
         text_color='white',
         text_size=1,
         text_thickness=1,
-
-        display=False,
-        handle_cv2Imshow='FaceRhythmPointVisualizer',
-        writer_cv2=None,
-
-        error_checking=False,
     ):
         """
         Visualize an image with points and text.
@@ -71,9 +173,11 @@ class FrameVisualizer:
             image (np.ndarray, uint8):
                 3D array of integers, where each element is a 
                 pixel value. Last dimension should be channels.
-            points (list of np.ndarray, int):
+            points (list of np.ndarray of dtype int):
                 list of 2D array: List elements are batches of points.
                     Each batch can have different colors and sizes.
+                    Each list element is a different batch.
+                    Shape of each array: (n_points, 2)
                     First dimension of each array is point number, and
                      second dimension is point coordinates. Order (x,y).
             point_sizes (int or list):
@@ -120,28 +224,31 @@ class FrameVisualizer:
                 If int: All text will be this thickness.
                 If list: Each element is a thickness for a different text.
                     Length of list must match the length of text.
-            display (bool):
-                If True: Display image using cv2.imshow.
-            handle_cv2Imshow (str):
-                Used as argument for cv2.imshow.
-                Can be used to close window later.
-            writer_cv2 (cv2.VideoWriter):
-                If not None: Write image to video using writer_cv2.write.
-            error_checking (bool):
-                If True: Perform error checking.
 
         Returns:
             image (np.ndarray, uint8):
                 A 3D array of integers, where each element is a 
                 pixel value.
         """
+        ## Get arguments from self if not None
+        point_sizes = self.point_sizes if self.point_sizes is not None else point_sizes
+        points_colors = self.points_colors if self.points_colors is not None else points_colors
+        alpha = self.alpha if self.alpha is not None else alpha
+        text = self.text if self.text is not None else text
+        text_positions = self.text_positions if self.text_positions is not None else text_positions
+        text_color = self.text_color if self.text_color is not None else text_color
+        text_size = self.text_size if self.text_size is not None else text_size
+        text_thickness = self.text_thickness if self.text_thickness is not None else text_thickness
+
         ## Check inputs
-        if error_checking:
+        if self.error_checking:
             ## Check image
             assert isinstance(image, np.ndarray), 'image must be a numpy array.'
             assert image.dtype == np.uint8, 'image must be a numpy array of uint8.'
             assert image.ndim == 3, 'image must be a 3D array.'
             assert image.shape[-1] == 3, 'image must have 3 channels.'
+            if self.frame_height_width is not None:
+                assert image.shape[:2] == self.frame_height_width, f'image must have shape {self.frame_height_width}, specified in self.frame_height_width, but has shape {image.shape[:2]}.'
 
             ## Check points
             if points is not None:
@@ -158,10 +265,11 @@ class FrameVisualizer:
                 # assert np.all([np.all(points[i][:,1] < image.shape[0]) for i in range(len(points))]), 'points must be within image.'
 
             ## Check points_sizes
-            assert isinstance(point_sizes, (int, list)), 'points_sizes must be an integer or a list.'
-            if isinstance(point_sizes, list):
-                assert len(point_sizes) == points.shape[0], 'Length of points_sizes must match the first dimension of points.'
-                assert all([isinstance(size, int) for size in point_sizes]), 'All elements of points_sizes must be integers.'
+            if point_sizes is not None:
+                assert isinstance(point_sizes, (int, list)), 'points_sizes must be an integer or a list.'
+                if isinstance(point_sizes, list):
+                    assert len(point_sizes) == points.shape[0], 'Length of points_sizes must match the first dimension of points.'
+                    assert all([isinstance(size, int) for size in point_sizes]), 'All elements of points_sizes must be integers.'
 
             ## Check points_colors
             if points_colors is not None:
@@ -218,7 +326,7 @@ class FrameVisualizer:
                 assert all([isinstance(thickness, int) for thickness in text_thickness]), 'All elements of text_thickness must be integers.'
 
         ## Make a copy of image
-        image_out = image.copy()
+        image_out = copy.copy(image)
 
         ## Convert point colors to list of BGR tuples
         if isinstance(points_colors, tuple) and points is not None:
@@ -229,6 +337,7 @@ class FrameVisualizer:
             text = [text]
 
         ## Convert points_sizes to list
+        point_sizes = int(2) if point_sizes is None else point_sizes
         if isinstance(point_sizes, int) and points is not None:
             point_sizes = [point_sizes] * len(points)
 
@@ -285,35 +394,68 @@ class FrameVisualizer:
 
 
         ## Display image_out
-        if display:
-            cv2.imshow(handle_cv2Imshow, image_out)
-            cv2.waitKey(1)
+        if self.display:
+            cv2.imshow(self.handle_cv2Imshow, image_out)
+            cv2.waitKey(1) if self.frame_rate is None else cv2.waitKey(int(1000/self.frame_rate))
 
         ## Write image_out
-        if writer_cv2 is not None:
-            writer_cv2.write(image_out)
+        if self.video_writer is not None:
+            self.video_writer.write(image_out)
 
         return image_out
 
-        # ## Make convolutional kernels for points
-        # def _make_convolution_kernel(point_size):
-        #     ## Make a cosine kernel
-        #     d = int((point_size//2)*2 + 1)
-        #     c = int(point_size//2)
-        #     x = np.linspace(-c, c, d)  ## position grid
-        #     y = np.linspace(-c, c, d)  ## position grid
-        #     xx, yy = np.meshgrid(x, y)  ## position grid
-        #     r = np.sqrt(xx**2 + yy**2)  ## radial distance grid
-        #     kernel = np.cos(r/point_size*np.pi/2)  ## convert to cosine
-        #     kernel[r > point_size/2] = 0  ## set values outside of circle to 0
-        #     kernel = kernel / np.sum(kernel)  ## normalize sum to 1
-        #     return kernel
-        # self.kernels = [_make_convolution_kernel(p) for p in self.points_sizes]
-        
-        # ## Initialize Toeplitz convolution objects
-        # self.convolvers = [Toeplitz_convolution2d(
-        #     x_shape=self.image_height_width,
-        #     k=kernel,
-        #     mode='same',
-        #     dtype=np.float32,
-        # ) for kernel in self.kernels]
+    def close(self):
+        if self.video_writer is not None:
+            self.video_writer.release()
+            cv2.destroyAllWindows()
+
+    def __del__(self):
+        self.close()
+    def __exit__(self):
+        self.close()
+    def __enter__(self):
+        return self
+    
+    def __repr__(self):
+        return f'FrameVisualizer(handle_cv2Imshow={self.handle_cv2Imshow}, display={self.display}, video_writer={self.video_writer}, path_video={self.path_save}, frame_rate={self.frame_rate}, frame_height_width={self.frame_height_width})'
+
+
+def play_video_with_points(
+        bufferedVideoReader,
+        frameVisualizer=None,
+        points=None,
+        idx_frames=None,
+    ):
+        """
+        Play a video with points overlaid on it.
+        Optionally, save the video to a file.
+        RH 2022
+
+        Args:
+            bufferedVideoReader (BufferedVideoReader): 
+                BufferedVideoReader object.
+                Made using the fr.helpers.BufferedVideoReader class.
+        """
+        ## Check arguments
+        print(type(bufferedVideoReader)) if frameVisualizer._verbose > 1 else None
+        assert isinstance(bufferedVideoReader, BufferedVideoReader), 'bufferedVideoReader must be a BufferedVideoReader object.'
+        assert isinstance(frameVisualizer, FrameVisualizer), 'frameVisualizer must be a FrameVisualizer object.'
+
+        ## Prep idx_frames
+        idx_frames = np.arange(bufferedVideoReader.num_frames_total) if idx_frames is None else idx_frames
+        ## Prep points
+        points_int = points.astype(int) if points is not None else None
+
+        ## Loop through frames
+        ### Set buffered video reader to first frame
+        bufferedVideoReader.set_iterator_frame_idx(int(idx_frames[0]))
+        ### Iterate through frames
+        for idx_frame in idx_frames:
+            frame = bufferedVideoReader[idx_frame][0]
+            frame = frame.numpy() if isinstance(frame, torch.Tensor) else frame
+            p = points_int[idx_frame] if points_int is not None else None
+            frameVisualizer.visualize_image_with_points(
+                image=frame,
+                points=[p],
+            )
+        frameVisualizer.close()
