@@ -1,4 +1,3 @@
-face-rhythm
 # Face-Rhythm
 
 Learn more at https://face-rhythm.readthedocs.io/
