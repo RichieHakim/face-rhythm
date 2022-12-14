@@ -15,7 +15,7 @@ class ROIs(FR_Module):
         select_mode="gui_notebook",
 
         exampleImage=None,
-        file_path=None,
+        path_file=None,
         points=None,
         mask_images=None,
         verbose=1,
@@ -35,7 +35,7 @@ class ROIs(FR_Module):
                         Load a file with the ROI points.
                         This should be an existing 'ROIs.h5' file from
                          a previous run.
-                        'file_path' must be provided, and either 
+                        'path_file' must be provided, and either 
                     'points':
                         Provide a list of points of the boundaries of
                          the ROIs.
@@ -47,7 +47,7 @@ class ROIs(FR_Module):
                 exampleImage (np.ndarray):
                     Image to show in the GUI to select the ROIs.
                     Only used if select_mode is 'gui'.
-                file_path (str):
+                path_file (str):
                     Path to the file to load.
                     Only used if select_mode is 'file'.
                 points (list of list of 2-element lists of float):
@@ -73,7 +73,7 @@ class ROIs(FR_Module):
         super().__init__()
         self._select_mode = select_mode
         self.exampleImage = exampleImage
-        self._file_path = file_path
+        self._path_file = path_file
         self.points = points
         self.mask_images = mask_images
         self.verbose = int(verbose)
@@ -86,9 +86,9 @@ class ROIs(FR_Module):
         if (select_mode == "gui"):
             assert exampleImage is not None, "FR ERROR: 'exampleImage' must be provided for select_mode 'gui' or 'gui_tk'."
         elif select_mode == "file":
-            assert self._file_path is not None, "FR ERROR: 'file_path' must be provided for select_mode 'file'."
-            assert isinstance(self._file_path, str), "FR ERROR: 'file_path' must be a string."
-            assert Path(self._file_path).exists(), f"FR ERROR: 'file_path' does not exist: {self._file_path}"
+            assert self._path_file is not None, "FR ERROR: 'path_file' must be provided for select_mode 'file'."
+            assert isinstance(self._path_file, str), "FR ERROR: 'path_file' must be a string."
+            assert Path(self._path_file).exists(), f"FR ERROR: 'path_file' does not exist: {self._path_file}"
         elif select_mode == "points":
             assert points is not None, "FR ERROR: 'points' argument must be provided for select_mode 'points'."
             assert exampleImage is not None, "FR ERROR: 'exampleImage' must be provided for select_mode 'points'."
@@ -126,7 +126,7 @@ class ROIs(FR_Module):
                     self.mask_images.update({f"mask_{ii}": mask_frame.astype(bool)})
         
         if select_mode == "file":
-            file = h5_handling.simple_load(self._file_path)
+            file = h5_handling.simple_load(self._path_file)
             file.unlazy()
             ## Check that the file has the correct format
             assert "mask_images" in file, "FR ERROR: 'mask_images' not found in file."
@@ -151,7 +151,7 @@ class ROIs(FR_Module):
         self.config = {
             "select_mode": self._select_mode,
             "exampleImage": (self.exampleImage is not None),
-            "file_path": file_path,
+            "path_file": path_file,
             "points": (points is not None),
             "mask_images": (mask_images is not None),
             "verbose": self.verbose,

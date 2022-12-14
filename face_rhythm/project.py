@@ -3,7 +3,8 @@ from pathlib import Path
 
 from datetime import datetime
 
-from .helpers import get_system_versions, prepare_cv2_imshow
+from .helpers import prepare_cv2_imshow
+from .util import get_system_versions
 
 def prepare_project(
     directory_project='./',

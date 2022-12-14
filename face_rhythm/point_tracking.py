@@ -175,15 +175,15 @@ class PointTracker(FR_Module):
         ## if the parameter was passed as an arg then place it in the args dict, otherwise use the default
         ### params_optical_flow
         params_missing = {key: params_optFlow_default[key] for key in params_optFlow_default if key not in params_optical_flow}
-        print(f"FR WARNING: Following parameters for optical flow were not specified and will be set to default values: {params_missing}") if self._verbose > 0 else None
+        print(f"FR WARNING: Following parameters for optical flow were not specified and will be set to default values: {params_missing}") if ((self._verbose > 0) and (len(params_missing) > 0)) else None
         self.params_optical_flow = {**params_optical_flow, **params_missing}
         ### params_outlier_handling
         params_missing = {key: params_outlierHandling_default[key] for key in params_outlierHandling_default if key not in params_outlier_handling}
-        print(f"FR WARNING: Following parameters for outlier handling were not specified and will be set to default values: {params_missing}") if self._verbose > 0 else None
+        print(f"FR WARNING: Following parameters for outlier handling were not specified and will be set to default values: {params_missing}") if ((self._verbose > 0) and (len(params_missing) > 0)) else None
         self.params_outlier_handling = {**params_outlier_handling, **params_missing}
         ### params_visualization
         params_missing = {key: params_visualization_default[key] for key in params_visualization_default if key not in params_visualization}
-        print(f"FR WARNING: Following parameters for visualization were not specified and will be set to default values: {params_missing}") if self._verbose > 0 else None
+        print(f"FR WARNING: Following parameters for visualization were not specified and will be set to default values: {params_missing}") if ((self._verbose > 0) and (len(params_missing) > 0)) else None
         self.params_visualization = {**params_visualization, **params_missing}
 
         ## Make points within rois_points with spacing of point_spacing
