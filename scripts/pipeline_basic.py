@@ -51,7 +51,7 @@ params = {
             'kwargs_method': {
                 'winSize': [20,20],
                 'maxLevel': 2,
-                'criteria': (2, 0.03),
+                'criteria': [2, 0.03],
             },
         },
         'visualize_video': False,
@@ -92,7 +92,7 @@ params = {
         'verbose': 2,
         'rearrange_data':{
             'names_dims_array': ['xy', 'points', 'frequency', 'time'],
-            'names_dims_concat_array': [('xy', 'points')],
+            'names_dims_concat_array': [['xy', 'points']],
             'concat_complexDim': False,
             'name_dim_concat_complexDim': 'time',
             'name_dim_dictElements': 'trials',

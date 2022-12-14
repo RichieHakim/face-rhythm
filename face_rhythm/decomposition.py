@@ -56,7 +56,7 @@ class TCA(util.FR_Module):
         data: dict,
 
         names_dims_array: list=['xy', 'points', 'frequency', 'time'],
-        names_dims_concat_array: list=[('xy', 'points')],
+        names_dims_concat_array: list=[['xy', 'points']],
 
         concat_complexDim: bool=True,
         name_dim_concat_complexDim: str='time',
@@ -91,8 +91,8 @@ class TCA(util.FR_Module):
                 Names of the dimensions of the data arrays.
                 Typically these are ['xy', 'points', 'frequency', 'time'].
 
-            names_dims_concat_array (list of tuples of str):
-                List of tuples of dimension names to concatenate.
+            names_dims_concat_array (list of 2-element lists of str):
+                List of 2-element lists of dimension names to concatenate.
                 Example tuple: ('dim1', 'dim2'). Here 'dim1' will be
                  concatenated along 'dim2'. The resulting array will have
                  one less dimension than the original arrays, and 'dim2'
@@ -544,35 +544,35 @@ class TCA(util.FR_Module):
             [gc.collect() for ii in range(5)]
 
 
-    def _check_inputs(self, data):
-        """
-        Check the inputs for type and value.
-        data is passed in because it is large and not set as
-         an attribute until after this function is called.
+    # def _check_inputs(self, data):
+    #     """
+    #     Check the inputs for type and value.
+    #     data is passed in because it is large and not set as
+    #      an attribute until after this function is called.
 
-        Args:
-            data (dict of np.ndarray):
-                Dictionary of data arrays.
-                Each element of the dictionary should be a numpy
-                 array. Number of dimensions should be the same
-                 as the number of names in self.names_dims_array.
-        """
-        ## Assertions
-        ### Assert that for each argument, the type matches the expected type
-        ### Assert that the data is a dictionary, and that all the values are numpy arrays, and that all arrays have the same number of dimensions
-        assert isinstance(data, dict), 'data must be a dictionary'
-        assert all([isinstance(v, np.ndarray) for v in data.values()]), 'all values in data must be numpy arrays'
-        assert len(set([v.ndim for v in data.values()])) == 1, 'all arrays in data must have the same number of dimensions'
-        ### Assert that the names of the dimensions are unique strings, and that the number of names matches the number of dimensions in the data
-        assert all([isinstance(n, str) for n in self.names_dimensions]), 'names of dimensions must be strings'
-        assert len(self.names_dimensions) == len(set(self.names_dimensions)), 'names of dimensions must be unique'
-        assert len(self.names_dimensions) == len(data[list(data.keys())[0]].shape), 'number of names of dimensions must match the number of dimensions in the data'
-        ### Assert that the dimensions to concatenate are tuples of strings, and that the strings are in the list of names of dimensions
-        assert all([isinstance(d, tuple) for d in self.dims_to_concatenate]), 'dimensions to concatenate must be tuples'
-        assert all([all([isinstance(n, str) for n in d]) for d in self.dims_to_concatenate]), 'dimensions to concatenate must be tuples of strings'
-        assert all([all([n in self.names_dimensions for n in d]) for d in self.dims_to_concatenate]), 'dimensions to concatenate must be tuples of strings that are in the list of names of dimensions'
-        ### Assert that the method is a string
-        assert isinstance(self.method, str), 'method must be a string'
-        ### Assert that the parameters for the method are a dictionary
-        assert isinstance(self.params_method, dict), 'parameters for method must be a dictionary'
+    #     Args:
+    #         data (dict of np.ndarray):
+    #             Dictionary of data arrays.
+    #             Each element of the dictionary should be a numpy
+    #              array. Number of dimensions should be the same
+    #              as the number of names in self.names_dims_array.
+    #     """
+    #     ## Assertions
+    #     ### Assert that for each argument, the type matches the expected type
+    #     ### Assert that the data is a dictionary, and that all the values are numpy arrays, and that all arrays have the same number of dimensions
+    #     assert isinstance(data, dict), 'data must be a dictionary'
+    #     assert all([isinstance(v, np.ndarray) for v in data.values()]), 'all values in data must be numpy arrays'
+    #     assert len(set([v.ndim for v in data.values()])) == 1, 'all arrays in data must have the same number of dimensions'
+    #     ### Assert that the names of the dimensions are unique strings, and that the number of names matches the number of dimensions in the data
+    #     assert all([isinstance(n, str) for n in self.names_dimensions]), 'names of dimensions must be strings'
+    #     assert len(self.names_dimensions) == len(set(self.names_dimensions)), 'names of dimensions must be unique'
+    #     assert len(self.names_dimensions) == len(data[list(data.keys())[0]].shape), 'number of names of dimensions must match the number of dimensions in the data'
+    #     ### Assert that the dimensions to concatenate are tuples of strings, and that the strings are in the list of names of dimensions
+    #     assert all([isinstance(d, tuple) for d in self.dims_to_concatenate]), 'dimensions to concatenate must be tuples'
+    #     assert all([all([isinstance(n, str) for n in d]) for d in self.dims_to_concatenate]), 'dimensions to concatenate must be tuples of strings'
+    #     assert all([all([n in self.names_dimensions for n in d]) for d in self.dims_to_concatenate]), 'dimensions to concatenate must be tuples of strings that are in the list of names of dimensions'
+    #     ### Assert that the method is a string
+    #     assert isinstance(self.method, str), 'method must be a string'
+    #     ### Assert that the parameters for the method are a dictionary
+    #     assert isinstance(self.params_method, dict), 'parameters for method must be a dictionary'
 

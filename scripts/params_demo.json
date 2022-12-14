@@ -1,0 +1,144 @@
+{
+    "project": {
+        "directory_project": "/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_script1/",
+        "overwrite_config": false,
+        "initialize_visualization": false,
+        "verbose": 2
+    },
+    "figure_saver": {
+        "format_save": [
+            "png"
+        ],
+        "kwargs_savefig": {
+            "bbox_inches": "tight",
+            "pad_inches": 0.1,
+            "transparent": true,
+            "dpi": 300
+        },
+        "overwrite": true,
+        "verbose": 2
+    },
+    "paths_videos": {
+        "directory_videos": "/media/rich/bigSSD/other lab data/Svoboda_lab/BCI34_2022-07-19/side/2022-07-19_13-34-06",
+        "filename_videos_strMatch": "trial_.*mp4",
+        "depth": 2
+    },
+    "BufferedVideoReader": {
+        "buffer_size": 1000,
+        "prefetch": 1,
+        "posthold": 1,
+        "method_getitem": "by_video",
+        "verbose": 1
+    },
+    "Dataset_videos": {
+        "contiguous": false,
+        "frame_rate_clamp": 240,
+        "verbose": 2
+    },
+    "ROIs": {
+        "select_mode": "file",
+        "path_file": "/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_2/analysis_files/ROIs.h5",
+        "verbose": 2
+    },
+    "PointTracker": {
+        "rois_points_idx": [
+            0
+        ],
+        "rois_masks_idx": [
+            1
+        ],
+        "contiguous": false,
+        "params_optical_flow": {
+            "method": "lucas_kanade",
+            "point_spacing": 12,
+            "mesh_rigidity": 0.01,
+            "mesh_n_neighbors": 15,
+            "relaxation": 0.001,
+            "kwargs_method": {
+                "winSize": [
+                    20,
+                    20
+                ],
+                "maxLevel": 2,
+                "criteria": [
+                    2,
+                    0.03
+                ]
+            }
+        },
+        "visualize_video": false,
+        "params_visualization": {
+            "alpha": 0.2,
+            "point_sizes": 2,
+            "writer_cv2": null
+        },
+        "params_outlier_handling": {
+            "threshold_displacement": 80,
+            "framesHalted_before": 30,
+            "framesHalted_after": 30
+        },
+        "verbose": 2
+    },
+    "VQT_Analyzer": {
+        "params_VQT": {
+            "Fs_sample": 240,
+            "Q_lowF": 2,
+            "Q_highF": 8,
+            "F_min": 1,
+            "F_max": 30,
+            "n_freq_bins": 40,
+            "win_size": 901,
+            "plot_pref": false,
+            "downsample_factor": 20,
+            "DEVICE_compute": "cuda:0",
+            "batch_size": 1000,
+            "return_complex": false,
+            "progressBar": true
+        },
+        "normalization_factor": 0.95,
+        "spectrogram_exponent": 1.0,
+        "one_over_f_exponent": 0.5,
+        "verbose": 2
+    },
+    "TCA": {
+        "verbose": 2,
+        "rearrange_data": {
+            "names_dims_array": [
+                "xy",
+                "points",
+                "frequency",
+                "time"
+            ],
+            "names_dims_concat_array": [
+                [
+                    "xy",
+                    "points"
+                ]
+            ],
+            "concat_complexDim": false,
+            "name_dim_concat_complexDim": "time",
+            "name_dim_dictElements": "trials",
+            "method_handling_dictElements": "concatenate",
+            "name_dim_concat_dictElements": "time",
+            "idx_windows": null,
+            "name_dim_array_window": "time"
+        },
+        "fit": {
+            "method": "CP_NN_HALS",
+            "params_method": {
+                "rank": 12,
+                "n_iter_max": 1000,
+                "init": "random",
+                "svd": "truncated_svd",
+                "tol": 1e-09,
+                "verbose": true
+            },
+            "DEVICE": "cuda:0",
+            "verbose": 2
+        },
+        "rearrange_factors": {
+            "undo_concat_complexDim": false,
+            "undo_concat_dictElements": true
+        }
+    }
+}
