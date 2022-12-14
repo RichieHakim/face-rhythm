@@ -88,12 +88,14 @@ https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-i
     ├── run_info.json         <- Output information from each module. Dictionary.
     │
     ├── run_data              <- Output data from each module.
-    │   ├── point_tracking.h5 <- Output data from optic flow module.
-    │   ├── spectral.h5       <- Output data from spectral decomposition module.
-    │   └── decomposition.h5  <- Output data from PCA/TCA modules.
+    │   ├── Dataset_videos.h5 <- Output data from Dataset_videos class. Contains metadata about the videos.
+    │   ├── ROIs.h5           <- Output data from ROIs class. Contains ROI masks.
+    │   ├── PointTracker.h5   <- Output data from PointTracker class. Contains point tracking data.
+    |   ├── VQT_Analyzer.h5   <- Output data from VQT_Analyzer class. Contains spectral decomposition data.
+    │   ├── TCA.h5            <- Output data from TCA class. Contains TCA decomposition data.
     │   
     └── visualizations        <- Output visualizations.
-        ├── example_plot.png  <- Example plot.
-        └── example_video.mp4 <- Example video.
+        ├── factors_rearranged_[frequency].png  <- Example of a rearranged factor plot.
+        └── point_tracking_demo.avi             <- Example video.
 
     
