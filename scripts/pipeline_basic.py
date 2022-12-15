@@ -245,7 +245,7 @@ paths_videos = fr.helpers.find_paths(
     dir_outer=directory_videos,
     reMatch=filename_videos_strMatch,  ## string to use to search for files in directory. Uses regular expressions!
     depth=0,  ## how many folders deep to search
-)[:3]
+)[:]
 
 pprint('Paths to videos:') if params['project']['verbose'] > 1 else None
 pprint(paths_videos, width=1000) if params['project']['verbose'] > 1 else None
