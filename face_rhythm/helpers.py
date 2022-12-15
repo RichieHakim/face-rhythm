@@ -255,6 +255,45 @@ def make_batches(
 ######################################################### CONTAINER HELPERS #########################################################
 #####################################################################################################################################
 
+class Lazy_repeat_item():
+    """
+    Makes a lazy iterator that repeats an item.
+     RH 2021
+    """
+    def __init__(self, item, pseudo_length=None):
+        """
+        Args:
+            item (any object):
+                item to repeat
+            pseudo_length (int):
+                length of the iterator.
+        """
+        super().__init__()
+        self.item = item
+        self.pseudo_length = pseudo_length
+
+    def __getitem__(self, i):
+        """
+        Args:
+            i (int):
+                index of item to return.
+                Ignored if pseudo_length is None.
+        """
+        if self.pseudo_length is None:
+            return self.item
+        elif i < self.pseudo_length:
+            return self.item
+        else:
+            raise IndexError('Index out of bounds')
+
+
+    def __len__(self):
+        return self.pseudo_length
+
+    def __repr__(self):
+        return repr(self.item)
+
+
 def deep_update_dict(dictionary, key, new_val=None, new_key=None, in_place=False):
     """
     Updates a dictionary with a new value.

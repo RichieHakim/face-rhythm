@@ -1,141 +1,221 @@
 
 #############################
-## Set Parameters
+## DEMO PARAMETERS
 #############################
 
-params = {
-    'project': {
-        'directory_project': '/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_script1/',
-        'overwrite_config': False,
-        'initialize_visualization': False,
-        'verbose': 2,
-    },
-    'figure_saver': {
-        'format_save': ['png'],
-        'kwargs_savefig': {'bbox_inches': 'tight', 'pad_inches': 0.1, 'transparent': True, 'dpi': 300},
-        'overwrite': True,
-        'verbose': 2,
-    },    
-    'paths_videos': {
-        'directory_videos': '/media/rich/bigSSD/other lab data/Svoboda_lab/BCI34_2022-07-19/side/2022-07-19_13-34-06',
-        'filename_videos_strMatch': 'trial_.*mp4',  ## You can use regular expressions to search and match more complex strings
-        'depth': 2,  ## How many folders deep to search directory
-    },
-    'BufferedVideoReader': {
-        'buffer_size': 1000,
-        'prefetch': 1,
-        'posthold': 1,
-        'method_getitem': 'by_video',
-        'verbose': 1,
-    },
-    'Dataset_videos': {
-        'contiguous': False,
-        'frame_rate_clamp': 240,
-        'verbose': 2,
-    },
-    'ROIs': {
-        'select_mode': 'file',
-        'path_file': '/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_2/analysis_files/ROIs.h5',
-        'verbose': 2,
-    },
-    'PointTracker': {
-        'rois_points_idx': [0],
-        'rois_masks_idx': [1],
-        'contiguous': False,
-        'params_optical_flow': {
-            'method': 'lucas_kanade',
-            'point_spacing': 12,
-            'mesh_rigidity': 0.01,
-            'mesh_n_neighbors': 15,
-            'relaxation': 0.001,
-            'kwargs_method': {
-                'winSize': [20,20],
-                'maxLevel': 2,
-                'criteria': [2, 0.03],
-            },
-        },
-        'visualize_video': False,
-        'params_visualization': {
-            'alpha': 0.2,
-            'point_sizes': 2,
-            'writer_cv2': None,
-        },
-        'params_outlier_handling': {
-            'threshold_displacement': 80,  ## Maximum displacement between frames, in pixels.
-            'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
-            'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
-        },
-        'verbose': 2,
-    },
-    'VQT_Analyzer': {
-        'params_VQT': {
-            'Fs_sample': 240, 
-            'Q_lowF': 2, 
-            'Q_highF': 8, 
-            'F_min': 1, 
-            'F_max': 30, 
-            'n_freq_bins': 40, 
-            'win_size': 901, 
-            'plot_pref': False, 
-            'downsample_factor': 20, 
-            'DEVICE_compute': 'cuda:0', 
-            'batch_size': 1000,
-            'return_complex': False, 
-            'progressBar': True
-        },
-        'normalization_factor': 0.95,
-        'spectrogram_exponent': 1.0,
-        'one_over_f_exponent': 0.5,
-        'verbose': 2,
-    },
-    'TCA': {
-        'verbose': 2,
-        'rearrange_data':{
-            'names_dims_array': ['xy', 'points', 'frequency', 'time'],
-            'names_dims_concat_array': [['xy', 'points']],
-            'concat_complexDim': False,
-            'name_dim_concat_complexDim': 'time',
-            'name_dim_dictElements': 'trials',
-            'method_handling_dictElements': 'concatenate',
-            'name_dim_concat_dictElements': 'time',
-            'idx_windows': None,
-            'name_dim_array_window': 'time',
-        },
-        'fit': {
-            'method': 'CP_NN_HALS',
-        #     method='CP',
-            'params_method': {
-                'rank': 12, 
-                'n_iter_max': 1000, 
-                'init': 'random', 
-                'svd': 'truncated_svd', 
-                'tol': 1e-09, 
-        #         'nn_modes': [0,1], 
-                'verbose': True, 
-            },
-            'DEVICE': 'cuda:0',
-            'verbose': 2,
-        },
-        'rearrange_factors': {
-            'undo_concat_complexDim': False,
-            'undo_concat_dictElements': True,
-        },
-    },
-}
+# params = {
+#     'project': {
+#         'directory_project': '/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_script1/',
+#         'overwrite_config': False,
+#         'initialize_visualization': False,
+#         'verbose': 2,
+#     },
+#     'figure_saver': {
+#         'format_save': ['png'],
+#         'kwargs_savefig': {'bbox_inches': 'tight', 'pad_inches': 0.1, 'transparent': True, 'dpi': 300},
+#         'overwrite': True,
+#         'verbose': 2,
+#     },    
+#     'paths_videos': {
+#         'directory_videos': '/media/rich/bigSSD/other lab data/Svoboda_lab/BCI34_2022-07-19/side/2022-07-19_13-34-06',
+#         'filename_videos_strMatch': 'trial_.*mp4',  ## You can use regular expressions to search and match more complex strings
+#         'depth': 2,  ## How many folders deep to search directory
+#     },
+#     'BufferedVideoReader': {
+#         'buffer_size': 1000,
+#         'prefetch': 1,
+#         'posthold': 1,
+#         'method_getitem': 'by_video',
+#         'verbose': 1,
+#     },
+#     'Dataset_videos': {
+#         'contiguous': False,
+#         'frame_rate_clamp': 240,
+#         'verbose': 2,
+#     },
+#     'ROIs': {
+#         'select_mode': 'file',
+#         'path_file': '/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_2/analysis_files/ROIs.h5',
+#         'verbose': 2,
+#     },
+#     'PointTracker': {
+#         'rois_points_idx': [0],
+#         'rois_masks_idx': [1],
+#         'contiguous': False,
+#         'params_optical_flow': {
+#             'method': 'lucas_kanade',
+#             'point_spacing': 12,
+#             'mesh_rigidity': 0.01,
+#             'mesh_n_neighbors': 15,
+#             'relaxation': 0.001,
+#             'kwargs_method': {
+#                 'winSize': [20,20],
+#                 'maxLevel': 2,
+#                 'criteria': [2, 0.03],
+#             },
+#         },
+#         'visualize_video': False,
+#         'params_visualization': {
+#             'alpha': 0.2,
+#             'point_sizes': 2,
+#             'writer_cv2': None,
+#         },
+#         'params_outlier_handling': {
+#             'threshold_displacement': 80,  ## Maximum displacement between frames, in pixels.
+#             'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
+#             'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
+#         },
+#         'verbose': 2,
+#     },
+#     'VQT_Analyzer': {
+#         'params_VQT': {
+#             'Fs_sample': 240, 
+#             'Q_lowF': 2, 
+#             'Q_highF': 8, 
+#             'F_min': 1, 
+#             'F_max': 30, 
+#             'n_freq_bins': 40, 
+#             'win_size': 901, 
+#             'plot_pref': False, 
+#             'downsample_factor': 20, 
+#             'DEVICE_compute': 'cuda:0', 
+#             'batch_size': 1000,
+#             'return_complex': False, 
+#             'progressBar': True
+#         },
+#         'normalization_factor': 0.95,
+#         'spectrogram_exponent': 1.0,
+#         'one_over_f_exponent': 0.5,
+#         'verbose': 2,
+#     },
+#     'TCA': {
+#         'verbose': 2,
+#         'rearrange_data':{
+#             'names_dims_array': ['xy', 'points', 'frequency', 'time'],
+#             'names_dims_concat_array': [['xy', 'points']],
+#             'concat_complexDim': False,
+#             'name_dim_concat_complexDim': 'time',
+#             'name_dim_dictElements': 'trials',
+#             'method_handling_dictElements': 'concatenate',
+#             'name_dim_concat_dictElements': 'time',
+#             'idx_windows': None,
+#             'name_dim_array_window': 'time',
+#         },
+#         'fit': {
+#             'method': 'CP_NN_HALS',
+#         #     method='CP',
+#             'params_method': {
+#                 'rank': 12, 
+#                 'n_iter_max': 1000, 
+#                 'init': 'random', 
+#                 'svd': 'truncated_svd', 
+#                 'tol': 1e-09, 
+#         #         'nn_modes': [0,1], 
+#                 'verbose': True, 
+#             },
+#             'DEVICE': 'cuda:0',
+#             'verbose': 2,
+#         },
+#         'rearrange_factors': {
+#             'undo_concat_complexDim': False,
+#             'undo_concat_dictElements': True,
+#         },
+#     },
+# }
 
+
+
+########################################
+## Import parameters from CLI
+########################################
+
+import os
+print(f"script environment: {os.environ['CONDA_DEFAULT_ENV']}")
+
+
+## Argparse --path_params, --directory_save
+import argparse
+parser = argparse.ArgumentParser(
+    prog='Face-Rhythm Basic Pipeline',
+    description='This script runs the basic pipeline using a json file containing the parameters.',
+)
+parser.add_argument(
+    '--path_params',
+    '-p',
+    required=True,
+    metavar='',
+    type=str,
+    default=None,
+    help='Path to json file containing parameters.',
+)
+parser.add_argument(
+    '--directory_save',
+    '-d',
+    required=False,
+    metavar='',
+    type=str,
+    default=None,
+    help="Directory to use as 'directory_project' and save results to. Overrides 'directory_project' field in parameters file.",
+)
+args = parser.parse_args()
+path_params = args.path_params
+directory_save = args.directory_save
+
+
+
+## Checks for path_params and directory_save
+from pathlib import Path
+
+## Check path_params
+### Check if path_params is valid
+assert Path(path_params).exists(), f"Path to parameters file does not exist: {path_params}"
+### Check if path is absolute. If not, convert to absolute path.
+if not Path(path_params).is_absolute():
+    path_params = Path(path_params).resolve()
+    print(f"Warning: Input path_params is not absolute. Converted to absolute path: {path_params}")
+### Warn if suffix is not json
+print(f"Warning: suffix of path_params is not .json: {path_params}") if Path(path_params).suffix != '.json' else None
+print(f"path_params: {path_params}")
+
+## Check directory_save
+### Check if directory_save is valid
+if args.directory_save is not None:
+    assert Path(args.directory_save).exists(), f"Path to directory_save does not exist: {args.directory_save}"
+    ### Check if directory_save is absolute. If not, convert to absolute path.
+    if not Path(args.directory_save).is_absolute():
+        args.directory_save = Path(args.directory_save).resolve()
+        print(f"Warning: Input directory_save is not absolute. Converted to absolute path: {args.directory_save}")
+    ### Check that directory_save is a directory
+    assert Path(args.directory_save).is_dir(), f"Input directory_save is not a directory: {args.directory_save}"
+    ### Set directory_save
+    print(f"directory_save: {directory_save}")
+
+## Load parameters
+import json
+with open(path_params, 'r') as f:
+    params = json.load(f)
+
+
+
+########################################
+## Start script
+########################################
 
 import face_rhythm as fr
 
 from pprint import pprint
 from pathlib import Path
+import time
 
 import cv2
 
 import numpy as np
 
+tic_start = time.time()
+
 fr.util.get_system_versions(verbose=True);
 
-directory_project = params['project']['directory_project']
+directory_project = params['project']['directory_project'] if directory_save is None else directory_save
 directory_videos  = params['paths_videos']['directory_videos']
 
 filename_videos_strMatch = params['paths_videos']['filename_videos_strMatch']
@@ -167,6 +247,7 @@ paths_videos = fr.helpers.find_paths(
     depth=0,  ## how many folders deep to search
 )[:3]
 
+pprint('Paths to videos:') if params['project']['verbose'] > 1 else None
 pprint(paths_videos, width=1000) if params['project']['verbose'] > 1 else None
 
 
@@ -357,13 +438,13 @@ spec = fr.spectral_analysis.VQT_Analyzer(
 ## Specify the point with the `idx_point` and `name_points` fields.\
 ## Note that the `pt_data['points_tracked']` dictionary holds subdictionaries withe numeric string names (ie `['0'], ['1']`) for each video.
 
-test = spec.demo_transform(
-    points_tracked=pt_data['points_tracked'],
-    point_positions=pt_data['point_positions'],
-    idx_point=30,
-    name_points='0',
-    plot=True,
-);
+# demo_sepc = spec.demo_transform(
+#     points_tracked=pt_data['points_tracked'],
+#     point_positions=pt_data['point_positions'],
+#     idx_point=30,
+#     name_points='0',
+#     plot=False,
+# );
 
 
 
@@ -529,3 +610,12 @@ tca_data.unlazy()
 #     idx_frames=idx_frames_to_use,
 # )
 
+
+
+########################################
+# Complete messages
+########################################
+
+print(f'RUN COMPLETE')
+print(f'Project directory: {directory_project}')
+print(f'Time elapsed: {time.time() - tic_start:.2f} seconds')
