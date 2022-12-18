@@ -409,6 +409,12 @@ class FrameVisualizer:
             self.video_writer.release()
             cv2.destroyAllWindows()
 
+    def __call__(self, *args, **kwds):
+        """
+        Calls self.visualize_image_with_points(*args, **kwds).
+        See that function for details.
+        """
+        self.visualize_image_with_points(*args, **kwds)
     def __del__(self):
         self.close()
     def __exit__(self):

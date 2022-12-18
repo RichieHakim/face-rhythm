@@ -76,7 +76,7 @@ class ROIs(FR_Module):
         self._path_file = path_file
         self.points = points
         self.mask_images = mask_images
-        self.verbose = int(verbose)
+        self._verbose = int(verbose)
 
 
         self.img_hw = self.exampleImage.shape[:2] if self.exampleImage is not None else None
@@ -107,7 +107,7 @@ class ROIs(FR_Module):
 
         if (select_mode == "gui") or (select_mode == "points"):
             if select_mode == "gui":
-                print(f"FR: Initializing GUI...") if self.verbose > 1 else None
+                print(f"FR: Initializing GUI...") if self._verbose > 1 else None
                 self._gui = _Select_ROI(exampleImage)
                 self._gui._ax.set_title('Select ROIs by clicking the image.')
                 self.points = self._gui.selected_points
@@ -144,7 +144,7 @@ class ROIs(FR_Module):
             ## Check that the points have the correct format
 
         elif select_mode == "mask":
-            print(f"FR: Initializing ROIs from mask images...") if self.verbose > 1 else None
+            print(f"FR: Initializing ROIs from mask images...") if self._verbose > 1 else None
         
 
         ## For FR_Module compatibility
@@ -154,7 +154,7 @@ class ROIs(FR_Module):
             "path_file": path_file,
             "points": (points is not None),
             "mask_images": (mask_images is not None),
-            "verbose": self.verbose,
+            "verbose": self._verbose,
         }
         self.run_info = {
         }
@@ -164,6 +164,82 @@ class ROIs(FR_Module):
         }
         # ## Append the self.run_info data to self.run_data
         # self.run_data.update(self.run_info)
+
+    def make_points(self, rois, point_spacing=10):
+        """
+        Make points from a list of ROIs.
+
+        Args:
+            rois (list of np.ndarray): 
+                List of ROIs.
+                Each ROI should be a 2D boolean numpy array.
+            point_spacing (int):
+                Spacing between points in pixels.
+        """
+        ## Assertions
+        ## rois should either be a list of 2D arrays or 3D array or a single 2D array
+        assert isinstance(rois, (list, np.ndarray)), "FR ERROR: 'rois' must be a list of 2D arrays or a 3D array or a single 2D array."
+        if isinstance(rois, list):
+            assert all([isinstance(roi, np.ndarray) for roi in rois]), "FR ERROR: 'rois' must be a list of 2D arrays or a 3D array or a single 2D array."
+            assert all([roi.shape == rois[0].shape for roi in rois]), "FR ERROR: shapes of all 'rois' must be the same."
+            assert all([roi.dtype == bool for roi in rois]), "FR ERROR: 'rois' must be boolean."
+        elif isinstance(rois, np.ndarray):
+            if rois.ndim == 2:
+                assert rois.dtype == bool, "FR ERROR: 'rois' must be boolean."
+                rois = [rois]
+            elif rois.ndim == 3:
+                assert all([roi.dtype == bool for roi in rois]), "FR ERROR: 'rois' must be boolean."
+                rois = [roi for roi in rois]
+
+        ## Make points within rois_points with spacing of point_spacing
+        ##  First make a single ROI boolean image, then make points
+        print("FR: Making points to track") if self._verbose > 1 else None
+        rois_all = np.stack(rois, axis=0).all(axis=0)
+        self.point_positions = self._helper_make_points(rois_all, point_spacing)
+        self.num_points = self.point_positions.shape[0]
+        print(f"FR: {self.point_positions.shape[0]} points will be tracked") if self._verbose > 1 else None
+
+    def _helper_make_points(self, roi, point_spacing):
+        """
+        Make points within a roi with spacing of point_spacing.
+        
+        Args:
+            roi (np.ndarray, boolean):
+                A 2D array of booleans, where True indicates a pixel
+                 that is within the region of interest.
+            point_spacing (int):
+                The spacing between points, in pixels.
+
+        Returns:
+            points (np.ndarray, np.float32):
+                A 2D array of integers, where each row is a point
+                 to track.
+        """
+        ## Assert that roi is a 2D array of booleans
+        assert isinstance(roi, np.ndarray), "FR ERROR: roi must be a numpy array"
+        assert roi.ndim == 2, "FR ERROR: roi must be a 2D array"
+        assert roi.dtype == bool, "FR ERROR: roi must be a 2D array of booleans"
+        ## Warn if point_spacing is not an integer. It will be rounded.
+        if not isinstance(point_spacing, int):
+            print("FR WARNING: point_spacing must be an integer. It will be rounded.")
+            point_spacing = int(round(point_spacing))
+
+        ## make point cloud
+        y, x = np.where(roi)
+        y_min, y_max = y.min(), y.max()
+        x_min, x_max = x.min(), x.max()
+        y_points = np.arange(y_min, y_max, point_spacing)
+        x_points = np.arange(x_min, x_max, point_spacing)
+        y_points, x_points = np.meshgrid(y_points, x_points)
+        y_points = y_points.flatten()
+        x_points = x_points.flatten()
+        ## remove points outside of roi
+        points = np.stack([y_points, x_points], axis=1)
+        points = points[roi[points[:, 0], points[:, 1]]].astype(np.float32)
+        ## flip to (x,y)
+        points = np.fliplr(points)
+
+        return points
 
     def __repr__(self):
         return f"ROIs. Select mode: {self._select_mode}. Number of ROIs: {len(self.mask_images)}."
@@ -177,17 +253,17 @@ class ROIs(FR_Module):
     def __iter__(self): return iter(self.mask_images)
     def __next__(self): return next(self.mask_images)
 
-    def plot_masks(self, image=None, **kwargs_imshow):
+    def plot_rois(self, image=None, **kwargs_imshow):
         """
-        Plot the masks.
-        If an image exists, it makes polygons of the masks on top of 
+        Plot the rois.
+        If an image exists, it makes polygons of the rois on top of 
          the image in different colors.
-        If no image exists, it plots the masks on a black background.
+        If no image exists, it plots the rois on a black background.
 
         Args:
             image (np.ndarray):
-                Image to plot the masks on top of.
-                If None, the masks are plotted on a black background.
+                Image to plot the rois on top of.
+                If None, the rois are plotted on a black background.
             **kwargs_imshow:
                 Keyword arguments for plt.imshow().
 
@@ -207,6 +283,9 @@ class ROIs(FR_Module):
         ## Make mask polygons
         for ii, mask in enumerate(self.mask_images.values()):
             ax.contour(mask, colors=[plt.cm.tab20(ii)], linewidths=2, alpha=0.5)
+        ## Show points on the image
+        if self.point_positions is not None:
+            ax.scatter(self.point_positions[:, 0], self.point_positions[:, 1], s=2, color="red")
         ## show figure
         plt.show()
         return fig, ax

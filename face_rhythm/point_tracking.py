@@ -18,12 +18,11 @@ class PointTracker(FR_Module):
     def __init__(
         self,
         buffered_video_reader: BufferedVideoReader,
-        rois_points: ROIs,
+        point_positions: np.ndarray,
         rois_masks: ROIs=None,
         contiguous: bool=False,
         params_optical_flow: dict={
                         "method": "lucas_kanade", ## method for optical flow. Only "lucas_kanade" is supported for now.
-                        "point_spacing": 10,  ## spacing between points, in pixels
                         "mesh_rigidity": 0.005,  ## Rigidity of mesh. Changes depending on point spacing.
                         "relaxation": 0.5,  ## How quickly points relax back to their original position.
                         "kwargs_method": {
@@ -41,7 +40,6 @@ class PointTracker(FR_Module):
         params_visualization: dict={
                         'alpha':1.0,
                         'point_sizes':1,
-                        'writer_cv2':None,
         },
         verbose: Union[bool, int]=1,
     ):
@@ -54,11 +52,11 @@ class PointTracker(FR_Module):
             buffered_video_reader (BuffereVideoReader):
                 A BufferedVideoReader object, containing the videos to track.
                 Object comes from fr.helpers.BufferedVideoReader
-            rois_points (2D array of booleans or list of 2D arrays of booleans):
-                An ROI is a 2D array of booleans, where True indicates a pixel
-                 that is within the region of interest.
-                If a list of ROIs is provided, then each ROI will be tracked
-                 separately.
+            point_positions (2D array of floats):
+                An array of points to track.
+                Each row is a point, and the columns are the x and y coordinates.
+                Can be made using the fr.rois.ROIs class, and the 
+                 ROIs.point_positions attribute.
             rois_masks (2D array of booleans or list of 2D arrays of booleans):
                 An ROI is a 2D array of booleans, where True indicates a pixel
                  that is within the region of interest.
@@ -132,14 +130,11 @@ class PointTracker(FR_Module):
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
         type(buffered_video_reader), isinstance(buffered_video_reader, BufferedVideoReader)  ## line needed sometimes for next assert to work
         assert isinstance(buffered_video_reader, BufferedVideoReader), "buffered_video_reader must be a fr.helpers.BufferedVideoReader object."
+        ## Assert that point_positions is a 2D array of floats
+        assert isinstance(point_positions, np.ndarray), "point_positions must be a 2D array of floats. Use the fr.rois.ROIs class to generate using .point_positions attribute."
         ## Assert that the rois variables are either 2D arrays or lists of 2D arrays
-        if isinstance(rois_points, np.ndarray):
-            rois_points = [rois_points]
         if isinstance(rois_masks, np.ndarray):
             rois_masks = [rois_masks]
-        assert isinstance(rois_points, list) and all([isinstance(roi, np.ndarray) for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
-        assert all([roi.ndim == 2 for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
-        assert all([roi.dtype == bool for roi in rois_points]), "FR ERROR: rois_points must be a 2D array of booleans or a list of 2D arrays of booleans"
         ## Assert that params_optical_flow is a dict
         assert isinstance(params_optical_flow, dict), "FR ERROR: params_optical_flow must be a dict"
         ## Assert that params_outlier_handling is a dict
@@ -150,7 +145,6 @@ class PointTracker(FR_Module):
         ## Define default parameters
         params_optFlow_default = {
                 "method": "lucas_kanade",
-                "point_spacing": 10,
                 "mesh_rigidity": 0.005,
                 "mesh_n_neighbors": 10,
                 "relaxation": 0.5,
@@ -168,7 +162,6 @@ class PointTracker(FR_Module):
         params_visualization_default = {
                 'alpha':1.0,
                 'point_sizes':1,
-                'writer_cv2':None,
             }
 
         ## Fill in default parameters
@@ -186,11 +179,8 @@ class PointTracker(FR_Module):
         print(f"FR WARNING: Following parameters for visualization were not specified and will be set to default values: {params_missing}") if ((self._verbose > 0) and (len(params_missing) > 0)) else None
         self.params_visualization = {**params_visualization, **params_missing}
 
-        ## Make points within rois_points with spacing of point_spacing
-        ##  First make a single ROI boolean image, then make points
-        print("FR: Making points to track") if self._verbose > 1 else None
-        rois_all = np.stack(rois_points, axis=0).all(axis=0)
-        self.point_positions = self._make_points(rois_all, self.params_optical_flow["point_spacing"])
+        ## Retrive point positions
+        self.point_positions = point_positions
         self.num_points = self.point_positions.shape[0]
         print(f"FR: {self.point_positions.shape[0]} points will be tracked") if self._verbose > 1 else None
 
@@ -220,7 +210,7 @@ class PointTracker(FR_Module):
         self.neighbors = torch.argsort(torch.linalg.norm(p_0.T[:,:,None] - p_0.T[:,None,:], ord=2, dim=0), dim=1)[:,:self.params_optical_flow["mesh_n_neighbors"]]
         self.d_0 = _vector_distance(torch.as_tensor(self.point_positions.copy(), dtype=torch.float32), self.neighbors)
         
-        ## Preallocate points_tracked (will be overwrittenw with another empty list)
+        ## Preallocate points_tracked (will be overwritten with another empty list)
         self.points_tracked = []
 
         ## Prepare violation tracker
@@ -231,7 +221,11 @@ class PointTracker(FR_Module):
         if self._visualize_video:
             print("FR: Preparing playback visualizer") if self._verbose > 1 else None
             self.visualizer = FrameVisualizer(
-                image_height_width=self.buffered_video_reader.frame_height_width,
+                display=True,
+                handle_cv2Imshow='point_tracking',
+                path_save=None,
+                frame_height_width=self.buffered_video_reader.frame_height_width,
+                error_checking=False,
                 verbose=self._verbose,
             )
 
@@ -256,47 +250,47 @@ class PointTracker(FR_Module):
         ## Append the self.run_info data to self.run_data
         self.run_data.update(self.run_info)
 
-    def _make_points(self, roi, point_spacing):
-        """
-        Make points within a roi with spacing of point_spacing.
+    # def _make_points(self, roi, point_spacing):
+    #     """
+    #     Make points within a roi with spacing of point_spacing.
         
-        Args:
-            roi (np.ndarray, boolean):
-                A 2D array of booleans, where True indicates a pixel
-                 that is within the region of interest.
-            point_spacing (int):
-                The spacing between points, in pixels.
+    #     Args:
+    #         roi (np.ndarray, boolean):
+    #             A 2D array of booleans, where True indicates a pixel
+    #              that is within the region of interest.
+    #         point_spacing (int):
+    #             The spacing between points, in pixels.
 
-        Returns:
-            points (np.ndarray, np.float32):
-                A 2D array of integers, where each row is a point
-                 to track.
-        """
-        ## Assert that roi is a 2D array of booleans
-        assert isinstance(roi, np.ndarray), "FR ERROR: roi must be a numpy array"
-        assert roi.ndim == 2, "FR ERROR: roi must be a 2D array"
-        assert roi.dtype == bool, "FR ERROR: roi must be a 2D array of booleans"
-        ## Warn if point_spacing is not an integer. It will be rounded.
-        if not isinstance(point_spacing, int):
-            print("FR WARNING: point_spacing must be an integer. It will be rounded.")
-            point_spacing = int(round(point_spacing))
+    #     Returns:
+    #         points (np.ndarray, np.float32):
+    #             A 2D array of integers, where each row is a point
+    #              to track.
+    #     """
+    #     ## Assert that roi is a 2D array of booleans
+    #     assert isinstance(roi, np.ndarray), "FR ERROR: roi must be a numpy array"
+    #     assert roi.ndim == 2, "FR ERROR: roi must be a 2D array"
+    #     assert roi.dtype == bool, "FR ERROR: roi must be a 2D array of booleans"
+    #     ## Warn if point_spacing is not an integer. It will be rounded.
+    #     if not isinstance(point_spacing, int):
+    #         print("FR WARNING: point_spacing must be an integer. It will be rounded.")
+    #         point_spacing = int(round(point_spacing))
 
-        ## make point cloud
-        y, x = np.where(roi)
-        y_min, y_max = y.min(), y.max()
-        x_min, x_max = x.min(), x.max()
-        y_points = np.arange(y_min, y_max, point_spacing)
-        x_points = np.arange(x_min, x_max, point_spacing)
-        y_points, x_points = np.meshgrid(y_points, x_points)
-        y_points = y_points.flatten()
-        x_points = x_points.flatten()
-        ## remove points outside of roi
-        points = np.stack([y_points, x_points], axis=1)
-        points = points[roi[points[:, 0], points[:, 1]]].astype(np.float32)
-        ## flip to (x,y)
-        points = np.fliplr(points)
+    #     ## make point cloud
+    #     y, x = np.where(roi)
+    #     y_min, y_max = y.min(), y.max()
+    #     x_min, x_max = x.min(), x.max()
+    #     y_points = np.arange(y_min, y_max, point_spacing)
+    #     x_points = np.arange(x_min, x_max, point_spacing)
+    #     y_points, x_points = np.meshgrid(y_points, x_points)
+    #     y_points = y_points.flatten()
+    #     x_points = x_points.flatten()
+    #     ## remove points outside of roi
+    #     points = np.stack([y_points, x_points], axis=1)
+    #     points = points[roi[points[:, 0], points[:, 1]]].astype(np.float32)
+    #     ## flip to (x,y)
+    #     points = np.fliplr(points)
 
-        return points
+    #     return points
 
     def cleanup(self):
         """
@@ -455,7 +449,8 @@ class PointTracker(FR_Module):
             frame_prev (np.ndarray, uint8):
                 A 2D array of integers, where each element is a pixel
                  value. The frame should be the previous frame.
-            points_prev (np.ndarray, np.float32):
+            points_        # rois_points: ROIs,
+prev (np.ndarray, np.float32):
                 A 2D array of np.float32, where each row is a point
                  to track. The points should be in the same order
                  as the points in the previous video. Order (x,y).
@@ -473,8 +468,6 @@ class PointTracker(FR_Module):
                 # points=points_new[None,...].astype(np.int64),
                 points=[points_new[self._pointIdx_violations_current].astype(np.int64), points_new[~self._pointIdx_violations_current].astype(np.int64)],
                 points_colors=[(0,0,255), (0,255,0)],
-                display=True,
-                error_checking=True,
                 **self._params_visualization,
             )
 
