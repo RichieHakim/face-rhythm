@@ -74,7 +74,7 @@ class ROIs(FR_Module):
         self._select_mode = select_mode
         self.exampleImage = exampleImage
         self._path_file = path_file
-        self.points = points
+        self.roi_points = points
         self.mask_images = mask_images
         self._verbose = int(verbose)
 
@@ -110,14 +110,14 @@ class ROIs(FR_Module):
                 print(f"FR: Initializing GUI...") if self._verbose > 1 else None
                 self._gui = _Select_ROI(exampleImage)
                 self._gui._ax.set_title('Select ROIs by clicking the image.')
-                self.points = self._gui.selected_points
+                self.roi_points = self._gui.selected_points
                 self.mask_images = self._gui.mask_frames
             elif select_mode == "points":
-                self.points = points.copy()
+                self.roi_points = points.copy()
             
                 import skimage
                 self.mask_images = {}
-                for ii, pts in enumerate(self.points):
+                for ii, pts in enumerate(self.roi_points):
                     pts = np.array(pts, dtype=float)
                     mask_frame = np.zeros((self.img_hw[0], self.img_hw[1]), dtype=bool)
                     pts_y, pts_x = skimage.draw.polygon(pts[:, 1], pts[:, 0])
@@ -138,10 +138,10 @@ class ROIs(FR_Module):
             assert all([mask.dtype == bool for mask in self.mask_images.values()]), "FR ERROR: 'mask_images' must be boolean."
             self.mask_images = {k: np.array(v, dtype=np.bool_) for k, v in self.mask_images.items()}  ## Ensure that the masks are boolean np arrays
             ## Check that the file has the correct format
-            assert "points" in file, "FR ERROR: 'points' not found in file."
-            self.points = file["points"]
-            self.points = {k: np.array(v, dtype=np.float32) for k, v in self.points.items()}  ## Ensure that the points are float np arrays
-            ## Check that the points have the correct format
+            assert "roi_points" in file, "FR ERROR: 'roi_points' not found in file."
+            self.roi_points = file["roi_points"]
+            self.roi_points = {k: np.array(v, dtype=np.float32) for k, v in self.roi_points.items()}  ## Ensure that the roi_points are float np arrays
+            ## Check that the roi_points have the correct format
 
         elif select_mode == "mask":
             print(f"FR: Initializing ROIs from mask images...") if self._verbose > 1 else None
@@ -152,7 +152,7 @@ class ROIs(FR_Module):
             "select_mode": self._select_mode,
             "exampleImage": (self.exampleImage is not None),
             "path_file": path_file,
-            "points": (points is not None),
+            "roi_points": (points is not None),
             "mask_images": (mask_images is not None),
             "verbose": self._verbose,
         }
@@ -160,7 +160,7 @@ class ROIs(FR_Module):
         }
         self.run_data = {
             "mask_images": self.mask_images,
-            "points": self.points,
+            "roi_points": self.roi_points,
         }
         # ## Append the self.run_info data to self.run_data
         # self.run_data.update(self.run_info)
@@ -198,6 +198,10 @@ class ROIs(FR_Module):
         self.point_positions = self._helper_make_points(rois_all, point_spacing)
         self.num_points = self.point_positions.shape[0]
         print(f"FR: {self.point_positions.shape[0]} points will be tracked") if self._verbose > 1 else None
+
+        self.run_data.update({
+            "point_positions": self.point_positions,
+        })
 
     def _helper_make_points(self, roi, point_spacing):
         """

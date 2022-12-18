@@ -37,14 +37,14 @@
 #         'select_mode': 'file',
 #         'path_file': '/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_2/analysis_files/ROIs.h5',
 #         'verbose': 2,
+#         'rois_points_idx': [0],
+#         'point_spacing': 12,
 #     },
 #     'PointTracker': {
-#         'rois_points_idx': [0],
 #         'rois_masks_idx': [1],
 #         'contiguous': False,
 #         'params_optical_flow': {
 #             'method': 'lucas_kanade',
-#             'point_spacing': 12,
 #             'mesh_rigidity': 0.01,
 #             'mesh_n_neighbors': 15,
 #             'relaxation': 0.001,
@@ -302,7 +302,10 @@ rois = fr.rois.ROIs(
     verbose=params['ROIs']['verbose'],
 )
 
-
+rois.make_points(
+    rois=[rois[ii] for ii in params['ROIs']['rois_points_idx']],
+    point_spacing=params['ROIs']['point_spacing'],
+)
 
 ## Save the `ROIs` object in the 'analysis_files' project folder
 
@@ -335,12 +338,11 @@ rois.save_run_data(path_config=path_config, overwrite=True, verbose=1)
 pt = fr.point_tracking.PointTracker(
 #     buffered_video_reader=videos[:5],
     buffered_video_reader=videos,
-    rois_points=[rois[ii] for ii in params['PointTracker']['rois_points_idx']],
+    point_positions=rois.point_positions,
     rois_masks=[rois[ii] for ii in params['PointTracker']['rois_masks_idx']],
     contiguous=params['PointTracker']['contiguous'],
     params_optical_flow={
         "method": params['PointTracker']['params_optical_flow']['method'],
-        "point_spacing": params['PointTracker']['params_optical_flow']['point_spacing'],
         "mesh_rigidity": params['PointTracker']['params_optical_flow']['mesh_rigidity'],
         "mesh_n_neighbors": params['PointTracker']['params_optical_flow']['mesh_n_neighbors'],
         "relaxation": params['PointTracker']['params_optical_flow']['relaxation'],
