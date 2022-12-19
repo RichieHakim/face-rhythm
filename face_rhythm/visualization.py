@@ -24,7 +24,7 @@ class FrameVisualizer:
         path_save=None,
         frame_height_width=(480, 640),
         frame_rate=None,
-        error_checking=False,
+        error_checking=True,
         verbose: int=1,
 
         point_sizes=None,
@@ -52,6 +52,8 @@ class FrameVisualizer:
             path_save (str):
                 If not None: Save video to this path.
                 Use .avi extension: 'directory/filename.avi'
+            frame_height_width (tuple of int):
+                Height and width of played back and/or saved video.
             frame_rate (int):
                 Frame rate of played back and/or saved video.
                 If None, will playback at top speed, and saved videos
@@ -252,6 +254,9 @@ class FrameVisualizer:
 
             ## Check points
             if points is not None:
+                if isinstance(points, np.ndarray):
+                    points = points.astype(np.int)
+                    points = [points]
                 assert isinstance(points, list), 'points must be a list.'
                 assert len(points) > 0, 'points must have at least one element.'
                 assert isinstance(points[0], np.ndarray), 'points must be a list of numpy arrays.'
@@ -477,3 +482,39 @@ def play_video_with_points(
                 points=[p],
             )
         frameVisualizer.close()
+
+
+def display_toggle_image_stack(images, clim=None, **kwargs):
+    """
+    Display a stack of images using a slider.
+    REQUIRES use of Jupyter Notebook.
+    RH 2022
+
+    Args:
+        images (np.ndarray):
+            Stack of images.
+            Shape: (num_frames, height, width)
+            Optionally, shape: (num_frames, height, width, num_channels)
+        clim (tuple, optional):
+            Color limits.
+        kwargs (dict, optional):
+            Keyword arguments to pass to imshow.
+    """
+    import matplotlib.pyplot as plt
+    from ipywidgets import interact, widgets
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    imshow_FOV = ax.imshow(
+        images[0],
+#         vmax=clim[1]
+        **kwargs
+    )
+
+    def update(i_frame = 0):
+        fig.canvas.draw_idle()
+        imshow_FOV.set_data(images[i_frame])
+        imshow_FOV.set_clim(clim)
+
+
+    interact(update, i_frame=widgets.IntSlider(min=0, max=len(images)-1, step=1, value=0));

@@ -1723,3 +1723,38 @@ class Cmap_conjunctive:
         colors = (colors * (self.normalization_range[1] - self.normalization_range[0]) + self.normalization_range[0]).astype(self.dtype_out)
 
         return colors
+
+
+##########################################################################################################################################
+############################################################ IMAGE PROCESSING ############################################################
+##########################################################################################################################################
+
+
+def clahe(im, grid_size=50, clipLimit=0, normalize=True):
+    """
+    Perform Contrast Limited Adaptive Histogram Equalization (CLAHE)
+     on an image.
+    RH 2022
+
+    Args:
+        im (np.ndarray):
+            Input image
+        grid_size (int):
+            Grid size.
+            See cv2.createCLAHE for more info.
+        clipLimit (int):
+            Clip limit.
+            See cv2.createCLAHE for more info.
+        normalize (bool):
+            Whether to normalize the output image.
+        
+    Returns:
+        im_out (np.ndarray):
+            Output image
+    """
+    import cv2
+    im_tu = (im / im.max())*(2**16) if normalize else im
+    im_tu = im_tu/10
+    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(grid_size, grid_size))
+    im_c = clahe.apply(im_tu.astype(np.uint16))
+    return im_c

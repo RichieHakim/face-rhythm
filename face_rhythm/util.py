@@ -149,7 +149,7 @@ class FR_Module:
         path_run_data=None, 
         path_config=None,
         overwrite=True, 
-        use_compression=True,
+        use_compression=False,
         track_order=True,
         verbose=1
     ):
@@ -204,7 +204,7 @@ class FR_Module:
         ## Assert path_run_data is a string
         assert isinstance(path_run_data, str), "FR ERROR: path_run_data must be a string"
         if path_run_data is not None:
-            assert Path(path_run_data).name == self.module_name+'.h5', f"FR ERROR: path_run_data must be named {self.module_name+'.h5'}"
+            print(f"FR WARNING: path_run_data file is expected to be named '{self.module_name+'.h5'}' if it is part of a project. Please make sure this is correct.") if verbose > 0 else None
         ## If a file exists and overwrite is False, then print a warning and cancel out
         ## If a file exists and overwrite is True, then print a warning and continue
         if Path(path_run_data).exists():
