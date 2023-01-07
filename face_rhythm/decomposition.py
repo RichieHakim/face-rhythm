@@ -438,6 +438,8 @@ class TCA(util.FR_Module):
             ## Make a new dict of factors with the new factor
             self.factors_rearranged['0'][self.name_dim_dictElements_postDecomp] = factor_postDecomp  ## Replace the concatenated factor with the new factor
             del self.factors_rearranged['0'][name_dim_dictElementConcat]  ## Delete the concatenated factor
+        else:
+            self.name_dim_dictElements_postDecomp = self._name_dim_dictElements
 
         if undo_concat_complexDim:
             ## Undo the concatenation of the complexDim dimension
