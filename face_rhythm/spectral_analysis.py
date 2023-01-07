@@ -28,6 +28,7 @@ class VQT_Analyzer(FR_Module):
             'win_size': 501,
             'plot_pref': False,
             'downsample_factor': 4,
+            'padding': 'valid',
             'DEVICE_compute': 'cpu',
             'DEVICE_return': 'cpu',
             'return_complex': False,

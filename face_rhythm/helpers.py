@@ -1403,6 +1403,7 @@ class VQT():
         n_freq_bins=55,
         win_size=501,
         downsample_factor=4,
+        padding='valid',
         DEVICE_compute='cpu',
         DEVICE_return='cpu',
         batch_size=1000,
@@ -1450,6 +1451,12 @@ class VQT():
                 If the length of the input signal is not
                  divisible by downsample_factor, the signal
                  will be zero-padded at the end so that it is.
+            padding (str):
+                Padding to use for the signal.
+                'same' will pad the signal so that the output
+                 signal is the same length as the input signal.
+                'valid' will not pad the signal. So the output
+                 signal will be shorter than the input signal.
             DEVICE_compute (str):
                 Device to use for computation.
             DEVICE_return (str):
@@ -1490,9 +1497,9 @@ class VQT():
                 plot_pref=plot_pref,
             )
         ## Gather parameters from arguments
-        self.Fs_sample, self.Q_lowF, self.Q_highF, self.F_min, self.F_max, self.n_freq_bins, self.win_size, self.downsample_factor, self.DEVICE_compute, \
+        self.Fs_sample, self.Q_lowF, self.Q_highF, self.F_min, self.F_max, self.n_freq_bins, self.win_size, self.downsample_factor, self.padding, self.DEVICE_compute, \
             self.DEVICE_return, self.batch_size, self.return_complex, self.plot_pref, self.progressBar = \
-                Fs_sample, Q_lowF, Q_highF, F_min, F_max, n_freq_bins, win_size, downsample_factor, DEVICE_compute, DEVICE_return, batch_size, return_complex, plot_pref, progressBar
+                Fs_sample, Q_lowF, Q_highF, F_min, F_max, n_freq_bins, win_size, downsample_factor, padding, DEVICE_compute, DEVICE_return, batch_size, return_complex, plot_pref, progressBar
 
     def _helper_ds(self, X: torch.Tensor, ds_factor: int=4, return_complex: bool=False):
         if ds_factor == 1:
@@ -1509,8 +1516,8 @@ class VQT():
 
     def _helper_conv(self, arr, filters, take_abs, DEVICE):
         out = torch.complex(
-            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:],  torch.real(filters.T).to(DEVICE).T[:,None,:], padding='same'),
-            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:], -torch.imag(filters.T).to(DEVICE).T[:,None,:], padding='same')
+            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:],  torch.real(filters.T).to(DEVICE).T[:,None,:], padding=self.padding),
+            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:], -torch.imag(filters.T).to(DEVICE).T[:,None,:], padding=self.padding)
         )
         if take_abs:
             return torch.abs(out)
