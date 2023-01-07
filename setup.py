@@ -20,7 +20,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setuptools.setup(
     name='face_rhythm',
-    # version='0.1.0',
+    version='0.1.0',
 
     description="A pipeline for analysis of facial behavior using optical flow",
     long_description=long_description,
