@@ -21,7 +21,7 @@ decord==0.6.0
 natsort==8.2.0
 hdfdict==0.3.1
 pandas==1.4.3
-tables==3.7.9
+tables==3.7.0
 einops==0.6.0
 pytest
 # torch==1.12.0
