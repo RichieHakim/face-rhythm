@@ -1,6 +1,6 @@
 ## requirements.txt
 
-numpy==1.23.2
+numpy
 jupyterlab
 tensorly==0.7.0
 opencv-contrib-python==4.6.0.66
