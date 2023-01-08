@@ -8,7 +8,7 @@ print(f"dispatcher environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
 from face_rhythm import helpers, util
 
-path_self, path_script, date = sys.argv
+path_self, date = sys.argv
 
 
 # date = '20221011'
