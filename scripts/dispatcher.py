@@ -239,7 +239,7 @@ cd /n/data1/hms/neurobio/sabatini/rich/
 date
 
 echo "loading modules"
-module load gcc/9.2.0 cuda/11.2
+module load gcc/9.2.0
 
 echo "activating environment"
 source activate {name_env}
