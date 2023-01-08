@@ -8,14 +8,14 @@ print(f"dispatcher environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
 from face_rhythm import helpers, util
 
-# path_self, path_script, dir_save, name_job, name_slurm, name_env = sys.argv
+path_self, path_script, date = sys.argv
 
 
-date = '20221011'
+# date = '20221011'
 
 path_script = f'/n/data1/hms/neurobio/sabatini/rich/github_repos/face-rhythm/scripts/pipeline_basic.py'
 dir_save = f'/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/mouse_g1/run_20230107/'
-name_job = f'faceRhythm_{date}'
+name_job = f'faceRhythm_{date}_'
 name_slurm = f'rh_{date}'
 name_env = f'/n/data1/hms/neurobio/sabatini/rich/virtual_envs/FR'
 
