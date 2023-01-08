@@ -227,7 +227,7 @@ sbatch_config_list = \
 #SBATCH --output={path}
 #SBATCH --gres=gpu:rtx6000:1
 #SBATCH --partition=gpu_requeue
-#SBATCH -c 8
+#SBATCH -c 20
 #SBATCH -n 1
 #SBATCH --mem=32GB
 #SBATCH --time=0-01:00:00
