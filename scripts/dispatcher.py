@@ -11,7 +11,7 @@ from face_rhythm import helpers, util
 # path_self, path_script, dir_save, name_job, name_slurm, name_env = sys.argv
 
 
-date = '20221010'
+date = '20221011'
 
 path_script = f'/n/data1/hms/neurobio/sabatini/rich/github_repos/face-rhythm/scripts/pipeline_basic.py'
 dir_save = f'/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/mouse_g1/run_20230107/'
@@ -229,7 +229,7 @@ sbatch_config_list = \
 #SBATCH --partition=gpu_requeue
 #SBATCH -c 20
 #SBATCH -n 1
-#SBATCH --mem=32GB
+#SBATCH --mem=48GB
 #SBATCH --time=0-01:00:00
 
 unset XDG_RUNTIME_DIR
