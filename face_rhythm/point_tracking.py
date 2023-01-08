@@ -407,7 +407,7 @@ class PointTracker(FR_Module):
 
         self.i_frame = 0
         video.set_iterator_frame_idx(0)
-        with tqdm(total=len(video), desc='frame #', position=1, leave=False, disable=self._verbose < 2) as pbar:
+        with tqdm(total=len(video), desc='frame #', position=1, leave=False, disable=self._verbose < 2, mininterval=1.0) as pbar:
             while (self.i_frame < len(video)):
                 for frame in video:
                     frame_new = self._format_decordTorchVideo_for_opticalFlow(vid=frame[None,...], mask=self.mask)[0]
