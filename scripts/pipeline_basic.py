@@ -357,7 +357,6 @@ pt = fr.point_tracking.PointTracker(
     params_visualization={
                 'alpha': params['PointTracker']['params_visualization']['alpha'],
                 'point_sizes': params['PointTracker']['params_visualization']['point_sizes'],
-                'writer_cv2': params['PointTracker']['params_visualization']['writer_cv2'],
     },
     params_outlier_handling = {
         'threshold_displacement': params['PointTracker']['params_outlier_handling']['threshold_displacement'],
@@ -415,7 +414,7 @@ Fs = fr.util.load_run_info_file(path_run_info)['Dataset_videos']['frame_rate']
 
 spec = fr.spectral_analysis.VQT_Analyzer(
     params_VQT={
-        'Fs_sample': params['VQT_Analyzer']['params_VQT']['Fs_sample'],
+        'Fs_sample': Fs,
         'Q_lowF': params['VQT_Analyzer']['params_VQT']['Q_lowF'],
         'Q_highF': params['VQT_Analyzer']['params_VQT']['Q_highF'],
         'F_min': params['VQT_Analyzer']['params_VQT']['F_min'],

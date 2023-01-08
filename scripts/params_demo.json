@@ -1,6 +1,6 @@
 {
     "project": {
-        "directory_project": "/media/rich/bigSSD/analysis_data/face_rhythm/demo_faceRhythm_svoboda/fr_run_20221013_new_script1/",
+        "directory_project": "/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/mouse_g1/run_session_20221010",
         "overwrite_config": false,
         "initialize_visualization": false,
         "verbose": 2
@@ -19,9 +19,9 @@
         "verbose": 2
     },
     "paths_videos": {
-        "directory_videos": "/media/rich/bigSSD/other lab data/Svoboda_lab/BCI34_2022-07-19/side/2022-07-19_13-34-06",
-        "filename_videos_strMatch": "trial_.*mp4",
-        "depth": 2
+        "directory_videos": "/n/data1/hms/neurobio/sabatini/rich/data/res2p/round_7_experiments/mouse_g1/20221010/camera_data/cam4/exp/",
+        "filename_videos_strMatch": "cam4.*avi",
+        "depth": 1
     },
     "BufferedVideoReader": {
         "buffer_size": 1000,
@@ -32,17 +32,17 @@
     },
     "Dataset_videos": {
         "contiguous": false,
-        "frame_rate_clamp": 240,
+        "frame_rate_clamp": null,
         "verbose": 2
     },
     "ROIs": {
         "select_mode": "file",
-        "path_file": "/media/rich/bigSSD/analysis_data/demo_faceRhythm_svoboda/fr_run_20221013_new_3/analysis_files/ROIs.h5",
+        "path_file": "/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/mouse_g1/ROIs_20221010.h5",
         "verbose": 2,
         "rois_points_idx": [
             0
         ],
-        "point_spacing": 12
+        "point_spacing": 9
     },
     "PointTracker": {
         "rois_masks_idx": [
@@ -51,13 +51,13 @@
         "contiguous": false,
         "params_optical_flow": {
             "method": "lucas_kanade",
-            "mesh_rigidity": 0.01,
+            "mesh_rigidity": 0.015,
             "mesh_n_neighbors": 15,
-            "relaxation": 0.001,
+            "relaxation": 0.0010,
             "kwargs_method": {
                 "winSize": [
-                    20,
-                    20
+                    28,
+                    28
                 ],
                 "maxLevel": 2,
                 "criteria": [
@@ -69,11 +69,10 @@
         "visualize_video": false,
         "params_visualization": {
             "alpha": 0.2,
-            "point_sizes": 2,
-            "writer_cv2": null
+            "point_sizes": 2
         },
         "params_outlier_handling": {
-            "threshold_displacement": 80,
+            "threshold_displacement": 180,
             "framesHalted_before": 30,
             "framesHalted_after": 30
         },
@@ -81,18 +80,17 @@
     },
     "VQT_Analyzer": {
         "params_VQT": {
-            "Fs_sample": 240,
             "Q_lowF": 2,
             "Q_highF": 8,
             "F_min": 1,
             "F_max": 30,
             "n_freq_bins": 40,
-            "win_size": 901,
+            "win_size": 701,
             "plot_pref": false,
             "downsample_factor": 20,
             "padding": "valid",
             "DEVICE_compute": "cuda:0",
-            "batch_size": 1000,
+            "batch_size": 10,
             "return_complex": false,
             "progressBar": true
         },
@@ -118,8 +116,8 @@
             ],
             "concat_complexDim": false,
             "name_dim_concat_complexDim": "time",
-            "name_dim_dictElements": "trials",
-            "method_handling_dictElements": "concatenate",
+            "name_dim_dictElements": "session",
+            "method_handling_dictElements": "separate",
             "name_dim_concat_dictElements": "time",
             "idx_windows": null,
             "name_dim_array_window": "time"
@@ -139,7 +137,7 @@
         },
         "rearrange_factors": {
             "undo_concat_complexDim": false,
-            "undo_concat_dictElements": true
+            "undo_concat_dictElements": false
         }
     }
 }
