@@ -279,113 +279,113 @@ data = fr.data_importing.Dataset_videos(
 
 
 
-# ## Save the `Dataset_videos` object in the 'analysis_files' project folder
+## Save the `Dataset_videos` object in the 'analysis_files' project folder
 
-# data.save_config(path_config=path_config, overwrite=True, verbose=1)
-# data.save_run_info(path_config=path_config, overwrite=True, verbose=1)
-# data.save_run_data(path_config=path_config, overwrite=True, verbose=1)
-
-
-
-# ########################################
-# ## Define ROIs
-# ########################################
-
-# ## Either select new ROIs (`select_mode='gui'`), or import existing ROIs (`path_file=path_to_ROIs.h5_file`).\
-# ## Typically, you should make 1 or 2 ROIs. One for defining where the face points should be and one for cropping the frame.
-
-# # %matplotlib notebook
-# rois = fr.rois.ROIs(
-# #     select_mode='gui',
-# #     exampleImage=data[0][0],
-#     select_mode=params['ROIs']['select_mode'],
-#     path_file=params['ROIs']['path_file'],
-#     verbose=params['ROIs']['verbose'],
-# )
-
-# rois.make_points(
-#     rois=[rois[ii] for ii in params['ROIs']['rois_points_idx']],
-#     point_spacing=params['ROIs']['point_spacing'],
-# )
-
-# ## Save the `ROIs` object in the 'analysis_files' project folder
-
-# rois.save_config(path_config=path_config, overwrite=True, verbose=1)
-# rois.save_run_info(path_config=path_config, overwrite=True, verbose=1)
-# rois.save_run_data(path_config=path_config, overwrite=True, verbose=1)
+data.save_config(path_config=path_config, overwrite=True, verbose=1)
+data.save_run_info(path_config=path_config, overwrite=True, verbose=1)
+data.save_run_data(path_config=path_config, overwrite=True, verbose=1)
 
 
 
-# # ## visualize the ROIs
+########################################
+## Define ROIs
+########################################
 
-# # rois.plot_masks(data[0][0])
+## Either select new ROIs (`select_mode='gui'`), or import existing ROIs (`path_file=path_to_ROIs.h5_file`).\
+## Typically, you should make 1 or 2 ROIs. One for defining where the face points should be and one for cropping the frame.
 
+# %matplotlib notebook
+rois = fr.rois.ROIs(
+#     select_mode='gui',
+#     exampleImage=data[0][0],
+    select_mode=params['ROIs']['select_mode'],
+    path_file=params['ROIs']['path_file'],
+    verbose=params['ROIs']['verbose'],
+)
 
+rois.make_points(
+    rois=[rois[ii] for ii in params['ROIs']['rois_points_idx']],
+    point_spacing=params['ROIs']['point_spacing'],
+)
 
-# ########################################
-# # Point Tracking
-# ########################################
+## Save the `ROIs` object in the 'analysis_files' project folder
 
-# ## Prepare `PointTracker` object.\
-# ## Set `visualize_video` to **`True`** to tune parameters until they look appropriate, then set to **`False`** to run the full dataset through at a much faster speed.
-# ##
-# ## Key parameters:
-# ## - `point_spacing`: distance between points. Vary so that total number of points is appropriate.
-# ## - `mesh_rigidity`: how rigid the mesh elasticity is. Vary so that points track well without drift.
-# ## - `relaxation`: how quickly the points relax back to their home position. Vary so that points track well without dift.
-# ## - `kwargs_method > winSize`: the spatial size of the optical flow calculation. Smaller is better but noisier, larger is less accurate but more robust to noise.
-# ## - `params_outlier_handling > threshold_displacement`: point displacements above this value will result in freezing of the points.
-
-# pt = fr.point_tracking.PointTracker(
-# #     buffered_video_reader=videos[:5],
-#     buffered_video_reader=videos,
-#     point_positions=rois.point_positions,
-#     rois_masks=[rois[ii] for ii in params['PointTracker']['rois_masks_idx']],
-#     contiguous=params['PointTracker']['contiguous'],
-#     params_optical_flow={
-#         "method": params['PointTracker']['params_optical_flow']['method'],
-#         "mesh_rigidity": params['PointTracker']['params_optical_flow']['mesh_rigidity'],
-#         "mesh_n_neighbors": params['PointTracker']['params_optical_flow']['mesh_n_neighbors'],
-#         "relaxation": params['PointTracker']['params_optical_flow']['relaxation'],
-#         "kwargs_method": {
-#             "winSize": params['PointTracker']['params_optical_flow']['kwargs_method']['winSize'],
-#             "maxLevel": params['PointTracker']['params_optical_flow']['kwargs_method']['maxLevel'],
-#             "criteria": tuple([cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT] + list(params['PointTracker']['params_optical_flow']['kwargs_method']['criteria'])),
-#         },        
-#     },
-#     visualize_video=params['PointTracker']['visualize_video'],
-#     params_visualization={
-#                 'alpha': params['PointTracker']['params_visualization']['alpha'],
-#                 'point_sizes': params['PointTracker']['params_visualization']['point_sizes'],
-#     },
-#     params_outlier_handling = {
-#         'threshold_displacement': params['PointTracker']['params_outlier_handling']['threshold_displacement'],
-#         'framesHalted_before': params['PointTracker']['params_outlier_handling']['framesHalted_before'],
-#         'framesHalted_after': params['PointTracker']['params_outlier_handling']['framesHalted_after'],
-#     },
-#     verbose=params['PointTracker']['verbose'],
-# )
+rois.save_config(path_config=path_config, overwrite=True, verbose=1)
+rois.save_run_info(path_config=path_config, overwrite=True, verbose=1)
+rois.save_run_data(path_config=path_config, overwrite=True, verbose=1)
 
 
 
-# ## Perform point tracking
+# ## visualize the ROIs
 
-# pt.track_points()
-
-
-
-# ## Save the `PointTracker` object in 'analysis_files' project directory.\
-# ## Using compression can reduce file sizes slightly but is very slow.
-
-# pt.save_config(path_config=path_config, overwrite=True, verbose=1)
-# pt.save_run_info(path_config=path_config, overwrite=True, verbose=2)
-# pt.save_run_data(path_config=path_config, overwrite=True, use_compression=False, verbose=1)
+# rois.plot_masks(data[0][0])
 
 
 
-# ## Clear some memory if needed. Optional.
+########################################
+# Point Tracking
+########################################
 
-# pt.cleanup()
+## Prepare `PointTracker` object.\
+## Set `visualize_video` to **`True`** to tune parameters until they look appropriate, then set to **`False`** to run the full dataset through at a much faster speed.
+##
+## Key parameters:
+## - `point_spacing`: distance between points. Vary so that total number of points is appropriate.
+## - `mesh_rigidity`: how rigid the mesh elasticity is. Vary so that points track well without drift.
+## - `relaxation`: how quickly the points relax back to their home position. Vary so that points track well without dift.
+## - `kwargs_method > winSize`: the spatial size of the optical flow calculation. Smaller is better but noisier, larger is less accurate but more robust to noise.
+## - `params_outlier_handling > threshold_displacement`: point displacements above this value will result in freezing of the points.
+
+pt = fr.point_tracking.PointTracker(
+#     buffered_video_reader=videos[:5],
+    buffered_video_reader=videos,
+    point_positions=rois.point_positions,
+    rois_masks=[rois[ii] for ii in params['PointTracker']['rois_masks_idx']],
+    contiguous=params['PointTracker']['contiguous'],
+    params_optical_flow={
+        "method": params['PointTracker']['params_optical_flow']['method'],
+        "mesh_rigidity": params['PointTracker']['params_optical_flow']['mesh_rigidity'],
+        "mesh_n_neighbors": params['PointTracker']['params_optical_flow']['mesh_n_neighbors'],
+        "relaxation": params['PointTracker']['params_optical_flow']['relaxation'],
+        "kwargs_method": {
+            "winSize": params['PointTracker']['params_optical_flow']['kwargs_method']['winSize'],
+            "maxLevel": params['PointTracker']['params_optical_flow']['kwargs_method']['maxLevel'],
+            "criteria": tuple([cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT] + list(params['PointTracker']['params_optical_flow']['kwargs_method']['criteria'])),
+        },        
+    },
+    visualize_video=params['PointTracker']['visualize_video'],
+    params_visualization={
+                'alpha': params['PointTracker']['params_visualization']['alpha'],
+                'point_sizes': params['PointTracker']['params_visualization']['point_sizes'],
+    },
+    params_outlier_handling = {
+        'threshold_displacement': params['PointTracker']['params_outlier_handling']['threshold_displacement'],
+        'framesHalted_before': params['PointTracker']['params_outlier_handling']['framesHalted_before'],
+        'framesHalted_after': params['PointTracker']['params_outlier_handling']['framesHalted_after'],
+    },
+    verbose=params['PointTracker']['verbose'],
+)
+
+
+
+## Perform point tracking
+
+pt.track_points()
+
+
+
+## Save the `PointTracker` object in 'analysis_files' project directory.\
+## Using compression can reduce file sizes slightly but is very slow.
+
+pt.save_config(path_config=path_config, overwrite=True, verbose=1)
+pt.save_run_info(path_config=path_config, overwrite=True, verbose=2)
+pt.save_run_data(path_config=path_config, overwrite=True, use_compression=False, verbose=1)
+
+
+
+## Clear some memory if needed. Optional.
+
+pt.cleanup()
 
 
 
