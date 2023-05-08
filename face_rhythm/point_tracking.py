@@ -449,8 +449,7 @@ class PointTracker(FR_Module):
             frame_prev (np.ndarray, uint8):
                 A 2D array of integers, where each element is a pixel
                  value. The frame should be the previous frame.
-            points_        # rois_points: ROIs,
-prev (np.ndarray, np.float32):
+            points_prev (np.ndarray, np.float32):
                 A 2D array of np.float32, where each row is a point
                  to track. The points should be in the same order
                  as the points in the previous video. Order (x,y).
