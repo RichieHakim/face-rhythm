@@ -302,7 +302,7 @@ class VQT_Analyzer(FR_Module):
         print(f'Total size of all spectrograms: {np.sum(sizes_spec):.8f} GB') if self._verbose > 1 else None
         print(f'Individual spectrogram sizes (in GB): {sizes_spec}') if self._verbose > 1 else None            
 
-        return spec
+        return spec, x_axis, freqs
 
     
     def __repr__(self): return f"{self.__class__.__name__}( normalization_factor={self._normalization_factor}, spectrogram_exponent={self._spectrogram_exponent}, VQT={self.VQT}, verbose={self._verbose} )"

@@ -1516,8 +1516,8 @@ class VQT():
 
     def _helper_conv(self, arr, filters, take_abs, DEVICE):
         out = torch.complex(
-            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:],  torch.real(filters.T).to(DEVICE).T[:,None,:], padding=self.padding),
-            torch.nn.functional.conv1d(arr.to(DEVICE)[:,None,:], -torch.imag(filters.T).to(DEVICE).T[:,None,:], padding=self.padding)
+            torch.nn.functional.conv1d(input=arr.to(DEVICE)[:,None,:], weight=torch.real(filters.T).to(DEVICE).T[:,None,:], padding=self.padding),
+            torch.nn.functional.conv1d(input=arr.to(DEVICE)[:,None,:], weight=-torch.imag(filters.T).to(DEVICE).T[:,None,:], padding=self.padding)
         )
         if take_abs:
             return torch.abs(out)
@@ -1567,7 +1567,11 @@ class VQT():
 
         ## Make x_axis
         x_axis = torch.nn.functional.avg_pool1d(
-            torch.arange(0, X.shape[-1])[None,:], 
+            torch.nn.functional.conv1d(
+                input=torch.arange(0, X.shape[-1], dtype=torch.float32)[None,None,:], 
+                weight=torch.ones(1,1,self.filters.shape[-1], dtype=torch.float32) / self.filters.shape[-1], 
+                padding=self.padding
+            ),
             kernel_size=[int(self.downsample_factor)], 
             stride=self.downsample_factor, ceil_mode=True
             ).squeeze()
