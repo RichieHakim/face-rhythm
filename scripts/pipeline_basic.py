@@ -392,8 +392,6 @@ pt.cleanup()
 ## Load the `PointTracker` data as a dictionary
 
 pt_data = fr.h5_handling.simple_load(str(Path(directory_project) / 'analysis_files' / 'PointTracker.h5'))
-pt_data.unlazy()
-
 
 
 ########################################
@@ -478,7 +476,6 @@ spec.cleanup()
 ## Load the `VQT_Analyzer` data as a dictionary
 
 spec_data = fr.h5_handling.simple_load(str(Path(directory_project) / 'analysis_files' / 'VQT_Analyzer.h5'))
-spec_data.unlazy()
 
 
 
@@ -578,7 +575,6 @@ tca._cleanup()
 ## Load the `TCA` data as a dictionary
 
 tca_data = fr.h5_handling.simple_load(str(Path(directory_project) / 'analysis_files' / 'TCA.h5'))
-tca_data.unlazy()
 
 
 

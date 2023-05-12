@@ -110,7 +110,6 @@ class ROIs(FR_Module):
         
         if select_mode == "file":
             file = h5_handling.simple_load(self._path_file)
-            file.unlazy()
             ## Check that the file has the correct format
             assert "mask_images" in file, "FR ERROR: 'mask_images' not found in file."
             self.mask_images = file["mask_images"]

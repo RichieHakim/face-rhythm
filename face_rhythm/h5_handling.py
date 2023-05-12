@@ -1,7 +1,6 @@
 ###########################
 ####### H5_HANDLING #######
 ###########################
-## From BNPM
 
 import gc
 import h5py
@@ -18,7 +17,8 @@ def close_all_h5():
                     obj.close()
                 except:
                     pass # Was already closed
-    except:
+    except Exception as e:
+        print(f"Error closing h5 files. Will try again using `tables._open_files.close_all()`. Error: {e}")
         import tables
         tables.file._open_files.close_all()
     
@@ -42,10 +42,9 @@ def show_group_items(hObj):
         with h5py.File(path , 'r') as f:
             h5_handling.show_group_items(f)
     '''
-    import hdfdict
 
     for ii,val in enumerate(list(iter(hObj))):
-        if isinstance(hObj[val] , h5py.Group) or isinstance(hObj[val], hdfdict.hdfdict.LazyHdfDict):
+        if isinstance(hObj[val] , h5py.Group) or isinstance(hObj[val]):
             print(f'{ii+1}. {val}:----------------')
         if isinstance(hObj[val] , dict):
             print(f'{ii+1}. {val}:----------------')
@@ -57,7 +56,7 @@ def show_group_items(hObj):
 
 
 
-def show_item_tree(hObj=None , path=None, show_metadata=True , print_metadata=False, indent_level=0):
+def show_item_tree(hObj=None , path=None, depth=None, show_metadata=True, print_metadata=False, indent_level=0):
     '''
     Recursive function that displays all the items 
      and groups in an h5 object or python dict
@@ -68,6 +67,8 @@ def show_item_tree(hObj=None , path=None, show_metadata=True , print_metadata=Fa
             'hierarchical Object'. hdf5 object OR python dictionary
         path (Path or string):
             If not None, then path to h5 object is used instead of hObj
+        depth (int):
+            how many levels deep to show the tree
         show_metadata (bool): 
             whether or not to list metadata with items
         print_metadata (bool): 
@@ -81,11 +82,18 @@ def show_item_tree(hObj=None , path=None, show_metadata=True , print_metadata=Fa
         with h5py.File(path , 'r') as f:
             h5_handling.show_item_tree(f)
     '''
-    import hdfdict
+
+    if depth is None:
+        depth = int(10000000000000000000)
+    else:
+        depth = int(depth)
+
+    if depth < 0:
+        return
 
     if path is not None:
         with h5py.File(path , 'r') as f:
-            show_item_tree(hObj=f, path=None, show_metadata=show_metadata, print_metadata=print_metadata, indent_level=indent_level)
+            show_item_tree(hObj=f, path=None, depth=depth-1, show_metadata=show_metadata, print_metadata=print_metadata, indent_level=indent_level)
     else:
         indent = f'  '*indent_level
         if hasattr(hObj, 'attrs') and show_metadata:
@@ -96,17 +104,17 @@ def show_item_tree(hObj=None , path=None, show_metadata=True , print_metadata=Fa
                     print(f'{indent}METADATA: {val}: shape={hObj.attrs[val].shape} , dtype={hObj.attrs[val].dtype}')
         
         for ii,val in enumerate(list(iter(hObj))):
-            if isinstance(hObj[val] , h5py.Group) or isinstance(hObj[val], hdfdict.hdfdict.LazyHdfDict):
+            if isinstance(hObj[val], h5py.Group):
                 print(f'{indent}{ii+1}. {val}:----------------')
-                show_item_tree(hObj[val], show_metadata=show_metadata, print_metadata=print_metadata , indent_level=indent_level+1)
-            elif isinstance(hObj[val] , dict):
+                show_item_tree(hObj[val], depth=depth-1, show_metadata=show_metadata, print_metadata=print_metadata , indent_level=indent_level+1)
+            elif isinstance(hObj[val], dict):
                 print(f'{indent}{ii+1}. {val}:----------------')
-                show_item_tree(hObj[val], show_metadata=show_metadata, print_metadata=print_metadata , indent_level=indent_level+1)
+                show_item_tree(hObj[val], depth=depth-1, show_metadata=show_metadata, print_metadata=print_metadata , indent_level=indent_level+1)
             else:
-                if hasattr(hObj[val] , 'shape') and hasattr(hObj[val] , 'dtype'):
-                    print(f'{indent}{ii+1}. {val}:   shape={hObj[val].shape} , dtype={hObj[val].dtype}')
+                if hasattr(hObj[val], 'shape') and hasattr(hObj[val], 'dtype'):
+                    print(f'{indent}{ii+1}. {val}:    '.ljust(20) + f'shape={hObj[val].shape} ,'.ljust(20) + f'dtype={hObj[val].dtype}')
                 else:
-                    print(f'{indent}{ii+1}. {val}:   type={type(hObj[val])}')
+                    print(f'{indent}{ii+1}. {val}:    '.ljust(20) + f'type={type(hObj[val])}')
 
 
 def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False, track_order=True):
@@ -166,38 +174,55 @@ def write_dict_to_h5(
             show_item_tree(hf)
 
 
-def simple_load(path=None, return_lazy=True, verbose=False):
+def simple_load(filepath, return_dict=True, verbose=False):
     """
-    Returns a lazy dictionary object (specific
-    to hdfdict package) containing the groups
+    Returns a dictionary object containing the groups
     as keys and the datasets as values from
     given hdf file.
-    RH 2021
+    RH 2023
 
     Args:
-        path (string or Path): 
+        filepath (string or Path): 
             Full path name of file to read.
-        return_lazy (bool):
-            Whether or not to return a LazyHdfDict object (True)
-             or a regular dict object (False)
-        verbose (bool):
-            Whether or not to print out the h5 file hierarchy.
-    
-    Returns:
-        h5_dict (LazyHdfDict):
-            LazyHdfDict object containing the groups
+        return_dict (bool):
+            Whether or not to return a dict object (True)
+            or an h5py object (False)
     """
-    import hdfdict
-    
-    h5Obj = hdfdict.load(str(path), **{'mode': 'r'})
-    
-    if return_lazy==False:
-        h5Obj = LazyHdfDict_to_dict(h5Obj)
-    
-    if verbose:
-        show_item_tree(hObj=h5Obj)
-    
-    return h5Obj
+    if return_dict:
+        with h5py.File(filepath, 'r') as h5_file:
+            if verbose:
+                print(f'==== Loading h5 file with hierarchy: ====')
+                show_item_tree(h5_file)
+            result = {}
+            def visitor_func(name, node):
+                # Split name by '/' and reduce to nested dict
+                keys = name.split('/')
+                sub_dict = result
+                for key in keys[:-1]:
+                    sub_dict = sub_dict.setdefault(key, {})
+
+                if isinstance(node, h5py.Dataset):
+                    sub_dict[keys[-1]] = node[...]
+                elif isinstance(node, h5py.Group):
+                    sub_dict.setdefault(keys[-1], {})
+
+            h5_file.visititems(visitor_func)            
+            return result
+    else:
+        return h5py.File(filepath, 'r')
+
+def h5Obj_to_dict(hObj):
+    '''
+    Converts an h5py object to a python dict object
+    RH 2023
+    '''
+    h5_dict = {}
+    for ii,val in enumerate(list(iter(hObj))):
+        if isinstance(hObj[val], h5py.Group):
+            h5_dict[val] = h5Obj_to_dict(hObj[val])
+        else:
+            h5_dict[val] = hObj[val][()]
+    return h5_dict
 
 
 def simple_save(
@@ -242,29 +267,55 @@ def simple_save(
     )
 
 
-def LazyHdfDict_to_dict(hdfdictObj):
+def merge_helper(d, group):
     """
-    Converts an hdfdict object to a python dict.
+    Merge a dictionary into an existing HDF5 file identified
+     by an h5py.File object.
 
     Args:
-        hdfdictObj (LazyHdfDict):
-            LazyHdfDict object to convert to a python dict.
-            
-    Returns:
-        dict (dict):
-            Python dict where all hierarchical groups are
-             converted to nested dicts.
+        d (dict): 
+            The dictionary containing the data to be merged.
+        group (h5py.Group): 
+            The HDF5 group to which the data should be merged.
     """
-    import hdfdict
-    assert isinstance(hdfdictObj, hdfdict.hdfdict.LazyHdfDict), "RH ERROR: Input must be an hdfdict LazyHdfDict object."
-
-    hdfdictObj.unlazy()
-
-    for ii, (key, val) in enumerate(hdfdictObj.items()):
-        if isinstance(val, hdfdict.hdfdict.LazyHdfDict):
-            hdfdictObj[key] = LazyHdfDict_to_dict(val)
+    for key, value in d.items():
+        if isinstance(value, dict):
+            # If the value is a dictionary, check if the group already exists, and either skip it or merge the data
+            if key in group:
+                merge_helper(value, group[key])
+            else:
+                subgroup = group.create_group(key)
+                merge_helper(value, subgroup)
         else:
-            hdfdictObj[key] = val
-        
-    return dict(hdfdictObj)
-            
+            # If the value is not a dictionary, convert it to a numpy array and create a dataset
+            if key in group:
+                del group[key]
+            group.create_dataset(key, data=value)
+def merge_dict_into_h5_file(d, filepath=None, h5Obj=None,):
+    """
+    Merge a dictionary into an existing HDF5 file identified
+     by a file path.
+    This function wraps a recursive function that goes through
+     each hierarchical level of the input dictionary and merges
+     it into the appropriate HDF5 group.
+
+    Args:
+        d (dict): 
+            The dictionary containing the data to be merged.
+        filepath (str): 
+            The file path of the HDF5 file.
+            Do not specify if hObj is specified.
+        h5Obj (h5py.File):
+            An h5py.File object.
+            Do not specify if filepath is specified.
+    """
+    if filepath is None and h5Obj is None:
+        raise ValueError('Either filepath or h5Obj must be specified.')
+    elif filepath is not None and h5Obj is not None:
+        raise ValueError('Only one of filepath or h5Obj must be specified.')
+    
+    elif filepath is not None:
+        with h5py.File(filepath, 'a') as file:
+            merge_helper(d, file)
+    elif h5Obj is not None:
+        merge_helper(d, h5Obj)
