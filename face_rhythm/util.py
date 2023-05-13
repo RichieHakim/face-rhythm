@@ -2,8 +2,12 @@ from pathlib import Path
 import re
 import time
 from datetime import datetime
+import inspect
+from typing import Any
+import PIL
 
 import yaml
+import numpy as np
 
 from . import h5_handling
 from . import helpers
@@ -306,7 +310,130 @@ def load_run_info_file(path, verbose=0):
     return helpers.json_load(path, mode='r')
 
 
-class Figure_Saver:
+class Saver_Viz_Base:
+    """
+    Super class for saving visualizations i.e. (Figuer_Saver, Image_Saver)
+    """
+    def __init__(
+        self,
+        path_config: str=None,
+        dir_save: str=None,
+        formats_save: list=['png'],
+        kwargs_method: dict={},
+        overwrite: bool=False,
+        verbose: int=1,
+    ):
+        """
+        Initializes Visualization_Saver object.
+
+        Args:
+            path_config (str):
+                Path to config.yaml file
+                Optional if dir_save is specified
+            dir_save (str):
+                Directory to save visualizations
+                Optional if path_config is specified
+            formats_save (list):
+                List of formats to save visualizations as.
+                Depedenent on the method used to save the visualization.
+            kwargs_method (dict):
+                Dictionary of keyword arguments to pass to the method 
+                 used to save the visualization.
+            overwrite (bool):
+                Whether to overwrite existing files.
+            verbose (int):
+                Level of verbosity. 0 prints nothing. 1 prints warnings.
+                 2 prints warnings and information.
+        """
+        ## Validate inputs
+        assert isinstance(path_config, str) or isinstance(dir_save, str), "FR ERROR: Either path_config or dir_save must be specified as a string."
+        if path_config is not None:
+            assert Path(path_config).exists(), "FR ERROR: path_config must exist"
+        if isinstance(formats_save, str):
+            formats_save = [formats_save]
+        assert isinstance(formats_save, list), "FR ERROR: formats_save must be a list"
+        assert all([isinstance(f, str) for f in formats_save]), "FR ERROR: formats_save must be a list of strings"
+
+        ## Set attributes
+        self.path_config = path_config
+        self.dir_save = dir_save
+        self.formats_save = formats_save
+        self.kwargs_method = kwargs_method
+        self.overwrite = overwrite
+        self.verbose = verbose
+
+        ## Load config file
+        self.dir_save = str(Path(load_config_file(self.path_config)['paths']['project']) / 'visualizations') if dir_save is None else dir_save
+
+        ## Create directory if it does not exist
+        if not Path(self.dir_save).exists():
+            Path(self.dir_save).mkdir(parents=True, exist_ok=True)
+            print(f'FR: Created directory {self.dir_save}') if verbose > 0 else None
+
+    def _save_single(
+        self,
+        name_save: str,
+        obj_save: object,
+        fn_save: callable,
+        kwargs_method: dict={},
+        format_save: str=None,
+    ):
+        """
+        Saves a single visualization.
+
+        Args:
+            name_save (str):
+                Name of the file to save the visualization as.
+            obj_save (object):
+                Object to save.
+            fn_save (callable):
+                Function to use to save the visualization.
+                Should take args: (obj_save, path_save, format_save, **kwargs_method)
+            kwargs_method (dict):
+                Dictionary of keyword arguments to pass to the method 
+                 used to save the visualization.
+            format_save (str):
+                Format to save the visualization as.
+                If None, then the default format is used.
+        """
+        ## Validate inputs
+        assert isinstance(name_save, str), "FR ERROR: name_save must be a string"
+        assert isinstance(obj_save, object), "FR ERROR: obj_save must be an object"
+        assert callable(fn_save), "FR ERROR: fn_save must be callable"
+        assert isinstance(kwargs_method, dict), "FR ERROR: kwargs_method must be a dictionary"
+        assert isinstance(format_save, str), "FR ERROR: format_save must be a string"
+
+        ## Set kwargs_method
+        kwargs_method = {**self.kwargs_method, **kwargs_method}
+
+        ## Set and prepare path to save
+        path_save = str(Path(self.dir_save).resolve() / f"{name_save}.{format_save}")
+        helpers.prepare_filepath_for_saving(path_save, mkdir=True, allow_overwrite=self.overwrite)
+
+        ## assert that fn_save has the correct kwargs
+        args_fn_save = inspect.getfullargspec(fn_save).args
+        assert all([k in args_fn_save for k in ['obj_save', 'path_save', 'format_save']]), "FR ERROR: fn_save must have args: ['obj_save', 'path_save', 'format_save']"
+
+        ## Save visualization
+        fn_save(
+            obj_save=obj_save,
+            path_save=path_save,
+            format_save=format_save,
+            kwargs_method=kwargs_method,
+        )
+
+    def _inherit_from_attrs(self, vars, attrs):
+        for var, attr in zip(vars, attrs):
+            if var is None:
+                assert hasattr(self, attr), f"FR ERROR: {attr} must be specified in either the constructor or the method call"
+                var = getattr(self, attr)
+            yield var
+
+    def __repr__(self):
+        return f"Figure_Saver(path_config={self.path_config}, dir_save={self.dir_save}, formats_save={self.formats_save}, kwargs_method={self.kwargs_method}, overwrite={self.overwrite}, verbose={self.verbose})"
+
+
+class Figure_Saver(Saver_Viz_Base):
     """
     Class for saving figures
     RH 2022
@@ -315,7 +442,7 @@ class Figure_Saver:
         self,
         path_config: str=None,
         dir_save: str=None,
-        format_save: list=['png'],
+        formats_save: list=['png'],
         kwargs_savefig: dict={
             'bbox_inches': 'tight',
             'pad_inches': 0.1,
@@ -335,7 +462,7 @@ class Figure_Saver:
             dir_save (str):
                 Directory to save the figure. Used if path_config is None.
                 Must be specified if path_config is None.
-            format (list of str):
+            formats_save (list of str):
                 Format(s) to save the figure. Default is 'png'.
                 Others: ['png', 'svg', 'eps', 'pdf']
             overwrite (bool):
@@ -348,105 +475,268 @@ class Figure_Saver:
                 1: Warning.
                 2: All info.
         """
-        self._path_config = path_config
-        ## Get dir_save from path_config if it is not specified
-        assert (self._path_config is not None) or (dir_save is not None), "FR ERROR: path_config or dir_save must be specified"
-        self.dir_save = str(Path(load_config_file(self._path_config)['paths']['project']) / 'visualizations') if dir_save is None else dir_save
+        ## Initialize super
+        super().__init__(
+            path_config=path_config,
+            dir_save=dir_save,
+            formats_save=formats_save,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
 
-        assert isinstance(format_save, list), "FR ERROR: format_save must be a list of strings"
-        assert all([isinstance(f, str) for f in format_save]), "FR ERROR: format_save must be a list of strings"
-        self.format_save = format_save
-
-        assert isinstance(kwargs_savefig, dict), "FR ERROR: kwargs_savefig must be a dictionary"
+        ## Set kwargs_savefig
         self.kwargs_savefig = kwargs_savefig
 
-        self.overwrite = overwrite
-        self.verbose = verbose
+        self.__call__ = self.save_figure
 
-    def save(
+    def save_figure(
         self,
         fig,
-        name_file: str=None,
+        name_save: str=None,
         dir_save: str=None,
+        formats_save: str=None,
+        kwargs_savefig: dict=None,
     ):
         """
-        Save the figures.
+        Saves a single figure.
 
         Args:
             fig (matplotlib.figure.Figure):
                 Figure to save.
-            name_file (str):
-                Name of the file to save. If None, then the name of 
-                the figure is used.
+            name_save (str):
+                Name of the file to save the figure as. 
+                If None, then the name of the figure is used.
             dir_save (str):
                 Directory to save the figure. If None, then the directory
                  specified in the initialization is used.
+            formats_save (str):
+                Formats to save the figure as. If None, then the format
+                 specified in the initialization is used.
+            kwargs_savefig (dict):
+                Keyword arguments to pass to fig.savefig().
         """
-        import matplotlib.pyplot as plt
-        assert isinstance(fig, plt.Figure), "FR ERROR: fig must be a matplotlib.figure.Figure"
+        import matplotlib
 
-        ## Get dir_save
-        dir_save = self.dir_save if dir_save is None else str(Path(dir_save).resolve())
+        ## Set missing inputs
+        name_save = name_save if name_save is not None else fig.get_label()
+        name_save = 'fig' if len(name_save) == 0 else name_save        
+        dir_save, formats_save, kwargs_savefig = self._inherit_from_attrs(
+            vars=[dir_save, formats_save, kwargs_savefig], 
+            attrs=['dir_save', 'formats_save', 'kwargs_savefig'],
+        )
+        formats_save = [formats_save] if not isinstance(formats_save, list) else formats_save
 
-        ## Get figure title
-        if name_file is None:
-            titles = [a.get_title() for a in fig.get_axes() if a.get_title() != '']
-            name_file = '.'.join(titles)
-        path_save = [str(Path(dir_save) / (name_file + '.' + f)) for f in self.format_save]
+        ## Validate inputs
+        assert isinstance(fig, matplotlib.figure.Figure), "FR ERROR: fig must be a matplotlib.figure.Figure"
 
         ## Save figure
-        for path, form in zip(path_save, self.format_save):
-            if Path(path).exists():
-                if self.overwrite:
-                    print(f'FR Warning: Overwriting file. File: {path} already exists.') if self.verbose > 0 else None
-                else:
-                    print(f'FR Warning: Not saving anything. File exists and overwrite==False. {path} already exists.') if self.verbose > 0 else None
-                    return None
-            print(f'FR: Saving figure {path} as format(s): {form}') if self.verbose > 1 else None
-            fig.savefig(path, format=form, **self.kwargs_savefig)
+        fn_save = lambda obj_save, path_save, format_save, kwargs_method: obj_save.savefig(path_save, format=format_save, **kwargs_method)
+        for format_save in formats_save:
+            self._save_single(
+                name_save=name_save,
+                obj_save=fig,
+                fn_save=fn_save,
+                kwargs_method=kwargs_savefig,
+                format_save=format_save,
+            )
 
-    def save_batch(
+class Image_Saver(Saver_Viz_Base):
+    def __init__(
         self,
-        figs,
-        names_files: str=None,
+        path_config: str=None,
         dir_save: str=None,
+        formats_save: list=['png'],
+        kwargs_PIL_save: dict={
+        },
+        overwrite: bool=False,
+        verbose: int=1,
     ):
         """
-        Save all figures in a list.
+        Initializes Image_Saver object
 
         Args:
-            figs (list of matplotlib.figure.Figure):
-                Figures to save.
-            name_file (str):
-                Name of the file to save. If None, then the name of 
-                the figure is used.
+            path_config (str):
+                Path to config.yaml file. If None, then path_save must
+                be specified.
+            dir_save (str):
+                Directory to save the figure. Used if path_config is None.
+                Must be specified if path_config is None.
+            formats_save (list of str):
+                Format(s) to save the figure. Default is 'png'.
+                Others: ['png', 'svg', 'eps', 'pdf']
+            kwargs_PIL_save (dict):
+                Keyword arguments to pass to PIL.Image.save().
+            overwrite (bool):
+                If True, then overwrite the file if it exists.
+            verbose (int):
+                Verbosity level.
+                0: No output.
+                1: Warning.
+                2: All info.
+        """
+        ## Initialize super
+        super().__init__(
+            path_config=path_config,
+            dir_save=dir_save,
+            formats_save=formats_save,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
+
+        ## Set kwargs_PIL_save
+        self.kwargs_PIL_save = kwargs_PIL_save
+
+        self.__call__ = self.save_image
+
+    def save_image(
+        self,
+        array_image,
+        name_save: str=None,
+        dir_save: str=None,
+        formats_save: str=None,
+        kwargs_PIL_save: dict=None,
+    ):
+        """
+        Saves a single image.
+
+        Args:
+            array_image (numpy.ndarray):
+                Image to save. If float, then should be between 0 and 1. 
+                Will be * 255 and cast to uint8.
+                If int, then should be between 0 and 255. Will be cast to uint8.
+            name_save (str):
+                Name of the file to save the figure as. 
+                If None, then the name of the figure is used.
             dir_save (str):
                 Directory to save the figure. If None, then the directory
                  specified in the initialization is used.
+            formats_save (str):
+                Formats to save the figure as. If None, then the format
+                 specified in the initialization is used.
+            kwargs_PIL_save (dict):
+                Keyword arguments to pass to PIL.Image.save(). 
         """
-        import matplotlib.pyplot as plt
-        assert isinstance(figs, list), "FR ERROR: figs must be a list of matplotlib.figure.Figure"
-        assert all([isinstance(fig, plt.Figure) for fig in figs]), "FR ERROR: figs must be a list of matplotlib.figure.Figure"
 
-        ## Get dir_save
-        dir_save = self.dir_save if dir_save is None else str(Path(dir_save).resolve())
+        ## Set missing inputs
+        name_save = name_save if name_save is not None else 'image'
+        dir_save, formats_save, kwargs_PIL_save = self._inherit_from_attrs(
+            vars=[dir_save, formats_save, kwargs_PIL_save],
+            attrs=['dir_save', 'formats_save', 'kwargs_PIL_save'],
+        )
+        formats_save = [formats_save] if not isinstance(formats_save, list) else formats_save
+        
+        ## Validate inputs
+        array_image = self._prepare_array_image(array_image)
 
-        for fig, name_file in zip(figs, names_files):
-            self.save(fig, name_file=name_file, dir_save=dir_save)
-
-    def __call__(
+        ## Save image
+        for format_save in formats_save:
+            self._save_single(
+                name_save=name_save,
+                obj_save=array_image,
+                fn_save=self._fn_save_single_image,
+                kwargs_method=kwargs_PIL_save,
+                format_save=format_save,
+            )
+        
+    def save_gif(
         self,
-        fig,
-        name_file: str=None,
+        array_images,
+        name_save: str=None,
         dir_save: str=None,
+        frame_rate: float=5.0,
+        loop: int=True,
+        optimize: bool=True,
+        kwargs_PIL_save: dict=None,
     ):
         """
-        Calls save() method.
+        Saves multiple images as a gif using PIL.
         """
-        self.save(fig, name_file=name_file, dir_save=dir_save)
+        ## Set missing inputs
+        name_save = name_save if name_save is not None else 'image'
+        dir_save, kwargs_PIL_save = self._inherit_from_attrs(
+            vars=[dir_save, kwargs_PIL_save],
+            attrs=['dir_save', 'kwargs_PIL_save'],
+        )
+        formats_save = ['gif']
+        
+        ## Validate inputs
+        assert isinstance(array_images, list), "FR ERROR: array_images must be a list"
+        array_images = [self._prepare_array_image(a) for a in array_images]
 
-    def __repr__(self):
-        return f"Figure_Saver(path_config={self._path_config}, dir_save={self.dir_save}, format={self.format_save}, overwrite={self.overwrite}, kwargs_savefig={self.kwargs_savefig}, verbose={self.verbose})"
+        kwargs_PIL_save['duration'] = 1000 / frame_rate
+        if isinstance(loop, bool):
+            loop = 0 if loop else None
+        else:
+            assert isinstance(loop, int), "FR ERROR: loop must be a bool or int. If int, then 0==loop forever, n==loop n times."
+        if loop is not None:
+            kwargs_PIL_save['loop'] = loop
+        else:
+            kwargs_PIL_save.pop('loop') if 'loop' in kwargs_PIL_save else None
+        
+        kwargs_PIL_save['optimize'] = optimize
+
+        ## Save gif
+        for format_save in formats_save:
+            self._save_single(
+                name_save=name_save,
+                obj_save=array_images,
+                fn_save=self._fn_save_gif,
+                kwargs_method=kwargs_PIL_save,
+                format_save=format_save,
+            )
+
+    def _fn_save_single_image(self, obj_save, path_save, format_save, kwargs_method):
+        """
+        Converts a single 3D numpy.ndarray with shape[-1] == 3 or 1 to a PIL.Image
+         and saves it.
+        """
+        format_LUT = {
+            'jpg': 'JPEG',
+            'tif': 'TIFF',
+        }
+        format_save = format_LUT.get(format_save, format_save)
+        obj_save = PIL.Image.fromarray(obj_save, mode='RGB') if obj_save.shape[-1] == 3 else PIL.Image.fromarray(obj_save, mode='L')
+        obj_save.save(path_save, format=format_save, **kwargs_method)
+
+    def _fn_save_gif(self, obj_save, path_save, format_save, kwargs_method):
+        """
+        Converts a list of 3D numpy.ndarrays with shape[-1] == 3 or 1 to a PIL.Image
+         and saves it.
+        """
+        obj_save = [PIL.Image.fromarray(a, mode='RGB') if a.shape[-1] == 3 else PIL.Image.fromarray(a, mode='L') for a in obj_save]
+        obj_save[0].save(
+            path_save,
+            save_all=True,
+            append_images=obj_save[1:],
+            format='GIF',
+            **kwargs_method,
+        )
+        
+    
+    def _prepare_array_image(self, array_image):
+        """
+        Converts an input array_image from a 2D or 3D numpy.ndarray of floats
+         between 0 and 1 or ints between 0 and 255 to a 3D numpy.ndarray of
+         uint8s between 0 and 255.
+        """
+        ## Validate inputs
+        assert isinstance(array_image, np.ndarray), "FR ERROR: array_image must be a numpy.ndarray"
+        assert array_image.ndim in [2, 3], "FR ERROR: array_image must be a 2D or 3D numpy.ndarray"
+
+        ## Prepare array_image
+        if array_image.ndim == 2:
+            array_image = np.expand_dims(array_image, axis=-1)
+
+        if np.issubdtype(array_image.dtype, np.floating):
+            assert np.all((0 <= array_image) & (array_image <= 1)), "FR ERROR: images must be between 0 and 1"
+            array_image = (array_image * 255).astype(np.uint8)
+        elif np.issubdtype(array_image.dtype, np.integer):
+            assert np.all((0 <= array_image) & (array_image <= 255)), "FR ERROR: images must be between 0 and 255"
+            array_image = array_image.astype(np.uint8)
+        else:
+            raise ValueError("FR ERROR: array_image.dtype must be float or int")
+
+        return array_image
 
 
 
