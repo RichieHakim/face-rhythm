@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 import torch
 # import scipy.sparse
+from tqdm import tqdm
 
 from .helpers import BufferedVideoReader
 
@@ -473,7 +474,7 @@ def play_video_with_points(
         ### Set buffered video reader to first frame
         bufferedVideoReader.set_iterator_frame_idx(int(idx_frames[0]))
         ### Iterate through frames
-        for idx_frame in idx_frames:
+        for idx_frame in tqdm(idx_frames):
             frame = bufferedVideoReader[idx_frame][0]
             frame = frame.numpy() if isinstance(frame, torch.Tensor) else frame
             p = points_int[idx_frame] if points_int is not None else None
@@ -484,37 +485,172 @@ def play_video_with_points(
         frameVisualizer.close()
 
 
-def display_toggle_image_stack(images, clim=None, **kwargs):
+# def display_toggle_image_stack(images, clim=None, **kwargs):
+#     """
+#     Display a stack of images using a slider.
+#     REQUIRES use of Jupyter Notebook.
+#     RH 2022
+
+#     Args:
+#         images (np.ndarray):
+#             Stack of images.
+#             Shape: (num_frames, height, width)
+#             Optionally, shape: (num_frames, height, width, num_channels)
+#         clim (tuple, optional):
+#             Color limits.
+#         kwargs (dict, optional):
+#             Keyword arguments to pass to imshow.
+#     """
+#     import matplotlib.pyplot as plt
+#     from ipywidgets import interact, widgets
+
+#     fig = plt.figure()
+#     ax = fig.add_subplot(1, 1, 1)
+#     imshow_FOV = ax.imshow(
+#         images[0],
+# #         vmax=clim[1]
+#         **kwargs
+#     )
+
+#     def update(i_frame = 0):
+#         fig.canvas.draw_idle()
+#         imshow_FOV.set_data(images[i_frame])
+#         imshow_FOV.set_clim(clim)
+
+
+#     interact(update, i_frame=widgets.IntSlider(min=0, max=len(images)-1, step=1, value=0));
+
+def display_toggle_image_stack(images, image_size=None, clim=None, interpolation='nearest'):
     """
-    Display a stack of images using a slider.
-    REQUIRES use of Jupyter Notebook.
-    RH 2022
+    Display images in a slider using Jupyter Notebook.
+    RH 2023
 
     Args:
-        images (np.ndarray):
-            Stack of images.
-            Shape: (num_frames, height, width)
-            Optionally, shape: (num_frames, height, width, num_channels)
-        clim (tuple, optional):
-            Color limits.
-        kwargs (dict, optional):
-            Keyword arguments to pass to imshow.
+        images (list of numpy arrays or PyTorch tensors):
+            List of images as numpy arrays or PyTorch tensors
+        image_size (tuple of ints, or float, optional):
+            If tuple: (width, height) for resizing images.
+            If float: resize factor to apply to each image.
+            If None (default), images are not resized.
+        clim (tuple of floats, optional):
+            Tuple of (min, max) values for scaling pixel intensities.
+            If None (default), min and max values are computed from the images
+             and used as bounds for scaling.
+        interpolation (string, optional):
+            String specifying the interpolation method for resizing.
+            Options: 'nearest', 'box', 'bilinear', 'hamming', 'bicubic', 'lanczos'.
+            Uses the Image.Resampling.* methods from PIL.
     """
-    import matplotlib.pyplot as plt
-    from ipywidgets import interact, widgets
+    from IPython.display import display, HTML
+    import numpy as np
+    import base64
+    from PIL import Image
+    from io import BytesIO
+    import torch
+    import datetime
+    import hashlib
+    import sys
+    
+    def normalize_image(image, clim=None):
+        """Normalize the input image using the min-max scaling method. Optionally, use the given clim values for scaling."""
+        if isinstance(image, torch.Tensor):
+            image = image.detach().cpu().numpy()
 
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    imshow_FOV = ax.imshow(
-        images[0],
-#         vmax=clim[1]
-        **kwargs
-    )
+        if clim is None:
+            clim = (np.min(image), np.max(image))
 
-    def update(i_frame = 0):
-        fig.canvas.draw_idle()
-        imshow_FOV.set_data(images[i_frame])
-        imshow_FOV.set_clim(clim)
+        norm_image = (image - clim[0]) / (clim[1] - clim[0])
+        norm_image = np.clip(norm_image, 0, 1)
+        return (norm_image * 255).astype(np.uint8)
+    def resize_image(image, size_new, interpolation):
+        """Resize the given image to the specified new size using the specified interpolation method."""
+        if isinstance(image, torch.Tensor):
+            image = image.detach().cpu().numpy()
+
+        pil_image = Image.fromarray(image.astype(np.uint8))
+        resized_image = pil_image.resize(size_new, resample=interpolation)
+        return np.array(resized_image)
+    def numpy_to_base64(numpy_array):
+        """Convert a numpy array to a base64 encoded string."""
+        img = Image.fromarray(numpy_array.astype('uint8'))
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        return base64.b64encode(buffered.getvalue()).decode("ascii")
+    def process_image(image, size=None):
+        """Normalize, resize, and convert image to base64."""
+        # Normalize image
+        norm_image = normalize_image(image, clim)
+
+        # Resize image if requested
+        if size is not None:
+            norm_image = resize_image(norm_image, size, interpolation_method)
+
+        # Convert image to base64
+        return numpy_to_base64(norm_image)
 
 
-    interact(update, i_frame=widgets.IntSlider(min=0, max=len(images)-1, step=1, value=0));
+    # Check if being called from a Jupyter notebook
+    if 'ipykernel' not in sys.modules:
+        raise RuntimeError("This function must be called from a Jupyter notebook.")
+
+    # Create a dictionary to map interpolation string inputs to Image objects
+    interpolation_methods = {
+        'nearest': Image.Resampling.NEAREST,
+        'box': Image.Resampling.BOX,
+        'bilinear': Image.Resampling.BILINEAR,
+        'hamming': Image.Resampling.HAMMING,
+        'bicubic': Image.Resampling.BICUBIC,
+        'lanczos': Image.Resampling.LANCZOS,
+    }
+
+    # Check if provided interpolation method is valid
+    if interpolation not in interpolation_methods:
+        raise ValueError("Invalid interpolation method. Choose from 'nearest', 'box', 'bilinear', 'hamming', 'bicubic', or 'lanczos'.")
+
+    # Get the actual Image object for the specified interpolation method
+    interpolation_method = interpolation_methods[interpolation]
+
+    # Generate a unique identifier for the slider
+    slider_id = hashlib.sha256(str(datetime.datetime.now()).encode()).hexdigest()
+
+    # Get the image sizes for processing and display
+    if image_size is not None:
+        image_sizes = [tuple((np.array(img.shape[:2]) * image_size).astype(int)) for img in images] if isinstance(image_size, (int, float)) else image_size
+        size_frame = image_sizes[0]
+    else:
+        image_sizes = [None] * len(images)
+        size_frame = images[0].shape[:2]
+
+    # Process all images in the input list
+    base64_images = [process_image(img, size=sz) for img,sz in zip(images, image_sizes)]
+
+    # Generate the HTML code for the slider
+            # <img id="displayedImage_{slider_id}" src="data:image/png;base64,{base64_images[0]}" ;">
+
+    html_code = f"""
+    <div>
+        <input type="range" id="imageSlider_{slider_id}" min="0" max="{len(base64_images) - 1}" value="0">
+        <img id="displayedImage_{slider_id}" src="data:image/png;base64,{base64_images[0]}" style="width: {size_frame[1]}px; height: {size_frame[0]}px;">
+        <span id="imageNumber_{slider_id}">Image 0/{len(base64_images) - 1}</span>
+    </div>
+
+    <script>
+        (function() {{
+            let base64_images = {base64_images};
+            let current_image = 0;
+    
+            function updateImage() {{
+                let slider = document.getElementById("imageSlider_{slider_id}");
+                current_image = parseInt(slider.value);
+                let displayedImage = document.getElementById("displayedImage_{slider_id}");
+                displayedImage.src = "data:image/png;base64," + base64_images[current_image];
+                let imageNumber = document.getElementById("imageNumber_{slider_id}");
+                imageNumber.innerHTML = "Image " + current_image + "/{len(base64_images) - 1}";
+            }}
+            
+            document.getElementById("imageSlider_{slider_id}").addEventListener("input", updateImage);
+        }})();
+    </script>
+    """
+
+    display(HTML(html_code))
