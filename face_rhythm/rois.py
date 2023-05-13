@@ -14,7 +14,7 @@ from . import h5_handling
 class ROIs(FR_Module):
     def __init__(
         self,
-        select_mode="gui_notebook",
+        select_mode="gui",
 
         exampleImage=None,
         path_file=None,
@@ -84,6 +84,7 @@ class ROIs(FR_Module):
         assert isinstance(select_mode, str), "FR ERROR: select_mode must be a string."
         if (select_mode == "gui"):
             assert exampleImage is not None, "FR ERROR: 'exampleImage' must be provided for select_mode 'gui'."
+            assert path_file is None, "FR ERROR: 'path_file' must not be provided for select_mode 'gui'."
         elif select_mode == "file":
             assert self._path_file is not None, "FR ERROR: 'path_file' must be provided for select_mode 'file'."
             assert isinstance(self._path_file, str), "FR ERROR: 'path_file' must be a string."
