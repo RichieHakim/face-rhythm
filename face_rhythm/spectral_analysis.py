@@ -138,7 +138,7 @@ class VQT_Analyzer(FR_Module):
         ## Compute spectrograms
         print(f"Computing spectrograms...") if self._verbose > 1 else None
         self.spectrograms, self.x_axis, self.freqs = {}, {}, {}
-        for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc='Computing spectrograms', leave=False):
+        for key, points in tqdm(points_tracked.items(), disable=not self._verbose > 1, desc='Computing spectrograms', leave=True, position=1):
             self.spectrograms[key], self.x_axis[key], self.freqs[key] = self.transform(points, point_positions)
 
         ## Update self.run_data
@@ -284,11 +284,19 @@ class VQT_Analyzer(FR_Module):
             x_0 = x_axis[0] / self.VQT.Fs_sample
             x_N = x_axis[-1] / self.VQT.Fs_sample
             fig, axs = plt.subplots(2, 1, figsize=(10, 5))
-            axs[0].imshow(np.abs(spec[0,:,:]), extent=[x_0, x_N, freqs[0], freqs[-1]], aspect='auto', origin='lower', cmap='hot')
-            axs[1].imshow(np.abs(spec[1,:,:]), extent=[x_0, x_N, freqs[0], freqs[-1]], aspect='auto', origin='lower', cmap='hot')
+            axs[0].imshow(np.abs(spec[0,:,:]), aspect='auto', origin='lower', cmap='hot')
+            axs[1].imshow(np.abs(spec[1,:,:]), aspect='auto', origin='lower', cmap='hot')
             axs[0].set_title(f'Spectrogram of x and y displacements of point {idx_point}')
             axs[1].set_xlabel('Time (s)')
             axs[0].set_ylabel('Frequency')
+            ## set yticks values
+            yticks = np.linspace(0, len(freqs), num=8, endpoint=False, dtype=int)
+            yticklabels = np.round(freqs[yticks], 2)
+            axs[0].set_yticks(yticks)
+            axs[0].set_yticklabels(yticklabels)
+            axs[1].set_yticks(yticks)
+            axs[1].set_yticklabels(yticklabels)
+
             plt.show()
 
 
