@@ -283,8 +283,56 @@ class TCA(util.FR_Module):
         self.names_dims_array_preDecomp = self._names_dims_array_new
         ## Set the name of the dimension of the dictionary elements
         self.name_dim_dictElements_preDecomp = self._name_dim_dictElements_new
-            
 
+    
+    def normalize_data(
+        self,
+        mean_subtract: bool=False,
+        std_divide: bool=False,
+        dim_name: str='time',
+    ):
+        """
+        Normalize the data.
+        self.rearrange_data() must be run before this function.
+
+        Args:
+            mean_subtract (bool):
+                Whether to subtract the mean from the data.
+            std_divide (bool):
+                Whether to divide the data by the standard deviation.
+            dim_name (str):
+                Name of the dimension to normalize over.
+                Should be the name after rearranging the data.
+        """
+        ## Place params into config
+        self.config['mean_subtract'] = mean_subtract
+        self.config['std_divide'] = std_divide
+
+        ## Skip everything if we don't need to normalize
+        if not mean_subtract and not std_divide:
+            return None
+
+        ## Assert that the data has been rearranged
+        assert self.data is not None, "self.data is None. Please run self.rearrange_data() before running self.normalize_data()."
+
+        ## Get the dimension to normalize over
+        dim_idx = self.names_dims_array_preDecomp.index(dim_name)
+
+        ## Normalize the data
+        self.data = {key: torch.as_tensor(self.data[key]) for key in self.data.keys()}
+        if mean_subtract:
+            arrs_mean = {key: torch.mean(self.data[key], dim=dim_idx, keepdims=True) for key in self.data.keys()}
+        else:
+            arrs_mean = {key: 0 for key in self.data.keys()}
+
+        if std_divide:
+            arrs_std = {key: torch.std(self.data[key], dim=dim_idx, keepdims=True) for key in self.data.keys()}
+        else:
+            arrs_std = {key: 1 for key in self.data.keys()}
+
+        self.data = {key: ((self.data[key] - arrs_mean[key]) / arrs_std[key]).type(torch.float32).cpu().numpy() for key in self.data.keys()}
+
+            
     def fit(
         self,
         data: dict=None,
@@ -367,6 +415,7 @@ class TCA(util.FR_Module):
         print(f"Running the TCA model with method '{self.method}'.") if self._verbose > 1 else None
         self._model = tl.decomposition.__dict__[method](**self.params_method)
 
+        self._cleanup()  ## Clean up any previous runs
         cp_all = {key: self._model.fit_transform(torch.as_tensor(d, device=self._DEVICE)) for key,d in self.data.items()}
         self.factors = {key_factor: {key: cp.factors[ii].cpu().numpy() for ii, key in enumerate(self.names_dims_array_preDecomp)} for key_factor,cp in cp_all.items()}
 
@@ -522,7 +571,8 @@ class TCA(util.FR_Module):
             fig, ax = plt.subplots()
             ax.plot(val)
             ax.set_title(title_figure)
-            ax.set_xlabel(name_factor[1:])
+            ax.set_xlabel(f'{name_factor}_bin')
+            ax.legend(np.arange(val.shape[1]))
 
             ## Save the figure
             if figure_saver is not None:
@@ -536,12 +586,13 @@ class TCA(util.FR_Module):
         """
         Clear the CUDA cache and garbage collect.
         """
-        if 'cuda' in self._DEVICE.type:
-            for ii in range(5):
-                torch.cuda.empty_cache()
-                time.sleep(0.1)
-                gc.collect()
-                time.sleep(0.1)
+        if hasattr(self, '_DEVICE'):
+            if 'cuda' in self._DEVICE.type:
+                for ii in range(5):
+                    torch.cuda.empty_cache()
+                    time.sleep(0.1)
+                    gc.collect()
+                    time.sleep(0.1)
         else:
             [gc.collect() for ii in range(5)]
 
