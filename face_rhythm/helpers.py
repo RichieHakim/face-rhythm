@@ -128,23 +128,105 @@ def find_paths(
 ########################################################### FILE HELPERS ############################################################
 #####################################################################################################################################
 
-def prepare_filepath_for_saving(path, mkdir=False, allow_overwrite=True):
+def prepare_path(path, mkdir=False, exist_ok=True):
     """
-    Checks if a file path is valid.
-    RH 2022
+    Checks if a directory or filepath for validity for different
+     purposes: saving, loading, etc.
+    If exists:
+        If exist_ok=True: all good
+        If exist_ok=False: raises error
+    If doesn't exist:
+        If file:
+            If parent directory exists:
+                All good
+            If parent directory doesn't exist:
+                If mkdir=True: creates parent directory
+                If mkdir=False: raises error
+        If directory:
+            If mkdir=True: creates directory
+            If mkdir=False: raises error
+   
+    Returns a resolved path.
+    RH 2023
 
     Args:
         path (str):
             Path to check.
         mkdir (bool):
             If True, creates parent directory if it does not exist.
-        allow_overwrite (bool):
+        exist_ok (bool):
             If True, allows overwriting of existing file.
+
+    Returns:
+        path (str):
+            Resolved path.
     """
-    Path(path).parent.mkdir(parents=True, exist_ok=True) if mkdir else None
-    assert allow_overwrite or not Path(path).exists(), f'{path} already exists.'
-    assert Path(path).parent.exists(), f'{Path(path).parent} does not exist.'
-    assert Path(path).parent.is_dir(), f'{Path(path).parent} is not a directory.'
+    ## check if path is valid
+    try:
+        path_obj = Path(path).resolve()
+    except FileNotFoundError as e:
+        print(f'Invalid path: {path}')
+        raise e
+    
+    ## check if path object exists
+    flag_exists = path_obj.exists()
+
+    ## determine if path is a directory or file
+    if flag_exists:
+        flag_dirFileNeither = 'dir' if path_obj.is_dir() else 'file' if path_obj.is_file() else 'neither'  ## 'neither' should never happen since path.is_file() or path.is_dir() should be True if path.exists()
+        assert flag_dirFileNeither != 'neither', f'Path: {path} is neither a file nor a directory.'
+        assert exist_ok, f'{path} already exists and exist_ok=False.'
+    else:
+        flag_dirFileNeither = 'dir' if path_obj.suffix == '' else 'file'  ## rely on suffix to determine if path is a file or directory
+
+    ## if path exists and is a file or directory
+    # all good. If exist_ok=False, then this should have already been caught above.
+    
+    ## if path doesn't exist and is a file
+    ### if parent directory exists        
+    # all good
+    ### if parent directory doesn't exist
+    #### mkdir if mkdir=True and raise error if mkdir=False
+    if not flag_exists and flag_dirFileNeither == 'file':
+        if Path(path).parent.exists():
+            pass ## all good
+        elif mkdir:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+        else:
+            assert False, f'File: {path} does not exist, Parent directory: {Path(path).parent} does not exist, and mkdir=False.'
+        
+    ## if path doesn't exist and is a directory
+    ### mkdir if mkdir=True and raise error if mkdir=False
+    if not flag_exists and flag_dirFileNeither == 'dir':
+        if mkdir:
+            Path(path).mkdir(parents=True, exist_ok=True)
+        else:
+            assert False, f'{path} does not exist and mkdir=False.'
+
+    ## if path is neither a file nor a directory
+    ### raise error
+    if flag_dirFileNeither == 'neither':
+        assert False, f'{path} is neither a file nor a directory. This should never happen. Check this function for bugs.'
+
+    return str(path_obj)
+
+### Custom functions for preparing paths for saving and loading files and directories
+def prepare_filepath_for_saving(filepath, mkdir=False, allow_overwrite=True):
+    return prepare_path(filepath, mkdir=mkdir, exist_ok=allow_overwrite)
+def prepare_filepath_for_loading(filepath, must_exist=True):
+    path = prepare_path(filepath, mkdir=False, exist_ok=must_exist)
+    if must_exist:
+        assert Path(path).is_file(), f'{path} is not a file.'
+    return path
+def prepare_directory_for_saving(directory, mkdir=False, exist_ok=True):
+    """Rarely used."""
+    return prepare_path(directory, mkdir=mkdir, exist_ok=exist_ok)
+def prepare_directory_for_loading(directory, must_exist=True):
+    """Rarely used."""
+    path = prepare_path(directory, mkdir=False, exist_ok=must_exist)
+    if must_exist:
+        assert Path(path).is_dir(), f'{path} is not a directory.'
+    return path
 
 
 def json_save(obj, path_save, indent=4, mode='w', mkdir=False, allow_overwrite=True):
@@ -1769,3 +1851,54 @@ def clahe(im, grid_size=50, clipLimit=0, normalize=True):
     clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(grid_size, grid_size))
     im_c = clahe.apply(im_tu.astype(np.uint16))
     return im_c
+
+
+def add_text_to_images(images, text, position=(10,10), font_size=1, color=(255,255,255), line_width=1, font=None, show=False, frameRate=30):
+    """
+    Add text to images using cv2.putText()
+    RH 2022
+
+    Args:
+        images (np.array):
+            frames of video or images.
+            shape: (n_frames, height, width, n_channels)
+        text (list of lists):
+            text to add to images.
+            Outer list: one element per frame.
+            Inner list: each element is a line of text.
+        position (tuple):
+            (x,y) position of text (top left corner)
+        font_size (int):
+            font size of text
+        color (tuple):
+            (r,g,b) color of text
+        line_width (int):
+            line width of text
+        font (str):
+            font to use.
+            If None, then will use cv2.FONT_HERSHEY_SIMPLEX
+            See cv2.FONT... for more options
+        show (bool):
+            if True, then will show the images with text added.
+
+    Returns:
+        images_with_text (np.array):
+            frames of video or images with text added.
+    """
+    import cv2
+    import copy
+    
+    if font is None:
+        font = cv2.FONT_HERSHEY_SIMPLEX
+    
+    images_cp = copy.deepcopy(images)
+    for i_f, frame in enumerate(images_cp):
+        for i_t, t in enumerate(text[i_f]):
+            cv2.putText(frame, t, [position[0] , position[1] + i_t*font_size*30], font, font_size, color, line_width)
+        if show:
+            cv2.imshow('add_text_to_images', frame)
+            cv2.waitKey(int(1000/frameRate))
+    
+    if show:
+        cv2.destroyWindow('add_text_to_images')
+    return images_cp
