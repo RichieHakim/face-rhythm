@@ -1,21 +1,62 @@
-numpy==1.18.3
-torch
-torchvision
-torchaudio
+## requirements.txt
+
+numpy
 jupyterlab
-tensorly
-opencv-python
-imageio==2.9.0
-matplotlib
-scikit-learn
-scikit-image
-librosa
-pyyaml
+tensorly==0.7.0
+opencv-contrib-python==4.6.0.66
+imageio
+matplotlib==3.5.2
+scikit-learn==1.1.2
+scikit-image==0.19.2
+librosa==0.9.2
+pyyaml==5.4.1
 imageio-ffmpeg
 tqdm
-h5py==2.10.0
+h5py==3.7.0
 pynwb
 ipywidgets
+Pillow==9.2.0
+opt_einsum==3.3.0
+decord==0.6.0
+natsort==8.2.0
+hdfdict==0.3.1
+pandas==1.4.3
+tables==3.7.0
+einops==0.6.0
 pytest
-Pillow==7.2.0
--e .
+# torch==1.12.0
+# torchvision==0.13.0
+# torchaudio==0.12.0
+# --extra-index-url https://download.pytorch.org/whl/cpu
+# tox
+
+
+    # - numpy
+    # - jupyterlab
+    # - tensorly
+    # - opencv-contrib-python
+    # - imageio
+    # - matplotlib
+    # - scikit-learn
+    # - scikit-image
+    # - librosa
+    # - pyyaml==5.4.1
+    # - imageio-ffmpeg
+    # - tqdm
+    # - h5py
+    # - pynwb
+    # - ipywidgets
+    # - pytest
+    # - Pillow
+    # - opt_einsum   
+    # - decord
+    # - natsort
+    # - hdfdict==0.3.1
+    # - pandas
+    # - tables
+    # - einops    
+    # - torch==1.12.0
+    # - torchvision==0.13.0
+    # - torchaudio==0.12.0 
+    # - --extra-index-url https://download.pytorch.org/whl/cpu
+    # - tox
