@@ -11,7 +11,6 @@ __all__=[
     'project',
     'rois',
     'spectral_analysis',
-    'tests',
     'util',
     'visualization',
     'data_importing',

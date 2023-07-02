@@ -22,7 +22,7 @@ with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
 # print(requirements)
 
 ## Get version number
-with open(str(dir_parent / "roicat" / "__init__.py"), "r") as f:
+with open(str(dir_parent / "face_rhythm" / "__init__.py"), "r") as f:
     for line in f:
         if line.startswith("__version__"):
             version = line.split("=")[1].strip().replace("\"", "").replace("\'", "")
@@ -32,6 +32,7 @@ with open(str(dir_parent / "roicat" / "__init__.py"), "r") as f:
 setuptools.setup(
     name='face_rhythm',
     version=version,
+    # version='0.1.1',
 
     description="A pipeline for analysis of facial behavior using optical flow",
     long_description=long_description,
