@@ -93,11 +93,11 @@ cpu_tracker.track_utilization(
     interval=0.2,
     path_save=str(Path(directory_save) / 'cpu_tracker.csv'),
 )
-gpu_tracker = fr.helpers.NVIDIA_Device_Checker(device_index=0)
-gpu_tracker.track_utilization(
-    interval=0.2,
-    path_save=str(Path(directory_save) / 'gpu_tracker.csv'),
-)
+# gpu_tracker = fr.helpers.NVIDIA_Device_Checker(device_index=0)
+# gpu_tracker.track_utilization(
+#     interval=0.2,
+#     path_save=str(Path(directory_save) / 'gpu_tracker.csv'),
+# )
 
 ## Initialize paths
 fr.util.system_info(verbose=True);
@@ -415,7 +415,7 @@ print(f'Project directory: {directory_project}')
 print(f'Time elapsed: {time.time() - tic_start:.2f} seconds')
 
 cpu_tracker.stop_tracking()
-gpu_tracker.stop_tracking()
+# gpu_tracker.stop_tracking()
 
 ## End the job and kill the kernel
 os._exit(0)
