@@ -6,18 +6,18 @@ import copy
 
 print(f"dispatcher environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
-from face_rhythm import helpers, util
+from face_rhythm import util
 
-path_self, date = sys.argv
+path_self, path_script, dir_save, dir_videos, dir_ROIs, name_job, name_slurm, name_env = sys.argv
 
 
 # date = '20221011'
 
-path_script = f'/n/data1/hms/neurobio/sabatini/rich/github_repos/face-rhythm/scripts/pipeline_basic.py'
-dir_save = f'/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/mouse_0322N/run_20230701/'
-name_job = f'faceRhythm_{date}_'
-name_slurm = f'rh_{date}'
-name_env = f'/n/data1/hms/neurobio/sabatini/rich/virtual_envs/FR'
+# path_script = f'/n/data1/hms/neurobio/sabatini/rich/github_repos/face-rhythm/scripts/pipeline_basic.py'
+# dir_save = f'/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/{mouse}/run_20230701/'
+# name_job = f'faceRhythm_{date}_'
+# name_slurm = f'rh_{date}'
+# name_env = f'/n/data1/hms/neurobio/sabatini/rich/virtual_envs/FR'
 
 ## set paths
 Path(dir_save).mkdir(parents=True, exist_ok=True)
@@ -25,7 +25,7 @@ Path(dir_save).mkdir(parents=True, exist_ok=True)
 
 params_template = {
     "project": {
-        "directory_project": str(Path(dir_save).resolve() / f'fr_{date}'),
+        "directory_project": dir_save,
         "overwrite_config": False,
         "initialize_visualization": False,
         "verbose": 2
@@ -44,7 +44,7 @@ params_template = {
         "verbose": 2
     },
     "paths_videos": {
-        "directory_videos": f"/n/data1/hms/neurobio/sabatini/gyu/data/full_data/mouse_0322N/{date}/camera_data/cam4/exp/",
+        "directory_videos": dir_videos,
         "filename_videos_strMatch": "cam4.*avi",
         "depth": 1
     },
@@ -53,55 +53,55 @@ params_template = {
         "prefetch": 1,
         "posthold": 1,
         "method_getitem": "by_video",
-        "verbose": 1
+        "verbose": 1,
     },
     "Dataset_videos": {
         "contiguous": False,
         "frame_rate_clamp": None,
-        "verbose": 2
+        "verbose": 2,
     },
     "ROIs": {
         "initialize":{
             "select_mode": "file",
-            "path_file": f"/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/mouse_0322N/ROIs_prealigned/mouse_0322N__{date}/ROIs.h5",
+            "path_file": dir_ROIs,
             "verbose": 2,
         },
         "make_rois": {
             "rois_points_idx": [
                 0
             ],
-            "point_spacing": 9
+            "point_spacing": 9,
         },
     },
     "PointTracker": {
         "contiguous": False,
         "params_optical_flow": {
             "method": "lucas_kanade",
-            "mesh_rigidity": 0.015,
-            "mesh_n_neighbors": 15,
-            "relaxation": 0.0010,
+            "mesh_rigidity": 0.025,
+            "mesh_n_neighbors": 8,
+            "relaxation": 0.0015,
             "kwargs_method": {
                 "winSize": [
-                    28,
-                    28
+                    20,
+                    20,
                 ],
                 "maxLevel": 2,
                 "criteria": [
                     3,
                     2,
-                    0.03
+                    0.03,
                 ],
             }
         },
         "visualize_video": False,
         "params_visualization": {
             "alpha": 0.2,
-            "point_sizes": 2
+            "point_sizes": 2,
         },
         "params_outlier_handling": {
-            "threshold_displacement": 180,
-            "framesHalted_before": 30,
-            "framesHalted_after": 30
+            "threshold_displacement": 150,
+            "framesHalted_before": 10,
+            "framesHalted_after": 10,
         },
         "verbose": 2
     },
@@ -227,10 +227,10 @@ sbatch_config_list = \
 #SBATCH --output={path}
 #SBATCH --gres=gpu:rtx6000:1
 #SBATCH --partition=gpu_requeue
-#SBATCH -c 20
+#SBATCH -c 4
 #SBATCH -n 1
-#SBATCH --mem=48GB
-#SBATCH --time=0-03:30:00
+#SBATCH --mem=10GB
+#SBATCH --time=0-00:30:00
 
 unset XDG_RUNTIME_DIR
 
