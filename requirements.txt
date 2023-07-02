@@ -27,6 +27,7 @@ pytest
 torch
 torchvision
 torchaudio
+nvidia-ml-py3
 # --extra-index-url https://download.pytorch.org/whl/cpu
 # tox
 

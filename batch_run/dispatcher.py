@@ -45,7 +45,8 @@ params_template = {
     },
     "paths_videos": {
         "directory_videos": dir_videos,
-        "filename_videos_strMatch": "cam4.*avi",
+        # "filename_videos_strMatch": "cam4.*avi",
+        "filename_videos_strMatch": "test\.avi",
         "depth": 1
     },
     "BufferedVideoReader": {
@@ -213,7 +214,7 @@ with open(str(Path(dir_save) / 'parameters_batch.json'), 'w') as f:
 ## run batch_run function
 paths_scripts = [path_script]
 params_list = params
-max_n_jobs=1
+max_n_jobs=40
 name_save=name_job
 
 
