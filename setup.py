@@ -6,21 +6,32 @@ https://github.com/pypa/sampleproject
 
 import setuptools
 from codecs import open
-from os import path
+import os
+from pathlib import Path
 
-here = path.abspath(path.dirname(__file__))
+dir_parent = Path(__file__).parent
+
+here = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 # with open('requirements.txt', 'r') as f:
 #     requirements = f.read().splitlines()
 # print(requirements)
 
+## Get version number
+with open(str(dir_parent / "roicat" / "__init__.py"), "r") as f:
+    for line in f:
+        if line.startswith("__version__"):
+            version = line.split("=")[1].strip().replace("\"", "").replace("\'", "")
+            break
+
+
 setuptools.setup(
     name='face_rhythm',
-    version='0.1.0',
+    version=version,
 
     description="A pipeline for analysis of facial behavior using optical flow",
     long_description=long_description,

@@ -16,3 +16,4 @@ build
 .pytest_cache
 
 face_rhythm.egg-info
+dist
