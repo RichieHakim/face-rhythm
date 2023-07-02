@@ -88,17 +88,18 @@ import numpy as np
 tic_start = time.time()
 
 ## RESOURCE TRACKING
-cpu_tracker = fr.helpers.CPU_Device_Checker()
-cpu_tracker.track_utilization(
-    interval=0.2,
-    path_save=str(Path(directory_save) / 'cpu_tracker.csv'),
-)
-gpu_tracker = fr.helpers.NVIDIA_Device_Checker()
-gpu_tracker.track_utilization(
-    interval=0.2,
-    path_save=str(Path(directory_save) / 'gpu_tracker.csv'),
-)
+# cpu_tracker = fr.helpers.CPU_Device_Checker()
+# cpu_tracker.track_utilization(
+#     interval=0.2,
+#     path_save=str(Path(directory_save) / 'cpu_tracker.csv'),
+# )
+# gpu_tracker = fr.helpers.NVIDIA_Device_Checker(device_index=0)
+# gpu_tracker.track_utilization(
+#     interval=0.2,
+#     path_save=str(Path(directory_save) / 'gpu_tracker.csv'),
+# )
 
+## Initialize paths
 fr.util.get_system_versions(verbose=True);
 
 directory_project = params['project']['directory_project'] if directory_save is None else directory_save
@@ -413,5 +414,5 @@ print(f'RUN COMPLETE')
 print(f'Project directory: {directory_project}')
 print(f'Time elapsed: {time.time() - tic_start:.2f} seconds')
 
-cpu_tracker.stop_tracking()
-gpu_tracker.stop_tracking()
+# cpu_tracker.stop_tracking()
+# gpu_tracker.stop_tracking()
