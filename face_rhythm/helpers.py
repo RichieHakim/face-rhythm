@@ -7,8 +7,12 @@ import json
 from pathlib import Path
 import copy
 import re
+from typing import List, Optional, Tuple, Union
+import os
+from functools import partial
 
 import numpy as np
+import cv2
 import decord
 import torch
 from tqdm import tqdm
@@ -52,52 +56,53 @@ def prepare_cv2_imshow():
 #####################################################################################################################################
 
 def find_paths(
-    dir_outer, 
-    reMatch='filename', 
-    find_files=True, 
-    find_folders=False, 
-    depth=0, 
-    natsorted=True, 
-    alg_ns=None, 
-):
+    dir_outer: str, 
+    reMatch: str = 'filename', 
+    find_files: bool = True, 
+    find_folders: bool = False, 
+    depth: int = 0, 
+    natsorted: bool = True, 
+    alg_ns: Optional[str] = None,
+    verbose: bool = False,
+) -> List[str]:
     """
-    Search for files and/or folders recursively in a directory.
+    Searches for files and/or folders recursively in a directory using a regex
+    match. 
     RH 2022
 
     Args:
-        dir_outer (str):
-            Path to directory to search
-        reMatch (str):
-            Regular expression to match
-            Each path name encountered will be compared using
-             re.search(reMatch, filename). If the output is not None,
-             the file will be included in the output.
-        find_files (bool):
-            Whether to find files
-        find_folders (bool):
-            Whether to find folders
-        depth (int):
-            Maximum folder depth to search.
-            depth=0 means only search the outer directory.
-            depth=2 means search the outer directory and two levels
-             of subdirectories below it.
-        natsorted (bool):
-            Whether to sort the output using natural sorting
-             with the natsort package.
-        alg_ns (str):
-            Algorithm to use for natural sorting.
-            See natsort.ns or
-             https://natsort.readthedocs.io/en/4.0.4/ns_class.html
-             for options.
-            Default is PATH.
-            Other commons are INT, FLOAT, VERSION.
+        dir_outer (str): 
+            Path to directory to search.
+        reMatch (str): 
+            Regular expression to match. Each path name encountered will be
+            compared using ``re.search(reMatch, filename)``. If the output is
+            not ``None``, the file will be included in the output. (Default is
+            ``'filename'``)
+        find_files (bool): 
+            Whether to find files. (Default is ``True``)
+        find_folders (bool): 
+            Whether to find folders. (Default is ``False``)
+        depth (int): 
+            Maximum folder depth to search. (Default is *0*). \n
+            * depth=0 means only search the outer directory. 
+            * depth=2 means search the outer directory and two levels of
+              subdirectories below it
+        natsorted (bool): 
+            Whether to sort the output using natural sorting with the natsort
+            package. (Default is ``True``)
+        alg_ns (str): 
+            Algorithm to use for natural sorting. See ``natsort.ns`` or
+            https://natsort.readthedocs.io/en/4.0.4/ns_class.html/ for options.
+            Default is PATH. Other commons are INT, FLOAT, VERSION. (Default is
+            ``None``)
+        verbose (bool):
+            Whether to print the paths found. (Default is ``False``)
 
     Returns:
-        paths (List of str):
-            Paths to matched files and/or folders in the directory
+        (List[str]): 
+            paths (List[str]): 
+                Paths to matched files and/or folders in the directory.
     """
-    import re
-    import os
     import natsort
     if alg_ns is None:
         alg_ns = natsort.ns.PATH
@@ -109,12 +114,14 @@ def find_paths(
             if os.path.isdir(path):
                 if find_folders:
                     if re.search(reMatch, path) is not None:
+                        print(f'Found folder: {path}') if verbose else None
                         paths.append(path)
                 if depth < depth_end:
                     paths += get_paths_recursive_inner(path, depth_end, depth=depth+1)
             else:
                 if find_files:
                     if re.search(reMatch, path) is not None:
+                        print(f'Found file: {path}') if verbose else None
                         paths.append(path)
         return paths
 
@@ -1060,6 +1067,95 @@ class BufferedVideoReader:
         return iter(lazy_iterator())
 
 
+
+def save_gif(
+    array, 
+    path, 
+    frameRate=5.0, 
+    loop=0, 
+    backend='PIL', 
+    kwargs_backend={},
+):
+    """
+    Save an array of images as a gif.
+    RH 2023
+
+    Args:
+        array (np.ndarray or list):
+            3D (grayscale) or 4D (color) array of images.
+            - if dtype is float type then scale from 0 to 1.
+            - if dtype is integer then scale from 0 to 255.
+        path (str):
+            Path to save the gif.
+        frameRate (float):
+            Frame rate of the gif.
+        loop (int):
+            Number of times to loop the gif.
+            0 mean loop forever
+            1 mean play once
+            2 means play twice (loop once)
+            etc.
+        backend (str):
+            Which backend to use.
+            Options: 'imageio' or 'PIL'
+        kwargs_backend (dict):
+            Keyword arguments for the backend.
+    """
+    array = np.stack(array, axis=0) if isinstance(array, list) else array
+    array = grayscale_to_rgb(array) if array.ndim == 3 else array
+    if np.issubdtype(array.dtype, np.floating):
+        array = (array*255).astype('uint8')
+    
+    kwargs_backend.update({'loop': loop} if loop != 1 else {})
+
+    if backend == 'imageio':
+        import imageio
+        imageio.mimsave(
+            path, 
+            array, 
+            format='GIF',
+            duration=1000/frameRate, 
+            **kwargs_backend,
+        )
+    elif backend == 'PIL':
+        from PIL import Image
+        frames = [Image.fromarray(array[i_frame]) for i_frame in range(array.shape[0])]
+        frames[0].save(
+            path, 
+            format='GIF', 
+            append_images=frames[1:], 
+            save_all=True, 
+            duration=1000/frameRate, 
+            **kwargs_backend,
+        )
+    else:
+        raise Exception(f'Unsupported backend {backend}')
+
+
+def grayscale_to_rgb(array):
+    """
+    Convert a grayscale image (2D array) or movie (3D array) to
+     RGB (3D or 4D array).
+    RH 2023
+
+    Args:
+        array (np.ndarray or torch.Tensor or list):
+            2D or 3D array of grayscale images
+    """
+    import torch
+    if isinstance(array, list):
+        if isinstance(array[0], np.ndarray):
+            array = np.stack(array, axis=0)
+        elif isinstance(array[0], torch.Tensor):
+            array = torch.stack(array, axis=0)
+        else:
+            raise Exception(f'Failed to convert list of type {type(array[0])} to array')
+    if isinstance(array, np.ndarray):
+        return np.stack([array, array, array], axis=-1)
+    elif isinstance(array, torch.Tensor):
+        return torch.stack([array, array, array], dim=-1)
+    
+    
 ########################################################################################################################################
 ############################################################# CONVOLUTION ##############################################################
 ########################################################################################################################################
@@ -1668,6 +1764,58 @@ class VQT():
 
 
 ############################################################################################################################################################################
+#################################################################### TORCH HELPERS #########################################################################################
+############################################################################################################################################################################
+
+
+def set_device(
+    use_GPU: bool = True, 
+    device_num: int = 0, 
+    verbose: bool = True
+) -> str:
+    """
+    Sets the device for PyTorch. If a GPU is available and **use_GPU** is
+    ``True``, it will be set as the device. Otherwise, the CPU will be set as
+    the device. 
+    RH 2022
+
+    Args:
+        use_GPU (bool): 
+            Determines if the GPU should be utilized: \n
+            * ``True``: the function will attempt to use the GPU if a GPU is
+              not available.
+            * ``False``: the function will use the CPU. \n
+            (Default is ``True``)
+        device_num (int): 
+            Specifies the index of the GPU to use. (Default is ``0``)
+        verbose (bool): 
+            Determines whether to print the device information. \n
+            * ``True``: the function will print out the device information.
+            \n
+            (Default is ``True``)
+
+    Returns:
+        (str): 
+            device (str): 
+                A string specifying the device, either *"cpu"* or
+                *"cuda:<device_num>"*.
+    """
+    if use_GPU:
+        print(f'devices available: {[torch.cuda.get_device_properties(ii) for ii in range(torch.cuda.device_count())]}') if verbose else None
+        device = f"cuda:{device_num}" if torch.cuda.is_available() else "cpu"
+        if device == "cpu":
+            print("no GPU available. Using CPU.") if verbose else None
+        else:
+            print(f"Using device: '{device}': {torch.cuda.get_device_properties(device_num)}") if verbose else None
+    else:
+        device = "cpu"
+        print(f"device: '{device}'") if verbose else None
+
+    return device
+
+
+
+############################################################################################################################################################################
 ################################################################## PLOTTING HELPERS ########################################################################################
 ############################################################################################################################################################################
 
@@ -1892,13 +2040,792 @@ def add_text_to_images(images, text, position=(10,10), font_size=1, color=(255,2
         font = cv2.FONT_HERSHEY_SIMPLEX
     
     images_cp = copy.deepcopy(images)
+    for ii, im in enumerate(images_cp):
+        im = im[:,:,None] if im.ndim==2 else im
+        images_cp[ii] = im
+        
     for i_f, frame in enumerate(images_cp):
         for i_t, t in enumerate(text[i_f]):
             cv2.putText(frame, t, [position[0] , position[1] + i_t*font_size*30], font, font_size, color, line_width)
-        if show:
-            cv2.imshow('add_text_to_images', frame)
-            cv2.waitKey(int(1000/frameRate))
+            
+            if show:
+                cv2.imshow('add_text_to_images', frame)
+                cv2.waitKey(int(1000/frameRate))
     
+        for ii, im in enumerate(images_cp):
+            im = im[:,:,0] if images[ii].ndim==2 else im
+            images_cp[ii] = im
+
     if show:
         cv2.destroyWindow('add_text_to_images')
     return images_cp
+
+
+def mask_image_border(
+    im: np.ndarray, 
+    border_outer: Optional[Union[int, Tuple[int, int, int, int]]] = None, 
+    border_inner: Optional[int] = None, 
+    mask_value: float = 0,
+) -> np.ndarray:
+    """
+    Masks an image within specified outer and inner borders. RH 2022
+
+    Args:
+        im (np.ndarray):
+            Input image of shape: *(height, width)* or *(height, width,
+            channels)*.
+        border_outer (Union[int, tuple[int, int, int, int], None]):
+            Number of pixels along the border to mask. If ``None``, the border
+            is not masked. If an int is provided, all borders are equally
+            masked. If a tuple of ints is provided, borders are masked in the
+            order: *(top, bottom, left, right)*. (Default is ``None``)
+        border_inner (int, Optional):
+            Number of pixels in the center to mask. Will be a square with side
+            length equal to this value. (Default is ``None``)
+        mask_value (float):
+            Value to replace the masked pixels with. (Default is *0*)
+
+    Returns:
+        (np.ndarray):
+            im_out (np.ndarray):
+                Masked output image.
+    """
+
+    ## Find the center of the image
+    height, width = im.shape[:2]
+    center_y = cy = int(np.floor(height/2))
+    center_x = cx = int(np.floor(width/2))
+
+    ## Mask the center
+    if border_inner is not None:
+        ## make edge_lengths
+        center_edge_length = cel = int(np.ceil(border_inner/2)) if border_inner is not None else 0
+        im[cy-cel:cy+cel, cx-cel:cx+cel] = mask_value
+    ## Mask the border
+    if border_outer is not None:
+        ## make edge_lengths
+        if isinstance(border_outer, int):
+            border_outer = (border_outer, border_outer, border_outer, border_outer)
+        
+        im[:border_outer[0], :] = mask_value
+        im[-border_outer[1]:, :] = mask_value
+        im[:, :border_outer[2]] = mask_value
+        im[:, -border_outer[3]:] = mask_value
+
+    return im
+
+
+def find_geometric_transformation(
+    im_template: np.ndarray, 
+    im_moving: np.ndarray,
+    warp_mode: str = 'euclidean',
+    n_iter: int = 5000,
+    termination_eps: float = 1e-10,
+    mask: Optional[np.ndarray] = None,
+    gaussFiltSize: int = 1
+) -> np.ndarray:
+    """
+    Find the transformation between two images.
+    Wrapper function for cv2.findTransformECC
+    RH 2022
+
+    Args:
+        im_template (np.ndarray):
+            Template image. The dtype must be either ``np.uint8`` or ``np.float32``.
+        im_moving (np.ndarray):
+            Moving image. The dtype must be either ``np.uint8`` or ``np.float32``.
+        warp_mode (str):
+            Warp mode. \n
+            * 'translation': Sets a translational motion model; warpMatrix is 2x3 with the first 2x2 part being the unity matrix and the rest two parameters being estimated.
+            * 'euclidean':   Sets a Euclidean (rigid) transformation as motion model; three parameters are estimated; warpMatrix is 2x3.
+            * 'affine':      Sets an affine motion model; six parameters are estimated; warpMatrix is 2x3. (Default)
+            * 'homography':  Sets a homography as a motion model; eight parameters are estimated;`warpMatrix` is 3x3.
+        n_iter (int):
+            Number of iterations. (Default is *5000*)
+        termination_eps (float):
+            Termination epsilon. This is the threshold of the increment in the correlation coefficient between two iterations. (Default is *1e-10*)
+        mask (np.ndarray):
+            Binary mask. Regions where mask is zero are ignored during the registration. If ``None``, no mask is used. (Default is ``None``)
+        gaussFiltSize (int):
+            Gaussian filter size. If *0*, no gaussian filter is used. (Default is *1*)
+
+    Returns:
+        (np.ndarray): 
+            warp_matrix (np.ndarray):
+                Warp matrix. See cv2.findTransformECC for more info. Can be
+                applied using cv2.warpAffine or cv2.warpPerspective.
+    """
+    LUT_modes = {
+        'translation': cv2.MOTION_TRANSLATION,
+        'euclidean': cv2.MOTION_EUCLIDEAN,
+        'affine': cv2.MOTION_AFFINE,
+        'homography': cv2.MOTION_HOMOGRAPHY,
+    }
+    assert warp_mode in LUT_modes.keys(), f"warp_mode must be one of {LUT_modes.keys()}. Got {warp_mode}"
+    warp_mode = LUT_modes[warp_mode]
+    if warp_mode in [cv2.MOTION_TRANSLATION, cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE]:
+        shape_eye = (2, 3)
+    elif warp_mode == cv2.MOTION_HOMOGRAPHY:
+        shape_eye = (3, 3)
+    else:
+        raise ValueError(f"warp_mode {warp_mode} not recognized (should not happen)")
+    warp_matrix = np.eye(*shape_eye, dtype=np.float32)
+
+    ## assert that the inputs are numpy arrays of dtype np.uint8
+    assert isinstance(im_template, np.ndarray) and (im_template.dtype == np.uint8 or im_template.dtype == np.float32), f"im_template must be a numpy array of dtype np.uint8 or np.float32. Got {type(im_template)} of dtype {im_template.dtype}"
+    assert isinstance(im_moving, np.ndarray) and (im_moving.dtype == np.uint8 or im_moving.dtype == np.float32), f"im_moving must be a numpy array of dtype np.uint8 or np.float32. Got {type(im_moving)} of dtype {im_moving.dtype}"
+    ## cast mask to bool then to uint8
+    if mask is not None:
+        assert isinstance(mask, np.ndarray), f"mask must be a numpy array. Got {type(mask)}"
+        if np.issubdtype(mask.dtype, np.bool_) or np.issubdtype(mask.dtype, np.uint8):
+            pass
+        else:
+            mask = (mask != 0).astype(np.uint8)
+    
+    ## make gaussFiltSize odd
+    gaussFiltSize = int(np.ceil(gaussFiltSize))
+    gaussFiltSize = gaussFiltSize + (gaussFiltSize % 2 == 0)
+
+    criteria = (
+        cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,
+        n_iter,
+        termination_eps,
+    )
+    # Run the ECC algorithm. The results are stored in warp_matrix.
+    (cc, warp_matrix) = cv2.findTransformECC(
+        templateImage=im_template, 
+        inputImage=im_moving, 
+        warpMatrix=warp_matrix,
+        motionType=warp_mode, 
+        criteria=criteria, 
+        inputMask=mask, 
+        gaussFiltSize=gaussFiltSize
+    )
+    return warp_matrix
+
+def apply_warp_transform(
+    im_in: np.ndarray,
+    warp_matrix: np.ndarray,
+    interpolation_method: int = cv2.INTER_LINEAR, 
+    borderMode: int = cv2.BORDER_CONSTANT, 
+    borderValue: int = 0
+) -> np.ndarray:
+    """
+    Apply a warp transform to an image. 
+    Wrapper function for ``cv2.warpAffine`` and ``cv2.warpPerspective``. 
+    RH 2022
+
+    Args:
+        im_in (np.ndarray): 
+            Input image with any dimensions.
+        warp_matrix (np.ndarray): 
+            Warp matrix. Shape should be *(2, 3)* for affine transformations,
+            and *(3, 3)* for homography. See ``cv2.findTransformECC`` for more
+            info.
+        interpolation_method (int): 
+            Interpolation method. See ``cv2.warpAffine`` for more info. (Default
+            is ``cv2.INTER_LINEAR``)
+        borderMode (int): 
+            Border mode. Determines how to handle pixels from outside the image
+            boundaries. See ``cv2.warpAffine`` for more info. (Default is
+            ``cv2.BORDER_CONSTANT``)
+        borderValue (int): 
+            Value to use for border pixels if borderMode is set to
+            ``cv2.BORDER_CONSTANT``. (Default is *0*)
+
+    Returns:
+        (np.ndarray): 
+            im_out (np.ndarray): 
+                Transformed output image with the same dimensions as the input
+                image.
+    """
+    if warp_matrix.shape == (2, 3):
+        im_out = cv2.warpAffine(
+            src=im_in,
+            M=warp_matrix,
+            dsize=(im_in.shape[1], im_in.shape[0]),
+            dst=copy.copy(im_in),
+            flags=interpolation_method + cv2.WARP_INVERSE_MAP,
+            borderMode=borderMode,
+            borderValue=borderValue
+        )
+        
+    elif warp_matrix.shape == (3, 3):
+        im_out = cv2.warpPerspective(
+            src=im_in,
+            M=warp_matrix,
+            dsize=(im_in.shape[1], im_in.shape[0]), 
+            dst=copy.copy(im_in), 
+            flags=interpolation_method + cv2.WARP_INVERSE_MAP, 
+            borderMode=borderMode, 
+            borderValue=borderValue
+        )
+
+    else:
+        raise ValueError(f"warp_matrix.shape {warp_matrix.shape} not recognized. Must be (2, 3) or (3, 3)")
+    
+    return im_out
+
+
+def warp_matrix_to_remappingIdx(
+    warp_matrix: Union[np.ndarray, torch.Tensor], 
+    x: int, 
+    y: int
+) -> Union[np.ndarray, torch.Tensor]:
+    """
+    Convert a warp matrix (2x3 or 3x3) into remapping indices (2D). 
+    RH 2023
+    
+    Args:
+        warp_matrix (Union[np.ndarray, torch.Tensor]): 
+            Warp matrix of shape *(2, 3)* for affine transformations, and *(3,
+            3)* for homography.
+        x (int): 
+            Width of the desired remapping indices.
+        y (int): 
+            Height of the desired remapping indices.
+        
+    Returns:
+        (Union[np.ndarray, torch.Tensor]): 
+            remapIdx (Union[np.ndarray, torch.Tensor]): 
+                Remapping indices of shape *(x, y, 2)* representing the x and y
+                displacements in pixels.
+    """
+    assert warp_matrix.shape in [(2, 3), (3, 3)], f"warp_matrix.shape {warp_matrix.shape} not recognized. Must be (2, 3) or (3, 3)"
+    assert isinstance(x, int) and isinstance(y, int), f"x and y must be integers"
+    assert x > 0 and y > 0, f"x and y must be positive"
+
+    if isinstance(warp_matrix, torch.Tensor):
+        stack, meshgrid, arange, hstack, ones, float32, array = torch.stack, torch.meshgrid, torch.arange, torch.hstack, torch.ones, torch.float32, torch.as_tensor
+        stack_partial = lambda x: stack(x, dim=0)
+    elif isinstance(warp_matrix, np.ndarray):
+        stack, meshgrid, arange, hstack, ones, float32, array = np.stack, np.meshgrid, np.arange, np.hstack, np.ones, np.float32, np.array
+        stack_partial = lambda x: stack(x, axis=0)
+    else:
+        raise ValueError(f"warp_matrix must be a torch.Tensor or np.ndarray")
+
+    # create the grid
+    mesh = stack_partial(meshgrid(arange(x, dtype=float32), arange(y, dtype=float32)))
+    mesh_coords = hstack((mesh.reshape(2,-1).T, ones((x*y, 1), dtype=float32)))
+    
+    # warp the grid
+    mesh_coords_warped = (mesh_coords @ warp_matrix.T)
+    mesh_coords_warped = mesh_coords_warped[:, :2] / mesh_coords_warped[:, 2:3] if warp_matrix.shape == (3, 3) else mesh_coords_warped  ## if homography, divide by z
+    
+    # reshape the warped grid
+    remapIdx = mesh_coords_warped.T.reshape(2, y, x)
+
+    # permute the axes to (x, y, 2)
+    remapIdx = remapIdx.permute(1, 2, 0) if isinstance(warp_matrix, torch.Tensor) else remapIdx.transpose(1, 2, 0)
+
+    return remapIdx
+
+
+def remap_images(
+    images: Union[np.ndarray, torch.Tensor],
+    remappingIdx: Union[np.ndarray, torch.Tensor],
+    backend: str = "torch",
+    interpolation_method: str = 'linear',
+    border_mode: str = 'constant',
+    border_value: float = 0,
+    device: str = 'cpu',
+) -> Union[np.ndarray, torch.Tensor]:
+    """
+    Applies remapping indices to a set of images. Remapping indices, similar to
+    flow fields, describe the index of the pixel to sample from rather than the
+    displacement of each pixel. RH 2023
+
+    Args:
+        images (Union[np.ndarray, torch.Tensor]): 
+            The images to be warped. Shapes can be *(N, C, H, W)*, *(C, H, W)*,
+            or *(H, W)*.
+        remappingIdx (Union[np.ndarray, torch.Tensor]): 
+            The remapping indices, describing the index of the pixel to sample
+            from. Shape is *(H, W, 2)*.
+        backend (str): 
+            The backend to use. Can be either ``'torch'`` or ``'cv2'``. (Default
+            is ``'torch'``)
+        interpolation_method (str): 
+            The interpolation method to use. Options are ``'linear'``,
+            ``'nearest'``, ``'cubic'``, and ``'lanczos'``. Refer to `cv2.remap`
+            or `torch.nn.functional.grid_sample` for more details. (Default is
+            ``'linear'``)
+        border_mode (str): 
+            The border mode to use. Options include ``'constant'``,
+            ``'reflect'``, ``'replicate'``, and ``'wrap'``. Refer to `cv2.remap`
+            for more details. (Default is ``'constant'``)
+        border_value (float): 
+            The border value to use. Refer to `cv2.remap` for more details.
+            (Default is ``0``)
+        device (str):
+            The device to use for computations. Commonly either ``'cpu'`` or
+            ``'gpu'``. (Default is ``'cpu'``)
+
+    Returns:
+        (Union[np.ndarray, torch.Tensor]):
+            warped_images (Union[np.ndarray, torch.Tensor]):
+                The warped images. The shape will be the same as the input
+                images, which can be *(N, C, H, W)*, *(C, H, W)*, or *(H, W)*.
+    """
+    # Check inputs
+    assert isinstance(images, (np.ndarray, torch.Tensor)), f"images must be a np.ndarray or torch.Tensor"
+    assert isinstance(remappingIdx, (np.ndarray, torch.Tensor)), f"remappingIdx must be a np.ndarray or torch.Tensor"
+    if images.ndim == 2:
+        images = images[None, None, :, :]
+    elif images.ndim == 3:
+        images = images[None, :, :, :]
+    elif images.ndim != 4:
+        raise ValueError(f"images must be a 2D, 3D, or 4D array. Got shape {images.shape}")
+    assert remappingIdx.ndim == 3, f"remappingIdx must be a 3D array of shape (H, W, 2). Got shape {remappingIdx.shape}"
+    assert images.shape[-2] == remappingIdx.shape[0], f"images H ({images.shape[-2]}) must match remappingIdx H ({remappingIdx.shape[0]})"
+    assert images.shape[-1] == remappingIdx.shape[1], f"images W ({images.shape[-1]}) must match remappingIdx W ({remappingIdx.shape[1]})"
+
+    # Check backend
+    if backend not in ["torch", "cv2"]:
+        raise ValueError("Invalid backend. Supported backends are 'torch' and 'cv2'.")
+    if backend == 'torch':
+        if isinstance(images, np.ndarray):
+            images = torch.as_tensor(images, device=device, dtype=torch.float32)
+        elif isinstance(images, torch.Tensor):
+            images = images.to(device=device).type(torch.float32)
+        if isinstance(remappingIdx, np.ndarray):
+            remappingIdx = torch.as_tensor(remappingIdx, device=device, dtype=torch.float32)
+        elif isinstance(remappingIdx, torch.Tensor):
+            remappingIdx = remappingIdx.to(device=device).type(torch.float32)
+        interpolation = {
+            'linear': 'bilinear',
+            'nearest': 'nearest',
+            'cubic': 'bicubic',
+            'lanczos': 'lanczos',
+        }[interpolation_method]
+        border = {
+            'constant': 'zeros',
+            'reflect': 'reflection',
+            'replicate': 'replication',
+            'wrap': 'circular',
+        }[border_mode]
+        ## Convert remappingIdx to normalized grid
+        normgrid = cv2RemappingIdx_to_pytorchFlowField(remappingIdx)
+
+        # Apply remappingIdx
+        warped_images = torch.nn.functional.grid_sample(
+            images, 
+            normgrid[None,...],
+            mode=interpolation, 
+            padding_mode=border, 
+            align_corners=True,  ## align_corners=True is the default in cv2.remap. See documentation for details.
+        )
+
+    elif backend == 'cv2':
+        assert isinstance(images, np.ndarray), f"images must be a np.ndarray when using backend='cv2'"
+        assert isinstance(remappingIdx, np.ndarray), f"remappingIdx must be a np.ndarray when using backend='cv2'"
+        ## convert to float32 if not uint8
+        images = images.astype(np.float32) if images.dtype != np.uint8 else images
+        remappingIdx = remappingIdx.astype(np.float32) if remappingIdx.dtype != np.uint8 else remappingIdx
+
+        interpolation = {
+            'linear': cv2.INTER_LINEAR,
+            'nearest': cv2.INTER_NEAREST,
+            'cubic': cv2.INTER_CUBIC,
+            'lanczos': cv2.INTER_LANCZOS4,
+        }[interpolation_method]
+        borderMode = {
+            'constant': cv2.BORDER_CONSTANT,
+            'reflect': cv2.BORDER_REFLECT,
+            'replicate': cv2.BORDER_REPLICATE,
+            'wrap': cv2.BORDER_WRAP,
+        }[border_mode]
+
+        # Apply remappingIdx
+        def remap(ims):
+            out = np.stack([cv2.remap(
+                im,
+                remappingIdx[..., 0], 
+                remappingIdx[..., 1], 
+                interpolation=interpolation, 
+                borderMode=borderMode, 
+                borderValue=border_value,
+            ) for im in ims], axis=0)
+            return out
+        warped_images = np.stack([remap(im) for im in images], axis=0)
+
+    return warped_images.squeeze()
+
+
+def invert_remappingIdx(
+    remappingIdx: np.ndarray, 
+    method: str = 'linear', 
+    fill_value: Optional[float] = np.nan
+) -> np.ndarray:
+    """
+    Inverts a remapping index field.
+
+    Requires the assumption that the remapping index field is invertible or bijective/one-to-one and non-occluding.
+    Defined 'remap_AB' as a remapping index field that warps image A onto image B, then 'remap_BA' is the remapping index field that warps image B onto image A. This function computes 'remap_BA' given 'remap_AB'.
+
+    RH 2023
+
+    Args:
+        remappingIdx (np.ndarray): 
+            An array of shape *(H, W, 2)* representing the remap field.
+        method (str):
+            Interpolation method to use. See ``scipy.interpolate.griddata``. Options are:
+            \n
+            * ``'linear'``
+            * ``'nearest'``
+            * ``'cubic'`` \n
+            (Default is ``'linear'``)
+        fill_value (Optional[float]):
+            Value used to fill points outside the convex hull. 
+            (Default is ``np.nan``)
+
+    Returns:
+        (np.ndarray): 
+                An array of shape *(H, W, 2)* representing the inverse remap field.
+    """
+    H, W, _ = remappingIdx.shape
+    
+    # Create the meshgrid of the original image
+    grid = np.mgrid[:H, :W][::-1].transpose(1,2,0).reshape(-1, 2)
+    
+    # Flatten the original meshgrid and remappingIdx
+    remapIdx_flat = remappingIdx.reshape(-1, 2)
+    
+    # Interpolate the inverse mapping using griddata
+    map_BA = scipy.interpolate.griddata(
+        points=remapIdx_flat, 
+        values=grid, 
+        xi=grid, 
+        method=method,
+        fill_value=fill_value,
+    ).reshape(H,W,2)
+    
+    return map_BA
+
+def invert_warp_matrix(
+    warp_matrix: np.ndarray
+) -> np.ndarray:
+    """
+    Inverts a provided warp matrix for the transformation A->B to compute the
+    warp matrix for B->A.
+    RH 2023
+
+    Args:
+        warp_matrix (np.ndarray): 
+            A 2x3 or 3x3 array representing the warp matrix. Shape: *(2, 3)* or
+            *(3, 3)*.
+
+    Returns:
+        (np.ndarray): 
+            inverted_warp_matrix (np.ndarray):
+                The inverted warp matrix. Shape: same as input.
+    """
+    if warp_matrix.shape == (2, 3):
+        # Convert 2x3 affine warp matrix to 3x3 by appending [0, 0, 1] as the last row
+        warp_matrix_3x3 = np.vstack((warp_matrix, np.array([0, 0, 1])))
+    elif warp_matrix.shape == (3, 3):
+        warp_matrix_3x3 = warp_matrix
+    else:
+        raise ValueError("Input warp_matrix must be of shape (2, 3) or (3, 3)")
+
+    # Compute the inverse of the 3x3 warp matrix
+    inverted_warp_matrix_3x3 = np.linalg.inv(warp_matrix_3x3)
+
+    if warp_matrix.shape == (2, 3):
+        # Convert the inverted 3x3 warp matrix back to 2x3 by removing the last row
+        inverted_warp_matrix = inverted_warp_matrix_3x3[:2, :]
+    else:
+        inverted_warp_matrix = inverted_warp_matrix_3x3
+
+    return inverted_warp_matrix
+
+
+def compose_remappingIdx(
+    remap_AB: np.ndarray,
+    remap_BC: np.ndarray,
+    method: str = 'linear',
+    fill_value: Optional[float] = np.nan,
+    bounds_error: bool = False,
+) -> np.ndarray:
+    """
+    Composes two remapping index fields using scipy.interpolate.interpn.
+    
+    This function computes 'remap_AC' from 'remap_AB' and 'remap_BC', where
+    'remap_AB' is a remapping index field that warps image A onto image B, and
+    'remap_BC' is a remapping index field that warps image B onto image C.
+    
+    RH 2023
+
+    Args:
+        remap_AB (np.ndarray): 
+            An array of shape *(H, W, 2)* representing the remap field from
+            image A to image B.
+        remap_BC (np.ndarray): 
+            An array of shape *(H, W, 2)* representing the remap field from
+            image B to image C.
+        method (str): 
+            Interpolation method to use. Either \n
+            * ``'linear'``: Use linear interpolation (default).
+            * ``'nearest'``: Use nearest interpolation.
+            * ``'cubic'``: Use cubic interpolation.
+        fill_value (Optional[float]): 
+            The value used for points outside the interpolation domain. (Default
+            is ``np.nan``)
+        bounds_error (bool):
+            If ``True``, a ValueError is raised when interpolated values are
+            requested outside of the domain of the input data. (Default is
+            ``False``)
+    
+    Returns:
+        (np.ndarray): 
+            remap_AC (np.ndarray): 
+                An array of shape *(H, W, 2)* representing the remap field from
+                image A to image C.
+    """
+    # Get the shape of the remap fields
+    H, W, _ = remap_AB.shape
+    
+    # Combine the x and y components of remap_AB into a complex number
+    # This is done to simplify the interpolation process
+    AB_complex = remap_AB[:,:,0] + remap_AB[:,:,1]*1j
+
+    # Perform the interpolation using interpn
+    AC = scipy.interpolate.interpn(
+        (np.arange(H), np.arange(W)), 
+        AB_complex, 
+        remap_BC.reshape(-1, 2)[:, ::-1], 
+        method=method, 
+        bounds_error=bounds_error, 
+        fill_value=fill_value
+    ).reshape(H, W)
+
+    # Split the real and imaginary parts of the interpolated result to get the x and y components
+    remap_AC = np.stack((AC.real, AC.imag), axis=-1)
+
+    return remap_AC
+
+
+def compose_transform_matrices(
+    matrix_AB: np.ndarray, 
+    matrix_BC: np.ndarray,
+) -> np.ndarray:
+    """
+    Composes two transformation matrices to create a transformation from one
+    image to another. RH 2023
+    
+    This function is used to combine two transformation matrices, 'matrix_AB'
+    and 'matrix_BC'. 'matrix_AB' represents a transformation that warps an image
+    A onto an image B. 'matrix_BC' represents a transformation that warps image
+    B onto image C. The result is 'matrix_AC', a transformation matrix that
+    would warp image A directly onto image C.
+    
+    Args:
+        matrix_AB (np.ndarray): 
+            A transformation matrix from image A to image B. The array can have
+            the shape *(2, 3)* or *(3, 3)*.
+        matrix_BC (np.ndarray): 
+            A transformation matrix from image B to image C. The array can have
+            the shape *(2, 3)* or *(3, 3)*.
+
+    Returns:
+        (np.ndarray): 
+            matrix_AC (np.ndarray):
+                A composed transformation matrix from image A to image C. The
+                array has the shape *(2, 3)* or *(3, 3)*.
+
+    Raises:
+        AssertionError: 
+            If the input matrices do not have the shape *(2, 3)* or *(3, 3)*.
+
+    Example:
+        .. highlight:: python
+        .. code-block:: python
+
+            # Define the transformation matrices
+            matrix_AB = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+            matrix_BC = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+            # Compose the transformation matrices
+            matrix_AC = compose_transform_matrices(matrix_AB, matrix_BC)
+    """
+    assert matrix_AB.shape in [(2, 3), (3, 3)], "Matrix AB must be of shape (2, 3) or (3, 3)."
+    assert matrix_BC.shape in [(2, 3), (3, 3)], "Matrix BC must be of shape (2, 3) or (3, 3)."
+
+    # If the input matrices are (2, 3), extend them to (3, 3) by adding a row [0, 0, 1]
+    if matrix_AB.shape == (2, 3):
+        matrix_AB = np.vstack((matrix_AB, [0, 0, 1]))
+    if matrix_BC.shape == (2, 3):
+        matrix_BC = np.vstack((matrix_BC, [0, 0, 1]))
+
+    # Compute the product of the extended matrices
+    matrix_AC = matrix_AB @ matrix_BC
+
+    # If the resulting matrix is (3, 3) and has the last row [0, 0, 1], convert it back to a (2, 3) matrix
+    if (matrix_AC.shape == (3, 3)) and np.allclose(matrix_AC[2], [0, 0, 1]):
+        matrix_AC = matrix_AC[:2, :]
+
+    return matrix_AC
+
+
+def _make_idx_grid(
+    im: Union[np.ndarray, object],
+) -> Union[np.ndarray, object]:
+    """
+    Helper function to make a grid of indices for an image. Used in
+    ``flowField_to_remappingIdx`` and ``remappingIdx_to_flowField``.
+
+    Args:
+        im (Union[np.ndarray, object]): 
+            An image represented as a numpy ndarray or torch Tensor.
+
+    Returns:
+        (Union[np.ndarray, object]):
+            idx_grid (Union[np.ndarray, object]):
+                Index grid for the given image.
+    """
+    if isinstance(im, torch.Tensor):
+        stack, meshgrid, arange = partial(torch.stack, dim=-1), partial(torch.meshgrid, indexing='xy'), partial(torch.arange, device=im.device, dtype=im.dtype)
+    elif isinstance(im, np.ndarray):
+        stack, meshgrid, arange = partial(np.stack, axis=-1), partial(np.meshgrid, indexing='xy'), partial(np.arange, dtype=im.dtype)
+    return stack(meshgrid(arange(im.shape[1]), arange(im.shape[0]))) # (H, W, 2). Last dimension is (x, y).
+def flowField_to_remappingIdx(
+    ff: Union[np.ndarray, object],
+) -> Union[np.ndarray, object]:
+    """
+    Convert a flow field to a remapping index. **WARNING**: Technically, it is
+    not possible to convert a flow field to a remapping index, since the
+    remapping index describes an interpolation mapping, while the flow field
+    describes a displacement.
+    RH 2023
+
+    Args:
+        ff (Union[np.ndarray, object]): 
+            Flow field represented as a numpy ndarray or torch Tensor. 
+            It describes the displacement of each pixel. 
+            Shape *(H, W, 2)*. Last dimension is *(x, y)*.
+
+    Returns:
+        (Union[np.ndarray, object]): 
+            ri (Union[np.ndarray, object]):
+                Remapping index. It describes the index of the pixel in 
+                the original image that should be mapped to the new pixel. 
+                Shape *(H, W, 2)*.
+    """
+    ri = ff + _make_idx_grid(ff)
+    return ri
+def remappingIdx_to_flowField(
+    ri: Union[np.ndarray, object],
+) -> Union[np.ndarray, object]:
+    """
+    Convert a remapping index to a flow field. **WARNING**: Technically, it is
+    not possible to convert a remapping index to a flow field, since the
+    remapping index describes an interpolation mapping, while the flow field
+    describes a displacement.
+    RH 2023
+
+    Args:
+        ri (Union[np.ndarray, object]): 
+            Remapping index represented as a numpy ndarray or torch Tensor. 
+            It describes the index of the pixel in the original image that 
+            should be mapped to the new pixel. Shape *(H, W, 2)*. Last 
+            dimension is *(x, y)*.
+
+    Returns:
+        (Union[np.ndarray, object]): 
+            ff (Union[np.ndarray, object]):
+                Flow field. It describes the displacement of each pixel. 
+                Shape *(H, W, 2)*.
+    """
+    ff = ri - _make_idx_grid(ri)
+    return ff
+def cv2RemappingIdx_to_pytorchFlowField(
+    ri: Union[np.ndarray, torch.Tensor]
+) -> Union[np.ndarray, torch.Tensor]:
+    """
+    Converts remapping indices from the OpenCV format to the PyTorch format. In
+    the OpenCV format, the displacement is in pixels relative to the top left
+    pixel of the image. In the PyTorch format, the displacement is in pixels
+    relative to the center of the image. RH 2023
+
+    Args:
+        ri (Union[np.ndarray, torch.Tensor]): 
+            Remapping indices. Each pixel describes the index of the pixel in
+            the original image that should be mapped to the new pixel. Shape:
+            *(H, W, 2)*. The last dimension is (x, y).
+        
+    Returns:
+        (Union[np.ndarray, torch.Tensor]): 
+            normgrid (Union[np.ndarray, torch.Tensor]): 
+                "Flow field", in the PyTorch format. Technically not a flow
+                field, since it doesn't describe displacement. Rather, it is a
+                remapping index relative to the center of the image. Shape: *(H,
+                W, 2)*. The last dimension is (x, y).
+    """
+    assert isinstance(ri, torch.Tensor), f"ri must be a torch.Tensor. Got {type(ri)}"
+    im_shape = torch.flipud(torch.as_tensor(ri.shape[:2], dtype=torch.float32, device=ri.device))  ## (W, H)
+    normgrid = ((ri / (im_shape[None, None, :] - 1)) - 0.5) * 2  ## PyTorch's grid_sample expects grid values in [-1, 1] because it's a relative offset from the center pixel. CV2's remap expects grid values in [0, 1] because it's an absolute offset from the top-left pixel.
+    ## note also that pytorch's grid_sample expects align_corners=True to correspond to cv2's default behavior.
+    return normgrid
+
+def remap_points(
+    points: np.ndarray, 
+    remappingIdx: np.ndarray,
+    interpolation: str = 'linear',
+    fill_value: float = None,
+) -> np.ndarray:
+    """
+    Remaps a set of points using an index map.
+
+    Args:
+        points (np.ndarray): 
+            Array of points to be remapped. It should be a 2D array with the
+            shape *(n_points, 2)*, where each point is represented by a pair of
+            floating point coordinates within the image.
+        remappingIdx (np.ndarray): 
+            Index map for the remapping. It should be a 3D array with the shape
+            *(height, width, 2)*. The data type should be a floating point
+            subtype.
+        interpolation (str):
+            Interpolation method to use.
+            See scipy.interpolate.RegularGridInterpolator. Can be:
+                * ``'linear'``
+                * ``'nearest'``
+                * ``'slinear'``
+                * ``'cubic'``
+                * ``'quintic'``
+                * ``'pchip'``
+        fill_value (float, optional):
+            Value used to fill points outside the convex hull. If ``None``, values
+            outside the convex hull are extrapolated.
+
+    Returns:
+        (np.ndarray): 
+            points_remap (np.ndarray): 
+                Remapped points array. It has the same shape as the input.
+    """
+    ### Assert points is a 2D numpy.ndarray of shape (n_points, 2) and that all points are within the image and that points are float
+    assert isinstance(points, np.ndarray), 'points must be a numpy.ndarray'
+    assert points.ndim == 2, 'points must be a 2D numpy.ndarray'
+    assert points.shape[1] == 2, 'points must be of shape (n_points, 2)'
+    assert np.issubdtype(points.dtype, np.floating), 'points must be a float subtype'
+
+    assert isinstance(remappingIdx, np.ndarray), 'remappingIdx must be a numpy.ndarray'
+    assert remappingIdx.ndim == 3, 'remappingIdx must be a 3D numpy.ndarray'
+    assert remappingIdx.shape[2] == 2, 'remappingIdx must be of shape (height, width, 2)'
+    assert np.issubdtype(remappingIdx.dtype, np.floating), 'remappingIdx must be a float subtype'
+
+    ## Make grid of indices for image remapping
+    dims = remappingIdx.shape
+    x_arange, y_arange = np.arange(0., dims[1]).astype(np.float32), np.arange(0., dims[0]).astype(np.float32)
+
+    ## Use RegularGridInterpolator to remap points
+    warper = scipy.interpolate.RegularGridInterpolator(
+        points=(y_arange, x_arange),
+        values=remappingIdx,
+        method=interpolation,
+        bounds_error=False,
+        fill_value=fill_value,
+    )
+    points_remap = warper(xi=(points[:, 1], points[:, 0]))
+
+    return points_remap

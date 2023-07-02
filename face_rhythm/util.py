@@ -661,19 +661,14 @@ class Image_Saver(Saver_Viz_Base):
         
         ## Validate inputs
         assert isinstance(array_images, list), "FR ERROR: array_images must be a list"
-        array_images = [self._prepare_array_image(a) for a in array_images]
-
-        kwargs_PIL_save['duration'] = 1000 / frame_rate
-        if isinstance(loop, bool):
-            loop = 0 if loop else None
-        else:
-            assert isinstance(loop, int), "FR ERROR: loop must be a bool or int. If int, then 0==loop forever, n==loop n times."
-        if loop is not None:
-            kwargs_PIL_save['loop'] = loop
-        else:
-            kwargs_PIL_save.pop('loop') if 'loop' in kwargs_PIL_save else None
         
         kwargs_PIL_save['optimize'] = optimize
+
+        kwargs_method = {
+            'frame_rate': frame_rate,
+            'loop': loop,
+            'kwargs_PIL_save': kwargs_PIL_save,
+        }
 
         ## Save gif
         for format_save in formats_save:
@@ -681,7 +676,7 @@ class Image_Saver(Saver_Viz_Base):
                 name_save=name_save,
                 obj_save=array_images,
                 fn_save=self._fn_save_gif,
-                kwargs_method=kwargs_PIL_save,
+                kwargs_method=kwargs_method,
                 format_save=format_save,
             )
 
@@ -703,14 +698,15 @@ class Image_Saver(Saver_Viz_Base):
         Converts a list of 3D numpy.ndarrays with shape[-1] == 3 or 1 to a PIL.Image
          and saves it.
         """
-        obj_save = [PIL.Image.fromarray(a, mode='RGB') if a.shape[-1] == 3 else PIL.Image.fromarray(a, mode='L') for a in obj_save]
-        obj_save[0].save(
-            path_save,
-            save_all=True,
-            append_images=obj_save[1:],
-            format='GIF',
-            **kwargs_method,
+        helpers.save_gif(
+            array=obj_save, 
+            path=path_save, 
+            frameRate=kwargs_method['frame_rate'],
+            loop=kwargs_method['loop'],
+            backend='PIL',
+            kwargs_backend=kwargs_method['kwargs_PIL_save'],
         )
+
         
     
     def _prepare_array_image(self, array_image):
@@ -738,7 +734,7 @@ class Image_Saver(Saver_Viz_Base):
 
         return array_image
 
-
+    
 
 def get_system_versions(verbose=False):
     """
