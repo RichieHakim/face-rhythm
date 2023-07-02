@@ -28,6 +28,9 @@ torch
 torchvision
 torchaudio
 nvidia-ml-py3
+py-cpuinfo
+GPUtil
+psutil
 # --extra-index-url https://download.pytorch.org/whl/cpu
 # tox
 

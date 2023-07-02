@@ -3,8 +3,8 @@ from pathlib import Path
 
 from datetime import datetime
 
-from .helpers import prepare_cv2_imshow
-from .util import get_system_versions
+from . import helpers, util
+
 
 def prepare_project(
     directory_project='./',
@@ -45,7 +45,7 @@ def prepare_project(
     """
     ## initialize cv2.imshow
     print('Initializing cv2.imshow') if verbose > 1 else None
-    prepare_cv2_imshow() if initialize_visualization else None
+    helpers.prepare_cv2_imshow() if initialize_visualization else None
 
     def _create_config_file():
         """
@@ -55,7 +55,7 @@ def prepare_project(
             'general': {
                 'date_created': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'date_modified': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'system_versions': get_system_versions(),
+                'system_versions': util.system_info(),
                 'path_created': path_config,
             },
             'paths': {

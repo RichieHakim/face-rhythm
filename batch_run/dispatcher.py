@@ -45,8 +45,8 @@ params_template = {
     },
     "paths_videos": {
         "directory_videos": dir_videos,
-        "filename_videos_strMatch": "cam4.*avi",
-        # "filename_videos_strMatch": "test\.avi",
+        # "filename_videos_strMatch": "cam4.*avi",
+        "filename_videos_strMatch": "test\.avi",
         "depth": 1
     },
     "BufferedVideoReader": {
@@ -226,12 +226,11 @@ sbatch_config_list = \
 [f"""#!/usr/bin/bash
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
-#SBATCH --gres=gpu:1,vram:23G
-#SBATCH --partition=gpu
+#SBATCH --partition=short
 #SBATCH -c 20
 #SBATCH -n 1
-#SBATCH --mem=36GB
-#SBATCH --time=0-02:30:00
+#SBATCH --mem=8GB
+#SBATCH --time=0-04:00:00
 
 unset XDG_RUNTIME_DIR
 
@@ -249,8 +248,8 @@ echo "starting job"
 python "$@"
 """ for path in paths_log]
 
-#SBATCH --gres=gpu:rtx6000:1
-#SBATCH --partition=gpu_requeue
+# SBATCH --gres=gpu:1,vram:23G
+# SBATCH --partition=gpu_requeue
 
 
 util.batch_run(
