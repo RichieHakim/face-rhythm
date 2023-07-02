@@ -45,8 +45,8 @@ params_template = {
     },
     "paths_videos": {
         "directory_videos": dir_videos,
-        # "filename_videos_strMatch": "cam4.*avi",
-        "filename_videos_strMatch": "test\.avi",
+        "filename_videos_strMatch": "cam4.*avi",
+        # "filename_videos_strMatch": "test\.avi",
         "depth": 1
     },
     "BufferedVideoReader": {
