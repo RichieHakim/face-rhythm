@@ -230,7 +230,7 @@ sbatch_config_list = \
 #SBATCH -c 20
 #SBATCH -n 1
 #SBATCH --mem=8GB
-#SBATCH --time=0-04:00:00
+#SBATCH --time=0-00:10:00
 
 unset XDG_RUNTIME_DIR
 

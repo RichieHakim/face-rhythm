@@ -55,7 +55,6 @@ def prepare_project(
             'general': {
                 'date_created': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'date_modified': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'system_versions': util.system_info(),
                 'path_created': path_config,
             },
             'paths': {
