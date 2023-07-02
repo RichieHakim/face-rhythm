@@ -1,7 +1,8 @@
 ## requirements.txt
 
 numpy
-jupyterlab
+jupyter
+notebook
 tensorly
 opencv-contrib-python==4.8.0.74
 imageio
