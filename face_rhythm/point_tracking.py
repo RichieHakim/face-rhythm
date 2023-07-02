@@ -403,7 +403,7 @@ class PointTracker(FR_Module):
 
         ## Preallocate points
         points_tracked = np.zeros((len(video), points_prev.shape[0], 2), dtype=np.float32)
-        self.violations_currentVideo = scipy.sparse.lil_matrix((len(video), points_prev.shape[0]), dtype=np.bool)
+        self.violations_currentVideo = scipy.sparse.lil_matrix((len(video), points_prev.shape[0]), dtype=np.bool_)
 
         self.i_frame = 0
         video.set_iterator_frame_idx(0)

@@ -456,7 +456,7 @@ class _Select_ROI:
             mask_frame = np.zeros((exampleImage.shape[0], exampleImage.shape[1]))
             pts_y, pts_x = skimage.draw.polygon(pts[:, 1], pts[:, 0])
             mask_frame[pts_y, pts_x] = 1
-            mask_frame = mask_frame.astype(np.bool)
+            mask_frame = mask_frame.astype(np.bool_)
             mask_frames.update({f"mask_{ii}": mask_frame})
         print(f'mask_frames computed') if verbose else None
         return mask_frames

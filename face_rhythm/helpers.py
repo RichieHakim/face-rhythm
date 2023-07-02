@@ -1304,7 +1304,7 @@ class Toeplitz_convolution2d:
             p_r = self.x_shape[1]+1 if p_r==0 else p_r
         
         if batching:
-            idx_crop = np.zeros((self.so), dtype=np.bool8)
+            idx_crop = np.zeros((self.so), dtype=np.bool_)
             idx_crop[p_t:p_b, p_l:p_r] = True
             idx_crop = idx_crop.reshape(-1)
             out = out_v[idx_crop,:].T
