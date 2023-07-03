@@ -200,7 +200,7 @@ with open(str(Path(dir_save) / 'notes.txt'), mode='a') as f:
 import shutil
 Path(dir_save).mkdir(parents=True, exist_ok=True)
 print(f'Copying {path_script} to {str(Path(dir_save) / Path(path_script).name)}')
-shutil.copy2(path_script, str(Path(dir_save) / Path(path_script).name));
+shutil.copyfile(path_script, str(Path(dir_save) / Path(path_script).name))
 
 
 

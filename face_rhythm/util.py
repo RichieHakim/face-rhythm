@@ -1018,7 +1018,7 @@ def batch_run(paths_scripts,
             f.write(sbatch_config_list[ii])
         # save the script
         path_script_job = dir_save_job / Path(paths_scripts[ii]).name
-        shutil.copy2(src=paths_scripts[ii], dst=str(path_script_job));
+        shutil.copyfile(paths_scripts[ii], path_script_job);
         # save the parameters        
         path_params_job = dir_save_job / 'params.json'
         with open(path_params_job, 'w') as f:
