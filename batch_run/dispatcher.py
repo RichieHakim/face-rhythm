@@ -24,11 +24,18 @@ Path(dir_save).mkdir(parents=True, exist_ok=True)
 
 
 params_template = {
+    "steps": [
+        "load_videos",
+        "ROIs",
+        "point_tracking",
+        "VQT",
+        "TCA",
+    ],
     "project": {
         "directory_project": dir_save,
         "overwrite_config": False,
         "initialize_visualization": False,
-        "verbose": 2
+        "verbose": 2,
     },
     "figure_saver": {
         "formats_save": [
@@ -38,7 +45,7 @@ params_template = {
             "bbox_inches": "tight",
             "pad_inches": 0.1,
             "transparent": True,
-            "dpi": 300
+            "dpi": 300,
         },
         "overwrite": True,
         "verbose": 2
@@ -47,7 +54,7 @@ params_template = {
         "directory_videos": dir_videos,
         "filename_videos_strMatch": "cam4.*avi",
         # "filename_videos_strMatch": "test\.avi",
-        "depth": 1
+        "depth": 1,
     },
     "BufferedVideoReader": {
         "buffer_size": 1000,
@@ -69,7 +76,7 @@ params_template = {
         },
         "make_rois": {
             "rois_points_idx": [
-                0
+                0,
             ],
             "point_spacing": 9,
         },
@@ -92,7 +99,7 @@ params_template = {
                     2,
                     0.03,
                 ],
-            }
+            },
         },
         "visualize_video": False,
         "params_visualization": {
@@ -104,7 +111,7 @@ params_template = {
             "framesHalted_before": 10,
             "framesHalted_after": 10,
         },
-        "verbose": 2
+        "verbose": 2,
     },
     "VQT_Analyzer": {
         "params_VQT": {
@@ -119,7 +126,7 @@ params_template = {
             "padding": "valid",
             "batch_size": 10,
             "return_complex": False,
-            "progressBar": True
+            "progressBar": True,
         },
         "normalization_factor": 0.95,
         "spectrogram_exponent": 1.0,
@@ -133,12 +140,12 @@ params_template = {
                 "xy",
                 "points",
                 "frequency",
-                "time"
+                "time",
             ],
             "names_dims_concat_array": [
                 [
                     "xy",
-                    "points"
+                    "points",
                 ]
             ],
             "concat_complexDim": False,
@@ -147,7 +154,7 @@ params_template = {
             "method_handling_dictElements": "separate",
             "name_dim_concat_dictElements": "time",
             "idx_windows": None,
-            "name_dim_array_window": "time"
+            "name_dim_array_window": "time",
         },
         "fit": {
             "method": "CP_NN_HALS",
@@ -157,15 +164,15 @@ params_template = {
                 "init": "random",
                 "svd": "truncated_svd",
                 "tol": 1e-09,
-                "verbose": True
+                "verbose": True,
             },
-            "verbose": 2
+            "verbose": 2,
         },
         "rearrange_factors": {
             "undo_concat_complexDim": False,
-            "undo_concat_dictElements": False
-        }
-    }
+            "undo_concat_dictElements": False,
+        },
+    },
 }
 
 
@@ -214,7 +221,7 @@ with open(str(Path(dir_save) / 'parameters_batch.json'), 'w') as f:
 ## run batch_run function
 paths_scripts = [path_script]
 params_list = params
-max_n_jobs=40
+max_n_jobs=1
 name_save=name_job
 
 
@@ -226,11 +233,12 @@ sbatch_config_list = \
 [f"""#!/usr/bin/bash
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
-#SBATCH --partition=short
-#SBATCH -c 20
+#SBATCH --gres=gpu:1,vram:23G
+#SBATCH --partition=gpu_requeue
+#SBATCH -c 2
 #SBATCH -n 1
-#SBATCH --mem=8GB
-#SBATCH --time=0-00:10:00
+#SBATCH --mem=48GB
+#SBATCH --time=0-00:30:00
 
 unset XDG_RUNTIME_DIR
 
