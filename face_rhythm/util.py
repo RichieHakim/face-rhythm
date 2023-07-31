@@ -872,16 +872,17 @@ def system_info(verbose: bool = False,) -> Dict:
 
     return versions
 
-def batch_run(paths_scripts, 
-                params_list, 
-                sbatch_config_list, 
-                max_n_jobs=2,
-                dir_save='/n/data1/hms/neurobio/sabatini/rich/analysis/', 
-                name_save='jobNum_', 
-                verbose=True,
-                ):
+def batch_run(
+    paths_scripts, 
+    params_list, 
+    sbatch_config_list, 
+    max_n_jobs=2,
+    dir_save='/n/data1/hms/neurobio/sabatini/rich/analysis/', 
+    name_save='jobNum_', 
+    verbose=True,
+):
     r"""
-    FROM BNPM
+    MODIFIED FROM BNPM
     Run a batch of jobs.
     Workflow 1: run a single script over a sweep of parameters
         - Make a script that takes in the set of parameters
