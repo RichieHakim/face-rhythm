@@ -62,6 +62,7 @@ class VQT_Analyzer(FR_Module):
             'params_VQT': params_VQT,
             'normalization_factor': normalization_factor,
             'spectrogram_exponent': spectrogram_exponent,
+            'one_over_f_exponent': one_over_f_exponent,
             'verbose': verbose,
         }
         self.run_info = {
