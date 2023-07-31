@@ -205,8 +205,12 @@ class ROIs(FR_Module):
         self.num_points = self.point_positions.shape[0]
         print(f"FR: {self.point_positions.shape[0]} points total") if self._verbose > 1 else None
 
+        self.config.update({
+            "point_spacing": point_spacing,
+        })
         self.run_data.update({
             "point_positions": self.point_positions,
+            "num_points": self.num_points,
         })
 
     def _helper_make_points(self, roi, point_spacing):
