@@ -256,12 +256,12 @@ class FrameVisualizer:
             ## Check points
             if points is not None:
                 if isinstance(points, np.ndarray):
-                    points = points.astype(np.int)
+                    points = points.astype(np.int_)
                     points = [points]
                 assert isinstance(points, list), 'points must be a list.'
                 assert len(points) > 0, 'points must have at least one element.'
                 assert isinstance(points[0], np.ndarray), 'points must be a list of numpy arrays.'
-                assert points[0].dtype == np.int, 'points must be a list of numpy arrays of int.'
+                assert points[0].dtype == np.int_, 'points must be a list of numpy arrays of int.'
                 assert points[0].ndim == 2, 'points must be a list of 2D numpy arrays.'
                 assert points[0].shape[1] == 2, 'points must be a list of 2D numpy arrays with 2 columns.'
                 # ## all points must be non-negative
@@ -291,7 +291,7 @@ class FrameVisualizer:
                         assert all([all([c_ >= 0 and c_ <= 255 for c_ in c]) for c in points_colors]), 'points_colors must be a list of tuples of 3 integers between 0 and 255.'
                     elif isinstance(points_colors[0], np.ndarray):
                         assert all([isinstance(c, np.ndarray) for c in points_colors]), 'points_colors must be a list of numpy arrays.'
-                        assert all([c.dtype == np.int for c in points_colors]), 'points_colors must be a list of numpy arrays of int.'
+                        assert all([c.dtype == np.int_ for c in points_colors]), 'points_colors must be a list of numpy arrays of int.'
                         assert all([c.ndim == 2 for c in points_colors]), 'points_colors must be a list of 2D numpy arrays.'
                         assert all([c.shape[1] == 3 for c in points_colors]), 'points_colors must be a list of 2D numpy arrays with 3 columns.'
                         assert all([np.all(c >= 0) for c in points_colors]), 'points_colors must be a list of 2D numpy arrays with values between 0 and 255.'
