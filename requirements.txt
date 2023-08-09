@@ -19,7 +19,6 @@ Pillow
 opt_einsum
 decord
 natsort
-hdfdict
 pandas
 tables
 einops
@@ -55,7 +54,6 @@ psutil
     # - opt_einsum   
     # - decord
     # - natsort
-    # - hdfdict==0.3.1
     # - pandas
     # - tables
     # - einops    

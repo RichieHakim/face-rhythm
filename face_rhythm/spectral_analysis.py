@@ -3,7 +3,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import hdfdict
 from tqdm import tqdm
 
 from .util import FR_Module
@@ -163,7 +162,7 @@ class VQT_Analyzer(FR_Module):
         """
         ## Assertions
         ### Assert that the points_tracked dict is valid
-        assert isinstance(points_tracked, (dict, hdfdict.hdfdict.LazyHdfDict)), f"points_tracked must be a dict or hdfdict.hdfdict.LazyHdfDict, not {type(points_tracked)}. See docstring for details."
+        assert isinstance(points_tracked, (dict,)), f"points_tracked must be a dict, not {type(points_tracked)}. See docstring for details."
         ### Assert that points_tracked contains 3D numpy arrays of shape(n_frames, n_points, 2)
         for key, value in points_tracked.items():
             assert isinstance(value, np.ndarray), f"points_tracked must contain numpy arrays, not {type(value)}. See docstring for details."
