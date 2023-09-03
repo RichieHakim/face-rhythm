@@ -129,7 +129,10 @@ class ROIs(FR_Module):
             ## Check that exampleImage has the correct format
             assert "exampleImage" in file, "FR ERROR: 'exampleImage' not found in file."
             self.exampleImage = file["exampleImage"]
-            self.exampleImage = np.array(self.exampleImage, dtype=np.float32)  ## Ensure that the exampleImage is a float np array
+            ## Ensure that the exampleImage is a float np array
+            self.exampleImage = np.array(self.exampleImage)
+            if self.exampleImage.dtype == np.uint8:
+                self.exampleImage = self.exampleImage.astype(np.float32) / 255.0
             self.img_hw = self.exampleImage.shape
             self.set_point_positions(point_positions=file['point_positions']) if file['point_positions'] is not None else None
             
