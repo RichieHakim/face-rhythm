@@ -1569,6 +1569,7 @@ def make_VQT_filters(
     
     ## Plot
     if plot_pref:
+        import matplotlib.pyplot as plt
         plt.figure()
         plt.plot(freqs)
         plt.xlabel('filter num')
