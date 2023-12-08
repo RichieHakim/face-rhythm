@@ -29,11 +29,12 @@ params_template = {
         "ROIs",
         # "point_tracking",
         "VQT",
-        "TCA",
+        # "TCA",
     ],
     "project": {
         "directory_project": dir_save,
         "overwrite_config": False,
+        "update_project_paths": True,
         "initialize_visualization": False,
         "verbose": 2,
     },
@@ -235,12 +236,12 @@ sbatch_config_list = \
 [f"""#!/usr/bin/bash
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
-#SBATCH --partition=gpu_quad
-#SBATCH --gres=gpu:1,vram:31G
+#SBATCH --constraint=intel
+#SBATCH --partition=short
 #SBATCH -c 4
 #SBATCH -n 1
 #SBATCH --mem=48GB
-#SBATCH --time=0-00:15:00
+#SBATCH --time=0-00:30:00
 
 unset XDG_RUNTIME_DIR
 
@@ -261,6 +262,9 @@ python "$@"
 # SBATCH --constraint=intel
 # SBATCH --gres=gpu:1,vram:23G
 # SBATCH --partition=gpu_requeue
+
+# SBATCH --partition=gpu_quad
+# SBATCH --gres=gpu:1,vram:31G
 
 
 util.batch_run(
