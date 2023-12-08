@@ -27,7 +27,7 @@ params_template = {
     "steps": [
         "load_videos",
         "ROIs",
-        "point_tracking",
+        # "point_tracking",
         "VQT",
         "TCA",
     ],
@@ -115,12 +115,14 @@ params_template = {
     },
     "VQT_Analyzer": {
         "params_VQT": {
-            "Q_lowF": 2,
-            "Q_highF": 4,
+            "Q_lowF": 4,
+            "Q_highF": 10,
             "F_min": 1.0,
             "F_max": 60,
             "n_freq_bins": 36,
             "win_size": 501,
+            "symmetry": 'left',
+            "taper_asymmetric": True,
             "plot_pref": False,
             "downsample_factor": 20,
             "padding": "valid",
@@ -233,12 +235,12 @@ sbatch_config_list = \
 [f"""#!/usr/bin/bash
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
-#SBATCH --gres=gpu:1,vram:23G
-#SBATCH --partition=gpu_requeue
-#SBATCH -c 2
+#SBATCH --partition=gpu_quad
+#SBATCH --gres=gpu:1,vram:31G
+#SBATCH -c 4
 #SBATCH -n 1
 #SBATCH --mem=48GB
-#SBATCH --time=0-00:30:00
+#SBATCH --time=0-00:15:00
 
 unset XDG_RUNTIME_DIR
 
@@ -256,6 +258,7 @@ echo "starting job"
 python "$@"
 """ for path in paths_log]
 
+# SBATCH --constraint=intel
 # SBATCH --gres=gpu:1,vram:23G
 # SBATCH --partition=gpu_requeue
 
