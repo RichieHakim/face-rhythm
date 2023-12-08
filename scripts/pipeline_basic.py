@@ -88,11 +88,11 @@ import numpy as np
 tic_start = time.time()
 
 ## RESOURCE TRACKING
-cpu_tracker = fr.helpers.CPU_Device_Checker()
-cpu_tracker.track_utilization(
-    interval=0.2,
-    path_save=str(Path(directory_save) / 'cpu_tracker.csv'),
-)
+# cpu_tracker = fr.helpers.CPU_Device_Checker()
+# cpu_tracker.track_utilization(
+#     interval=0.2,
+#     path_save=str(Path(directory_save) / 'cpu_tracker.csv'),
+# )
 # gpu_tracker = fr.helpers.NVIDIA_Device_Checker(device_index=0)
 # gpu_tracker.track_utilization(
 #     interval=0.2,
