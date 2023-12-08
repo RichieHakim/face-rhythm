@@ -57,7 +57,7 @@ class FR_Module:
         assert Path(path_config).suffix == ".yaml", "FR ERROR: path_config must be a yaml file"
         assert Path(path_config).name == "config.yaml", "FR ERROR: path_config must be named config.yaml"
 
-        config = load_yaml_safe(path_config)
+        config = load_config_file(path_config)
             
         ## Append self.config to module_name key in config.yaml
         if (self.module_name in config.keys()) and not overwrite:

@@ -9,6 +9,7 @@ from . import helpers, util
 def prepare_project(
     directory_project='./',
     overwrite_config=False,
+    update_project_paths=False,
     mkdir=True,
     initialize_visualization=True,
     verbose=1,
@@ -23,7 +24,16 @@ def prepare_project(
             Path to the project. 
             If './' is passed, the current working directory is used
         overwrite_config (bool): 
-            Whether to overwrite the config
+            Whether to overwrite the ENTIRE config file with a brand
+             new config file.
+            If False, update_project_paths can still be set to True.
+        update_project_paths (bool):
+            If True, then will update the following within the config.yaml
+             file to reflect the current project directory (directory_project):
+                - paths > project: directory_project/
+                - paths > config: directory_project/config.yaml
+                - paths > run_info: directory_project/run_info.json
+            If overwrite_config is True, then this is ignored.
         mkdir (bool):
             Whether to create the project directory if it doesn't exist
         initialize_visualization (bool):
@@ -84,6 +94,15 @@ def prepare_project(
         if overwrite_config:
             print(f'FR: Overwriting config.yaml file at {path_config}') if verbose > 0 else None
             _create_config_file()
+        elif update_project_paths:
+            print(f'FR: Updating project paths in config.yaml file at {path_config}') if verbose > 0 else None
+            config = load_config_file(path_config)
+            config['paths']['project'] = directory_project
+            config['paths']['config'] = path_config
+            config['paths']['run_info'] = path_run_info
+            config['general']['date_modified'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open(path_config, 'w') as f:
+                yaml.dump(config, f, Dumper=yaml.Dumper, sort_keys=False)
     else:
         _create_config_file()
         print(f'FR: No existing config.yaml file found in {directory_project}. \n Creating new config.yaml at {Path(directory_project) / "config.yaml"}')
