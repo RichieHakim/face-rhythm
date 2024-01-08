@@ -27,7 +27,7 @@ Learn more at https://face-rhythm.readthedocs.io/
 **`conda env create --file environment_CPU_only.yml`**<br>
 
 In either case, this step will create a conda environment named face-rhythm. Activate it: 
-**`conda activate face-rhythm`** <br>
+**`conda activate face_rhythm`** <br>
 
 #### 3. Run the set up script <br>
 **`pip install -e .`**<br>

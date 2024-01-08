@@ -23,7 +23,7 @@ Otherwise,
 
 Then activate the conda environment 
 .. code-block:: console
-    conda activate face-rhythm 
+    conda activate face_rhythm 
 
 3. Run the set up script:
 
