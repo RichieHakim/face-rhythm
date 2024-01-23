@@ -3,8 +3,9 @@ import re
 import time
 from datetime import datetime
 import inspect
-from typing import Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 import PIL
+import warnings
 
 import yaml
 import numpy as np
@@ -56,7 +57,7 @@ class FR_Module:
         assert Path(path_config).suffix == ".yaml", "FR ERROR: path_config must be a yaml file"
         assert Path(path_config).name == "config.yaml", "FR ERROR: path_config must be named config.yaml"
 
-        config = load_yaml_safe(path_config)
+        config = load_config_file(path_config)
             
         ## Append self.config to module_name key in config.yaml
         if (self.module_name in config.keys()) and not overwrite:
@@ -661,19 +662,14 @@ class Image_Saver(Saver_Viz_Base):
         
         ## Validate inputs
         assert isinstance(array_images, list), "FR ERROR: array_images must be a list"
-        array_images = [self._prepare_array_image(a) for a in array_images]
-
-        kwargs_PIL_save['duration'] = 1000 / frame_rate
-        if isinstance(loop, bool):
-            loop = 0 if loop else None
-        else:
-            assert isinstance(loop, int), "FR ERROR: loop must be a bool or int. If int, then 0==loop forever, n==loop n times."
-        if loop is not None:
-            kwargs_PIL_save['loop'] = loop
-        else:
-            kwargs_PIL_save.pop('loop') if 'loop' in kwargs_PIL_save else None
         
         kwargs_PIL_save['optimize'] = optimize
+
+        kwargs_method = {
+            'frame_rate': frame_rate,
+            'loop': loop,
+            'kwargs_PIL_save': kwargs_PIL_save,
+        }
 
         ## Save gif
         for format_save in formats_save:
@@ -681,7 +677,7 @@ class Image_Saver(Saver_Viz_Base):
                 name_save=name_save,
                 obj_save=array_images,
                 fn_save=self._fn_save_gif,
-                kwargs_method=kwargs_PIL_save,
+                kwargs_method=kwargs_method,
                 format_save=format_save,
             )
 
@@ -703,14 +699,15 @@ class Image_Saver(Saver_Viz_Base):
         Converts a list of 3D numpy.ndarrays with shape[-1] == 3 or 1 to a PIL.Image
          and saves it.
         """
-        obj_save = [PIL.Image.fromarray(a, mode='RGB') if a.shape[-1] == 3 else PIL.Image.fromarray(a, mode='L') for a in obj_save]
-        obj_save[0].save(
-            path_save,
-            save_all=True,
-            append_images=obj_save[1:],
-            format='GIF',
-            **kwargs_method,
+        helpers.save_gif(
+            array=obj_save, 
+            path=path_save, 
+            frameRate=kwargs_method['frame_rate'],
+            loop=kwargs_method['loop'],
+            backend='PIL',
+            kwargs_backend=kwargs_method['kwargs_PIL_save'],
         )
+
         
     
     def _prepare_array_image(self, array_image):
@@ -738,103 +735,154 @@ class Image_Saver(Saver_Viz_Base):
 
         return array_image
 
+    
 
-
-def get_system_versions(verbose=False):
+def system_info(verbose: bool = False,) -> Dict:
     """
-    Checks the versions of various important softwares.
-    Prints those versions
+    Checks and prints the versions of various important software packages.
     RH 2022
 
     Args:
         verbose (bool): 
-            Whether to print the versions
+            Whether to print the software versions. 
+            (Default is ``False``)
 
     Returns:
-        versions (dict):
-            Dictionary of versions
+        (Dict): 
+            versions (Dict):
+                Dictionary containing the versions of various software packages.
     """
     ## Operating system and version
     import platform
-    operating_system = str(platform.system()) + ': ' + str(platform.release()) + ', ' + str(platform.version()) + ', ' + str(platform.machine()) + ', node: ' + str(platform.node()) 
-    print(f'Operating System: {operating_system}') if verbose else None
+    def try_fns(fn):
+        try:
+            return fn()
+        except:
+            return None
+    fns = {key: val for key, val in platform.__dict__.items() if (callable(val) and key[0] != '_')}
+    operating_system = {key: try_fns(val) for key, val in fns.items() if (callable(val) and key[0] != '_')}
+    print(f'== Operating System ==: {operating_system["uname"]}') if verbose else None
 
+    ## CPU info
+    try:
+        import cpuinfo
+        import multiprocessing as mp
+        # cpu_info = cpuinfo.get_cpu_info()
+        cpu_n_cores = mp.cpu_count()
+        cpu_brand = cpuinfo.cpuinfo.CPUID().get_processor_brand(cpuinfo.cpuinfo.CPUID().get_max_extension_support())
+        cpu_info = {'n_cores': cpu_n_cores, 'brand': cpu_brand}
+        if 'flags' in cpu_info:
+            cpu_info['flags'] = 'omitted'
+    except Exception as e:
+        warnings.warn(f'RH WARNING: unable to get cpu info. Got error: {e}')
+        cpu_info = 'Error: Failed to get'
+    print(f'== CPU Info ==: {cpu_info}') if verbose else None
+
+    ## RAM
+    import psutil
+    ram = psutil.virtual_memory()
+    print(f'== RAM ==: {ram}') if verbose else None
+
+    ## User
+    import getpass
+    user = getpass.getuser()
+
+    ## GPU
+    try:
+        import GPUtil
+        gpus = GPUtil.getGPUs()
+        gpu_info = {gpu.id: gpu.__dict__ for gpu in gpus}
+    except Exception as e:
+        warnings.warn(f'RH WARNING: unable to get gpu info. Got error: {e}')
+        gpu_info = 'Error: Failed to get'
+    print(f'== GPU Info ==: {gpu_info}') if verbose else None
+    
     ## Conda Environment
     import os
     if 'CONDA_DEFAULT_ENV' not in os.environ:
         conda_env = 'None'
     else:
         conda_env = os.environ['CONDA_DEFAULT_ENV']
-    print(f'Conda Environment: {conda_env}') if verbose else None
+    print(f'== Conda Environment ==: {conda_env}') if verbose else None
 
     ## Python
     import sys
     python_version = sys.version.split(' ')[0]
-    print(f'Python Version: {python_version}') if verbose else None
+    print(f'== Python Version ==: {python_version}') if verbose else None
 
     ## GCC
     import subprocess
-    gcc_version = subprocess.check_output(['gcc', '--version']).decode('utf-8').split('\n')[0].split(' ')[-1]
-    print(f'GCC Version: {gcc_version}') if verbose else None
+    try:
+        gcc_version = subprocess.check_output(['gcc', '--version']).decode('utf-8').split('\n')[0].split(' ')[-1]
+    except Exception as e:
+        warnings.warn(f'RH WARNING: unable to get gcc version. Got error: {e}')
+        gcc_version = 'Faled to get'
+    print(f'== GCC Version ==: {gcc_version}') if verbose else None
     
     ## PyTorch
     import torch
     torch_version = str(torch.__version__)
-    print(f'PyTorch Version: {torch_version}') if verbose else None
+    print(f'== PyTorch Version ==: {torch_version}') if verbose else None
     ## CUDA
     if torch.cuda.is_available():
         cuda_version = torch.version.cuda
-        print(f"\
-CUDA Version: {cuda_version}, \
-CUDNN Version: {torch.backends.cudnn.version()}, \
-Number of Devices: {torch.cuda.device_count()}, \
-Devices: {[f'device {i}: Name={torch.cuda.get_device_name(i)}, Memory={torch.cuda.get_device_properties(i).total_memory / 1e9} GB' for i in range(torch.cuda.device_count())]}, \
-") if verbose else None
+        cudnn_version = torch.backends.cudnn.version()
+        torch_devices = [f'device {i}: Name={torch.cuda.get_device_name(i)}, Memory={torch.cuda.get_device_properties(i).total_memory / 1e9} GB' for i in range(torch.cuda.device_count())]
+        print(f"== CUDA Version ==: {cuda_version}, CUDNN Version: {cudnn_version}, Number of Devices: {torch.cuda.device_count()}, Devices: {torch_devices}, ") if verbose else None
     else:
         cuda_version = None
-        print('CUDA is not available') if verbose else None
+        cudnn_version = None
+        torch_devices = None
+        print('== CUDA is not available ==') if verbose else None
 
-    ## Numpy
-    import numpy
-    numpy_version = numpy.__version__
-    print(f'Numpy Version: {numpy_version}') if verbose else None
+    ## all packages in environment
+    import pkg_resources
+    pkgs_dict = {i.key: i.version for i in pkg_resources.working_set}
 
-    ## OpenCV
-    import cv2
-    opencv_version = cv2.__version__
-    print(f'OpenCV Version: {opencv_version}') if verbose else None
-    # print(cv2.getBuildInformation())
-
-    ## face-rhythm
+    ## face_rhythm
     import face_rhythm
-    faceRhythm_version = face_rhythm.__version__
-    print(f'face-rhythm Version: {faceRhythm_version}') if verbose else None
+    import time
+    face_rhythm_version = face_rhythm.__version__
+    face_rhythm_fileDate = time.ctime(os.path.getctime(pkg_resources.get_distribution("face_rhythm").location))
+    face_rhythm_stuff = {'version': face_rhythm_version, 'date_installed': face_rhythm_fileDate}
+    print(f'== face_rhythm Version ==: {face_rhythm}') if verbose else None
+    print(f'== face_rhythm date installed ==: {face_rhythm_fileDate}') if verbose else None
+
+    ## get datetime
+    from datetime import datetime
+    dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     versions = {
-        'face-rhythm_version': faceRhythm_version,
+        'datetime': dt,
+        'face_rhythm': face_rhythm_stuff,
         'operating_system': operating_system,
+        'cpu_info': cpu_info,  ## This is the slow one.
+        'user': user,
+        'ram': ram,
+        'gpu_info': gpu_info,
         'conda_env': conda_env,
-        'python_version': python_version,
-        'gcc_version': gcc_version,
-        'torch_version': torch_version,
-        'cuda_version': cuda_version,
-        'numpy_version': numpy_version,
-        'opencv_version': opencv_version,
+        'python': python_version,
+        'gcc': gcc_version,
+        'torch': torch_version,
+        'cuda': cuda_version,
+        'cudnn': cudnn_version,
+        'torch_devices': torch_devices,
+        'pkgs': pkgs_dict,
     }
 
     return versions
 
-
-def batch_run(paths_scripts, 
-                params_list, 
-                sbatch_config_list, 
-                max_n_jobs=2,
-                dir_save='/n/data1/hms/neurobio/sabatini/rich/analysis/', 
-                name_save='jobNum_', 
-                verbose=True,
-                ):
+def batch_run(
+    paths_scripts, 
+    params_list, 
+    sbatch_config_list, 
+    max_n_jobs=2,
+    dir_save='/n/data1/hms/neurobio/sabatini/rich/analysis/', 
+    name_save='jobNum_', 
+    verbose=True,
+):
     r"""
-    FROM BNPM
+    MODIFIED FROM BNPM
     Run a batch of jobs.
     Workflow 1: run a single script over a sweep of parameters
         - Make a script that takes in the set of parameters
@@ -971,7 +1019,7 @@ def batch_run(paths_scripts,
             f.write(sbatch_config_list[ii])
         # save the script
         path_script_job = dir_save_job / Path(paths_scripts[ii]).name
-        shutil.copy2(src=paths_scripts[ii], dst=str(path_script_job));
+        shutil.copyfile(paths_scripts[ii], path_script_job);
         # save the parameters        
         path_params_job = dir_save_job / 'params.json'
         with open(path_params_job, 'w') as f:

@@ -11,11 +11,10 @@ __all__=[
     'project',
     'rois',
     'spectral_analysis',
-    'tests',
     'util',
     'visualization',
     'data_importing',
-    'tests',
+    # 'tests',
 ]
 
 import torch  ## For some reason, it crashes if I don't import torch before other packages... RH 20221128
@@ -23,4 +22,4 @@ import torch  ## For some reason, it crashes if I don't import torch before othe
 for pkg in __all__:
     exec('from . import ' + pkg)
 
-__version__ = '0.1.0'
+__version__ = '0.1.3'

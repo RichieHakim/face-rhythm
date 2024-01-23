@@ -399,11 +399,11 @@ class PointTracker(FR_Module):
         ## Assert that points_prev is a 2D array of integers
         assert isinstance(points_prev, np.ndarray), "FR ERROR: points_prev must be a numpy array"
         assert points_prev.ndim == 2, "FR ERROR: points_prev must be a 2D array"
-        assert points_prev.dtype == np.float32, "FR ERROR: points_prev must be a 2D array of np.float32"
+        points_prev = points_prev.astype(np.float32)
 
         ## Preallocate points
         points_tracked = np.zeros((len(video), points_prev.shape[0], 2), dtype=np.float32)
-        self.violations_currentVideo = scipy.sparse.lil_matrix((len(video), points_prev.shape[0]), dtype=np.bool)
+        self.violations_currentVideo = scipy.sparse.lil_matrix((len(video), points_prev.shape[0]), dtype=np.bool_)
 
         self.i_frame = 0
         video.set_iterator_frame_idx(0)
