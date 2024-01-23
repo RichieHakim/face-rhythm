@@ -10,9 +10,13 @@ Learn more at https://face-rhythm.readthedocs.io/
 # Installation
 
 #### 0. Requirements <br>
+- Operating system:
+  - Ubuntu >= 18.04 (other linux versions usually okay but not actively maintained)
+  - Windows >= 10
+  - Mac >= 12
 - [Anaconda](https://www.anaconda.com/distribution/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
 - If using linux/unix: GCC >= 5.4.0, ideally == 9.2.0. Google how to do this on your operating system. Check with: `gcc --version`.
-- **Optional:** [CUDA compatible NVIDIA GPU](https://developer.nvidia.com/cuda-gpus) and [drivers](https://developer.nvidia.com/cuda-toolkit-archive). Using a GPU can increase ROICaT speeds ~5-50x, though without it, ROICaT will still run reasonably quick. GPU support is not available for Macs.
+- **Optional:** [CUDA compatible NVIDIA GPU](https://developer.nvidia.com/cuda-gpus) and [drivers](https://developer.nvidia.com/cuda-toolkit-archive). Using a GPU can increase the speeds for the TCA step, but is not necessary.
 - The below commands should be run in the terminal (Mac/Linux) or Anaconda Prompt (Windows).
 <br>
 
