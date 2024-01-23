@@ -49,7 +49,7 @@ deps_core = [deps_all_dict[dep] for dep in [
     'ipywidgets',
     'Pillow',
     'opt_einsum',
-    'decord',
+    'eva-decord',
     'natsort',
     'pandas',
     'tables',
