@@ -238,7 +238,7 @@ sbatch_config_list = \
 #SBATCH --output={path}
 #SBATCH --constraint=intel
 #SBATCH --partition=short
-#SBATCH -c 4
+#SBATCH -c 8
 #SBATCH -n 1
 #SBATCH --mem=48GB
 #SBATCH --time=0-00:30:00
