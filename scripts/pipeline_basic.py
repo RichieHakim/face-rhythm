@@ -421,7 +421,7 @@ print(f'RUN COMPLETE')
 print(f'Project directory: {directory_project}')
 print(f'Time elapsed: {time.time() - tic_start:.2f} seconds')
 
-cpu_tracker.stop_tracking()
+# cpu_tracker.stop_tracking()
 # gpu_tracker.stop_tracking()
 
 ## End the job and kill the kernel
