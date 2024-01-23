@@ -19,12 +19,15 @@ Learn more at https://face-rhythm.readthedocs.io/
 **`git clone https://github.com/RichieHakim/face-rhythm/`**<br>
 **`cd face-rhythm`**<br>
 
-#### 2. Create a conda environment 
-#### 3A. Install dependencies with GPU support (recommended)<br>
+#### 2. Create a conda environment
+#### 2A. Install dependencies with GPU support (recommended)<br>
 **`conda env create --file environment_GPU.yml`**<br>
 
-#### 3B. Install dependencies with only CPU support<br>
+#### 2B. Install dependencies with only CPU support<br>
 **`conda env create --file environment_CPU_only.yml`**<br>
+
+In either case, this step will create a conda environment named face-rhythm. Activate it: 
+**`conda activate face_rhythm`** <br>
 
 #### 3. Run the set up script <br>
 **`pip install -e .`**<br>
@@ -40,14 +43,20 @@ you analyze a new dataset. You may want to save a copy of the .ipynb file you us
 **`cd directory/where/you/want/to/save/your/project`**<br>
 **`mkdir face_rhythm_run`**<br>
 
-#### 2. Open up jupyter notebook! The plots display better using Jupyter Notebook than Jupyter Lab or VSCode. <br>
+#### 2. Copy the interactive notebook to your project directory 
+We recommend copying the interactive notebook from your face-rhythm repository to your project folder each time you make a new project. This will allow you to have one notebook per project, which will keep your analyses from potentially conflicting if you run different datasets through the same notebooks. 
+**`cp /path to face-rhythm repo/face-rhythm/notebooks/interactive_pipeline_basic.ipynb.ipynb /path to project/face_rhythm_run/`**<br>
+
+`interactive_pipeline_basic.ipynb.ipynb` is a basic demo notebook that runs through the entire pipeline.
+See the `notebooks/other` folder for some notebooks demonstrating other kinds of analyses. These are more experimental and are subject to change as we develop new analyses. 
+
+#### 3. Open up jupyter notebook! The plots display better using Jupyter Notebook than Jupyter Lab or VSCode. <br>
 **`jupyter notebook`**<br>
 If you run into a kernel error at this stage and are a Windows user, check out: 
 https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-issues
 
-#### 3. Open up a demo notebook and run it! <br>
-- `basic_face_rhythm_notebook.ipynb` is a basic demo notebook that runs through the entire pipeline.
-- `demo_align_temporal_factors.ipynb` is a demo notebook that shows how to align the temporal factors that are output from the basic pipeline.
+Navigate to your folder containing your interactive notebook and launch it by clicking on it! 
+
 
 <br>
 <br>

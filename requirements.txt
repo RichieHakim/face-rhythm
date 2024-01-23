@@ -2,7 +2,7 @@
 
 numpy
 jupyter
-notebook
+notebook<7
 tensorly
 opencv-contrib-python==4.8.0.74
 imageio
@@ -17,7 +17,7 @@ pynwb
 ipywidgets
 Pillow
 opt_einsum
-decord
+eva-decord
 natsort
 pandas
 tables

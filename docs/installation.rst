@@ -8,16 +8,22 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
     git clone https://github.com/RichieHakim/face-rhythm/
     cd face-rhythm
-    git checkout release
+    git switch release
 
 
 2. Create a conda environment:
 
+If you intend to use a GPU (recommended):
 .. code-block:: console
+    conda env create --file environment_GPU.yml
 
-    conda create -n face-rhythm python=3.8
-    conda activate face-rhythm
+Otherwise, 
+.. code-block:: console
+    conda env create --file environment_CPU_only.yml
 
+Then activate the conda environment 
+.. code-block:: console
+    conda activate face_rhythm 
 
 3. Run the set up script:
 
@@ -25,14 +31,7 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
     pip install -e .
 
-4. Install the correct version of cuda toolkit (if you plan on using a gpu).
-`This link <https://anaconda.org/anaconda/cudatoolkit>`_ and `this link <https://pytorch.org/get-started/locally/>`_ are useful for figuring that out:
-
-.. code-block:: console
-
-    conda install cudatoolkit=10.2
-
-5. Create a "project directory" where we will save intermediate files, videos, and config files.
+4. Create a "project directory" where we will save intermediate files, videos, and config files.
 This project directory should ideally be outside of the repo, and you'll create a new one each time
 you analyze a new dataset.
 Again, given that your ipynb will change a lot (get populated with plots and new parameters,
@@ -45,7 +44,7 @@ each of my project folders.
     mkdir face_rhythm_run
     cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_run/
 
-6. Get started! I like to use jupyter notebook for this stuff:
+5. Get started! I like to use jupyter notebook for this stuff:
 
 .. code-block:: console
 
