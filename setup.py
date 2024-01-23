@@ -1,25 +1,73 @@
-"""A setuptools based setup module.
-See:
-https://packaging.python.org/en/latest/distributing.html
-https://github.com/pypa/sampleproject
-"""
-
-import setuptools
-from codecs import open
-import os
+## setup.py file borrowed roicat
 from pathlib import Path
+
+from distutils.core import setup
+import copy
 
 dir_parent = Path(__file__).parent
 
-here = os.path.abspath(os.path.dirname(__file__))
+def read_requirements():
+    with open(str(dir_parent / "requirements.txt"), "r") as req:
+        content = req.read()  ## read the file
+        requirements = content.split("\n") ## make a list of requirements split by (\n) which is the new line character
 
-# Get the long description from the README file
-with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
+    ## Filter out any empty strings from the list
+    requirements = [req for req in requirements if req]
+    ## Filter out any lines starting with #
+    requirements = [req for req in requirements if not req.startswith("#")]
+    ## Remove any commas, quotation marks, and spaces from each requirement
+    requirements = [req.replace(",", "").replace("\"", "").replace("\'", "").strip() for req in requirements]
 
-# with open('requirements.txt', 'r') as f:
-#     requirements = f.read().splitlines()
-# print(requirements)
+    return requirements
+
+deps_all = read_requirements()
+
+## Dependencies: latest versions of requirements
+### remove everything starting and after the first =,>,<,! sign
+deps_names = [req.split('=')[0].split('>')[0].split('<')[0].split('!')[0] for req in deps_all]
+deps_all_dict = dict(zip(deps_names, deps_all))
+
+deps_all_latest = copy.deepcopy(deps_names)
+
+## Make different versions of dependencies
+### Also pull out the version number from the requirements (specified in deps_all_dict values).
+deps_core = [deps_all_dict[dep] for dep in [
+    'numpy',
+    'jupyter',
+    'notebook',
+    'tensorly',
+    'opencv-contrib-python',
+    'imageio',
+    'matplotlib',
+    'scikit-learn',
+    'scikit-image',
+    'pyyaml',
+    'imageio-ffmpeg',
+    'tqdm',
+    'h5py',
+    'pynwb',
+    'ipywidgets',
+    'Pillow',
+    'opt_einsum',
+    'eva-decord',
+    'natsort',
+    'pandas',
+    'tables',
+    'einops',
+    'pytest',
+    'torch',
+    'torchvision',
+    'torchaudio',
+    'nvidia-ml-py3',
+    'py-cpuinfo',
+    'GPUtil',
+    'psutil',
+]]
+
+
+## Get README.md
+with open(str(dir_parent / "README.md"), "r") as f:
+    readme = f.read()
 
 ## Get version number
 with open(str(dir_parent / "face_rhythm" / "__init__.py"), "r") as f:
@@ -29,13 +77,13 @@ with open(str(dir_parent / "face_rhythm" / "__init__.py"), "r") as f:
             break
 
 
-setuptools.setup(
+setup(
     name='face_rhythm',
     version=version,
-    # version='0.1.1',
+    keywords=['neuroscience', 'neuroimaging', 'machine learning'],
 
     description="A pipeline for analysis of facial behavior using optical flow",
-    long_description=long_description,
+    long_description=readme,
     long_description_content_type='text/markdown',
 
     # The project's main homepage.
@@ -45,7 +93,7 @@ setuptools.setup(
     author='Rich Hakim',
 
     # Choose your license
-    # license='MIT',
+    license='LICENSE',
 
     # Supported platforms
     platforms=['Any'],
@@ -62,31 +110,17 @@ setuptools.setup(
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
 
-        # Pick your license as you wish (should match "license" above)
-        # 'License :: OSI Approved :: MIT License',
-
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 3',
     ],
-
-    # What does your project relate to?
-    keywords='face beahvior optical flow',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     # packages=setuptools.find_packages(),
     packages=['face_rhythm'],
 
-    # Alternatively, if you want to distribute just a my_module.py, uncomment
-    # this:
-    #   py_modules=["my_module"],
-
-    # List run-time dependencies here.  These will be installed by pip when
-    # your project is installed. For an analysis of "install_requires" vs pip's
-    # requirements files see:
-    # https://packaging.python.org/en/latest/requirements.html
-    # install_requires=requirements,
+    install_requires=[deps_core,],
 
     include_package_data=True,
 )

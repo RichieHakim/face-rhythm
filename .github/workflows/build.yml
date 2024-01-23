@@ -1,0 +1,153 @@
+name: build
+
+on:
+  push:
+    # branches: [ "main" ]
+    branches: [ "dev" ]
+    # branches: [ "main", "dev" ]
+  pull_request:
+    # branches: [ "main" ]
+    # branches: [ "dev" ]    
+    branches: [ "release", "dev" ]        
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'description'     
+        required: false                     
+        default: '' 
+        
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+
+    name: ${{ matrix.platform }}, py${{ matrix.python-version }}, ${{ matrix.extra }}, ${{ matrix.install-level }}
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [
+          # ubuntu-latest,
+          ubuntu-22.04,
+          ubuntu-20.04,
+          # # windows-latest,
+          windows-2022,
+          windows-2019,
+          # # macos-latest,
+          macos-12,
+          macos-11.0,
+          # macos-10.15,
+        ]
+        python-version: [ 
+          # "3.9",
+          # "3.10",
+          "3.11",
+          "3.12",
+        ]
+        extra: [
+          all,
+          all_latest,
+        ]
+        install-level: [
+          system,
+          user,
+        ]
+
+    steps:
+    
+    - name: Set up conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniconda-version: latest
+        activate-environment: face_rhythm
+        auto-activate-base: true
+        auto-update-conda: false
+        remove-profiles: true
+        architecture: x64
+        clean-patched-environment-file: true
+        run-post: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Check out repository code
+      uses: actions/checkout@v3
+        
+    - name: Prepare PowerShell
+      shell: pwsh
+      run: |
+          conda info
+          conda list
+
+    - name: Check specs of the machine -- Linux
+      if: startsWith(matrix.platform, 'ubuntu')
+      run: |
+        ## check cpu, memory, disk, etc.
+        ## print the command inputs to the workflow
+        echo "CPU info (lscpu):"
+        lscpu
+        echo "Memory info (free -h):"
+        free -h
+        echo "Disk info (df -h):"
+        df -h
+        echo "Network info (ip a):"
+        ip a
+        echo "OS info (uname -a):"
+        uname -a
+    - name: Check specs of the machine -- Windows
+      if: startsWith(matrix.platform, 'windows')
+      run: |
+        ## check cpu, memory, disk, etc.
+        ## just do a generic check on system info
+        ## print the command inputs to the workflow
+        echo "System info (systeminfo):"
+        systeminfo
+    - name: Check specs of the machine -- MacOS
+      if: startsWith(matrix.platform, 'macos')
+      run: |
+        ## check cpu, memory, disk, etc.
+        ## print the command inputs to the workflow
+        echo "CPU info (sysctl -n machdep.cpu.brand_string):"
+        sysctl -n machdep.cpu.brand_string
+        echo "Memory info (sysctl -n hw.memsize):"
+        sysctl -n hw.memsize
+        echo "Disk info (df -h):"
+        df -h
+        echo "OS info (uname -a):"
+        uname -a
+    
+
+    - name: Install face_rhythm with pip dependencies -- system-level
+      if: matrix.install-level == 'system'
+      run: |
+        ## install dependencies with optional extras
+        pip install -v -e .[${{ matrix.extra }}]
+    - name: Install face_rhythm with pip dependencies -- user-level
+      if: matrix.install-level == 'user'
+      run: |
+        pip install -v -e .[${{ matrix.extra }}] --user
+
+
+    - name: Check installed packages
+      run: |
+        pip list
+        ## Below, check which versions of torch and torchvision are installed; and whether CUDA is available
+        python -c "import torch, torchvision; print(f'Using versions: torch=={torch.__version__}, torchvision=={torchvision.__version__}');  print('torch.cuda.is_available() = ', torch.cuda.is_available())"
+
+    - name: Run pytest and generate coverage report
+      run: |
+        # pip install tox tox-gh-actions
+        pip install pytest pytest-cov
+        python -m pytest --capture=tee-sys --cov=face_rhythm --cov-report=xml:coverage.xml --color=yes
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3  ## this is a public action recognized by GitHub Actions
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}  ## this is a secret variable
+        file: coverage.xml  ## this is the default name of the coverage report file
+        fail_ci_if_error: false
+        verbose: true

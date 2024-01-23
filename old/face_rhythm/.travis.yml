@@ -1,9 +1,13 @@
 language: python
-python:
-  - "3.9"
-before_install:
-  - pip install pytest
 # command to install dependencies
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - ipython
+  - pytest
 install:
   - pip install -e .
 # command to run tests

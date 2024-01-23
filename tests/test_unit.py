@@ -1,7 +1,7 @@
 ####### data_importing #######
 
 ## Dataset_videos
-from ..data_importing import Dataset_videos
+from face_rhythm.data_importing import Dataset_videos
 class test_Dataset_videos:
     def __init__(self):
         pass
