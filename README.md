@@ -10,21 +10,18 @@ Learn more at https://face-rhythm.readthedocs.io/
 # Installation
 
 #### 0. Requirements <br>
-- [Anaconda](https://www.anaconda.com/distribution/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html)<br>
-- GCC >= 5.4.0, ideally == 9.2.0. Google how to do this on your operating system. For unix/linux: check with `gcc --version`.<br>
-- For GPU support, you just need a CUDA compatible NVIDIA GPU and the relevant [drivers](https://www.nvidia.com/Download/index.aspx?lang=en-us). There is no need to download CUDA or CUDNN as PyTorch takes care of this during the installation. Using a GPU is not required, but can increase speeds 2-20x depending on the GPU and your data. See https://developer.nvidia.com/cuda-gpus for a list of compatible GPUs.
-- On some Linux servers (like Harvard's O2 server), you may need to load modules instead of installing. To load conda, gcc, try: `module load conda3/latest gcc/9.2.0` or similar.<br>
+- [Anaconda](https://www.anaconda.com/distribution/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
+- If using linux/unix: GCC >= 5.4.0, ideally == 9.2.0. Google how to do this on your operating system. Check with: `gcc --version`.
+- **Optional:** [CUDA compatible NVIDIA GPU](https://developer.nvidia.com/cuda-gpus) and [drivers](https://developer.nvidia.com/cuda-toolkit-archive). Using a GPU can increase ROICaT speeds ~5-50x, though without it, ROICaT will still run reasonably quick. GPU support is not available for Macs.
+- The below commands should be run in the terminal (Mac/Linux) or Anaconda Prompt (Windows).
+<br>
 
 #### 1. Clone this repo <br>
 **`git clone https://github.com/RichieHakim/face-rhythm/`**<br>
 **`cd face-rhythm`**<br>
 
 #### 2. Create a conda environment
-#### 2A. Install dependencies with GPU support (recommended)<br>
-**`conda env create --file environment_GPU.yml`**<br>
-
-#### 2B. Install dependencies with only CPU support<br>
-**`conda env create --file environment_CPU_only.yml`**<br>
+**`conda env create --file environment.yml`**<br>
 
 In either case, this step will create a conda environment named face-rhythm. Activate it: 
 **`conda activate face_rhythm`** <br>
