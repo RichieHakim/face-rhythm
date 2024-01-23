@@ -7,7 +7,7 @@ tensorly
 opencv-contrib-python==4.8.0.74
 imageio
 matplotlib
-scikit-learn==1.3.0
+scikit-learn==1.4.0
 scikit-image
 pyyaml
 imageio-ffmpeg
