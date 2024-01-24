@@ -96,7 +96,7 @@ def prepare_project(
             _create_config_file()
         elif update_project_paths:
             print(f'FR: Updating project paths in config.yaml file at {path_config}') if verbose > 0 else None
-            config = load_config_file(path_config)
+            config = util.load_config_file(path_config)
             config['paths']['project'] = directory_project
             config['paths']['config'] = path_config
             config['paths']['run_info'] = path_run_info
