@@ -46,9 +46,9 @@ you analyze a new dataset. You may want to save a copy of the .ipynb file you us
 
 #### 2. Copy the interactive notebook to your project directory 
 We recommend copying the interactive notebook from your face-rhythm repository to your project folder each time you make a new project. This will allow you to have one notebook per project, which will keep your analyses from potentially conflicting if you run different datasets through the same notebooks. 
-**`cp /path to face-rhythm repo/face-rhythm/notebooks/interactive_pipeline_basic.ipynb.ipynb /path to project/face_rhythm_run/`**<br>
+**`cp /path to face-rhythm repo/face-rhythm/notebooks/interactive_pipeline_basic.ipynb /path to project/face_rhythm_run/`**<br>
 
-`interactive_pipeline_basic.ipynb.ipynb` is a basic demo notebook that runs through the entire pipeline.
+`interactive_pipeline_basic.ipynb` is a basic demo notebook that runs through the entire pipeline.
 See the `notebooks/other` folder for some notebooks demonstrating other kinds of analyses. These are more experimental and are subject to change as we develop new analyses. 
 
 #### 3. Open up jupyter notebook! The plots display better using Jupyter Notebook than Jupyter Lab or VSCode. <br>
