@@ -1,7 +1,15 @@
 {
+    "steps": [
+        "load_videos",
+        "ROIs",
+        "point_tracking",
+        "VQT",
+        "TCA"
+    ],
     "project": {
-        "directory_project": "/home/rich/Desktop/test_FR/fr_20230430",
+        "directory_project": "/path/to/new/project/directory/",
         "overwrite_config": false,
+        "update_project_paths": true,
         "initialize_visualization": false,
         "verbose": 2
     },
@@ -19,8 +27,8 @@
         "verbose": 2
     },
     "paths_videos": {
-        "directory_videos": "/media/rich/bigSSD/data_raw/face_rhythm/mouse_0322N/20230430/cam4",
-        "filename_videos_strMatch": "cam4.*avi",
+        "directory_videos": "/path/to/videos/directory/",
+        "filename_videos_strMatch": "regularExpressionsStringMatch_camera4\\.avi",
         "depth": 1
     },
     "BufferedVideoReader": {
@@ -38,7 +46,7 @@
     "ROIs": {
         "initialize": {
             "select_mode": "file",
-            "path_file": "/home/rich/Desktop/0322N_and_0322R/mouse_0322N__20230430/ROIs.h5",
+            "path_file": "/path/to/ROIs.h5",
             "verbose": 2
         },
         "make_rois": {
@@ -52,13 +60,13 @@
         "contiguous": false,
         "params_optical_flow": {
             "method": "lucas_kanade",
-            "mesh_rigidity": 0.015,
-            "mesh_n_neighbors": 15,
-            "relaxation": 0.001,
+            "mesh_rigidity": 0.025,
+            "mesh_n_neighbors": 8,
+            "relaxation": 0.0015,
             "kwargs_method": {
                 "winSize": [
-                    28,
-                    28
+                    20,
+                    20
                 ],
                 "maxLevel": 2,
                 "criteria": [
@@ -74,20 +82,22 @@
             "point_sizes": 2
         },
         "params_outlier_handling": {
-            "threshold_displacement": 180,
-            "framesHalted_before": 30,
-            "framesHalted_after": 30
+            "threshold_displacement": 150,
+            "framesHalted_before": 10,
+            "framesHalted_after": 10
         },
         "verbose": 2
     },
     "VQT_Analyzer": {
         "params_VQT": {
-            "Q_lowF": 2,
-            "Q_highF": 4,
+            "Q_lowF": 4,
+            "Q_highF": 10,
             "F_min": 1.0,
             "F_max": 60,
             "n_freq_bins": 36,
             "win_size": 501,
+            "symmetry": "left",
+            "taper_asymmetric": true,
             "plot_pref": false,
             "downsample_factor": 20,
             "padding": "valid",
