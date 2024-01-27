@@ -325,9 +325,9 @@ def pipeline_basic(params):
 
 
 
-        ## Load the `TCA` data as a dictionary
+        # ## Load the `TCA` data as a dictionary
 
-        tca_data = fr.h5_handling.simple_load(str(Path(directory_project) / 'analysis_files' / 'TCA.h5'))
+        # tca_data = fr.h5_handling.simple_load(str(Path(directory_project) / 'analysis_files' / 'TCA.h5'))
 
 
 
