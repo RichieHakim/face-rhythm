@@ -4,7 +4,7 @@ numpy==1.26.3
 jupyter
 notebook<7
 tensorly==0.8.1
-opencv-contrib-python==4.8.0.74
+opencv-contrib-python==4.9.0.80
 matplotlib
 scikit-learn==1.4.0
 scikit-image
