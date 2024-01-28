@@ -5,7 +5,7 @@ import re
 def test_python_version(
     look_for_verion_in_environmentYaml=True, 
     filename_environmentYaml='environment_GPU.yml',
-    fallback_version=3.9,
+    fallback_version=3.11,
     verbose=1,
 ):
     """
