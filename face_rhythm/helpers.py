@@ -478,6 +478,89 @@ def find_subDict_key(d: dict, s: str, max_depth: int=9999999):
     return list(helper_find_subDict_key(d, s, depth=max_depth, _k_all=[]))
 
 
+## parameter dictionary helpers ##
+
+def fill_in_dict(
+    d: Dict, 
+    defaults: Dict,
+    verbose: bool = True,
+    hierarchy: List[str] = ['dict'], 
+):
+    """
+    In-place. Fills in dictionary ``d`` with values from ``defaults`` if they
+    are missing. Works hierachically.
+    RH 2023
+
+    Args:
+        d (Dict):
+            Dictionary to fill in.
+            In-place.
+        defaults (Dict):
+            Dictionary of defaults.
+        verbose (bool):
+            Whether to print messages.
+        hierarchy (List[str]):
+            Used internally for recursion.
+            Hierarchy of keys to d.
+    """
+    from copy import deepcopy
+    for key in defaults:
+        if key not in d:
+            print(f"Key '{key}' not found in params dictionary: {' > '.join([f'{str(h)}' for h in hierarchy])}. Using default value: {defaults[key]}") if verbose else None
+            d.update({key: deepcopy(defaults[key])})
+        elif isinstance(defaults[key], dict):
+            assert isinstance(d[key], dict), f"Key '{key}' is a dict in defaults, but not in params. {' > '.join([f'{str(h)}' for h in hierarchy])}."
+            fill_in_dict(d[key], defaults[key], hierarchy=hierarchy+[key])
+            
+
+def check_keys_subset(d, default_dict, hierarchy=['defaults']):
+    """
+    Checks that the keys in d are all in default_dict. Raises an error if not.
+    RH 2023
+
+    Args:
+        d (Dict):
+            Dictionary to check.
+        default_dict (Dict):
+            Dictionary containing the keys to check against.
+        hierarchy (List[str]):
+            Used internally for recursion.
+            Hierarchy of keys to d.
+    """
+    default_keys = list(default_dict.keys())
+    for key in d.keys():
+        assert key in default_keys, f"Parameter '{key}' not found in defaults dictionary: {' > '.join([f'{str(h)}' for h in hierarchy])}."
+        if isinstance(default_dict[key], dict) and isinstance(d[key], dict):
+            check_keys_subset(d[key], default_dict[key], hierarchy=hierarchy+[key])
+
+
+def prepare_params(params, defaults, verbose=True):
+    """
+    Does the following:
+        * Checks that all keys in ``params`` are in ``defaults``.
+        * Fills in any missing keys in ``params`` with values from ``defaults``.
+        * Returns a deepcopy of the filled-in ``params``.
+
+    Args:
+        params (Dict):
+            Dictionary of parameters.
+        defaults (Dict):
+            Dictionary of defaults.
+        verbose (bool):
+            Whether to print messages.
+    """
+    from copy import deepcopy
+    ## Check inputs
+    assert isinstance(params, dict), f"p must be a dict. Got {type(params)} instead."
+    ## Make sure all the keys in p are valid
+    check_keys_subset(params, defaults)
+    ## Fill in any missing keys with defaults
+    params_out = deepcopy(params)
+    fill_in_dict(params_out, defaults, verbose=verbose)
+
+    return params_out
+
+
 #####################################################################################################################################
 ############################################################## VIDEO ################################################################
 #####################################################################################################################################
@@ -3213,10 +3296,15 @@ class Equivalence_checker():
                     Otherwise, returns False.
         """
         try:
-            out = np.allclose(test, true, **self._kwargs_allclose)
+            ## If the dtype is a kind of string (or byte string) or object, then allclose will raise an error. In this case, just check if the values are equal.
+            if np.issubdtype(test.dtype, np.str_) or np.issubdtype(test.dtype, np.bytes_) or test.dtype == np.object_:
+                out = bool(np.all(test == true))
+                print(f"Equivalence check {'passed' if out else 'failed'}. Path: {path}.") if self._verbose > 0 else None
+            else:
+                out = np.allclose(test, true, **self._kwargs_allclose)
             print(f"Equivalence check passed. Path: {path}") if self._verbose > 1 else None
         except Exception as e:
-            out = None
+            out = None  ## This is not False because sometimes allclose will raise an error if the arrays have a weird dtype among other reasons.
             warnings.warn(f"WARNING. Equivalence check failed. Path: {path}. Error: {e}") if self._verbose else None
             
         if out == False:
@@ -3270,23 +3358,8 @@ class Equivalence_checker():
             if path[-1].startswith('_'):
                 return (None, 'excluded from testing')
 
-        ## DICT
-        if isinstance(true, dict):
-            result = {}
-            for key in true:
-                if key not in test:
-                    result[str(key)] = (False, 'key not found')
-                else:
-                    result[str(key)] = self.__call__(test[key], true[key], path=path + [str(key)])
-        ## ITERATABLE
-        elif isinstance(true, (list, tuple, set)):
-            if len(true) != len(test):
-                result = (False, 'length_mismatch')
-            result = {}
-            for idx, (i, j) in enumerate(zip(test, true)):
-                result[str(idx)] = self.__call__(i, j, path=path + [str(idx)])
         ## NP.NDARRAY
-        elif isinstance(true, np.ndarray):
+        if isinstance(true, np.ndarray):
             r = self._checker(test, true, path)
             result = (r, 'equivalence')
         ## NP.SCALAR
@@ -3296,21 +3369,43 @@ class Equivalence_checker():
                 result = (r, 'equivalence')
             else:
                 result = (test == true, 'equivalence')
-        ## STRING
-        elif isinstance(true, str):
-            result = (test == true, 'equivalence')
         ## NUMBER
         elif isinstance(true, (int, float, complex)):
             r = self._checker(test, true, path)
             result = (result, 'equivalence')
+        ## DICT
+        elif isinstance(true, dict):
+            result = {}
+            for key in true:
+                if key not in test:
+                    result[str(key)] = (False, 'key not found')
+                    print(f"Equivalence check failed. Path: {path}. Key {key} not found.") if self._verbose > 0 else None
+                else:
+                    result[str(key)] = self.__call__(test[key], true[key], path=path + [str(key)])
+        ## ITERATABLE
+        elif isinstance(true, (list, tuple, set)):
+            if len(true) != len(test):
+                result = (False, 'length_mismatch')
+                print(f"Equivalence check failed. Path: {path}. Length mismatch.") if self._verbose > 0 else None
+            else:
+                result = {}
+                for idx, (i, j) in enumerate(zip(test, true)):
+                    result[str(idx)] = self.__call__(i, j, path=path + [str(idx)])
+        ## STRING
+        elif isinstance(true, str):
+            result = (test == true, 'equivalence')
+            print(f"Equivalence check {'passed' if result[0] else 'failed'}. Path: {path}.") if self._verbose > 0 else None
         ## BOOL
         elif isinstance(true, bool):
             result = (test == true, 'equivalence')
+            print(f"Equivalence check {'passed' if result[0] else 'failed'}. Path: {path}.") if self._verbose > 0 else None
         ## NONE
         elif true is None:
             result = (test is None, 'equivalence')
+            print(f"Equivalence check {'passed' if result[0] else 'failed'}. Path: {path}.") if self._verbose > 0 else None
         ## N/A
         else:
             result = (None, 'not tested')
+            print(f"Equivalence check not performed. Path: {path}.") if self._verbose > 0 else None
 
         return result
