@@ -1,0 +1,67 @@
+{
+    "Dataset_videos": {
+        "frame_rate": 120.0,
+        "num_frames_total": 2000,
+        "frame_height_width": [
+            582,
+            784
+        ],
+        "num_channels": 3,
+        "metadata": {
+            "paths_videos": [
+                "/media/rich/Home_Linux_partition/github_repos/face-rhythm/tests/data_test/inputs/demo_mouse0322N20230430cam4_1.avi",
+                "/media/rich/Home_Linux_partition/github_repos/face-rhythm/tests/data_test/inputs/demo_mouse0322N20230430cam4_2.avi"
+            ],
+            "num_frames": [
+                1000,
+                1000
+            ],
+            "frame_rate": [
+                120.0,
+                120.0
+            ],
+            "frame_height_width": [
+                [
+                    582,
+                    784
+                ],
+                [
+                    582,
+                    784
+                ]
+            ],
+            "num_channels": [
+                3,
+                3
+            ]
+        }
+    },
+    "ROIs": {
+        "img_hw": [
+            582,
+            784,
+            3
+        ]
+    },
+    "PointTracker": {
+        "num_videos": 1,
+        "num_frames": [
+            2000
+        ],
+        "num_frames_total": 2000,
+        "num_points": 347,
+        "violation_fraction": [
+            0
+        ]
+    },
+    "VQT_Analyzer": {},
+    "TCA": {
+        "names_dims_array": [
+            "(xy points)",
+            "frequency",
+            "time"
+        ],
+        "name_dim_dictElements": "session",
+        "num_dictElements": 1
+    }
+}

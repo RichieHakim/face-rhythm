@@ -23,6 +23,15 @@ def pipeline_basic(params):
             Dictionary of parameters. See function for required fields. \n
             Also, /scripts/params_pipeline_basic.json contains an example
             parameters file. \n
+
+    Returns:
+        (dict):
+            Dictionary containing the following keys: \n
+            - path_config (str): Path to the config file \n
+            - path_run_info (str): Path to the run_info file \n
+            - directory_project (str): Path to the project directory \n
+            - SEED (int): Random seed used \n
+            - params (dict): Dictionary of parameters used \n
     """
 
     ########################################
@@ -57,10 +66,11 @@ def pipeline_basic(params):
         seed=params['project']['random_seed'],
         deterministic=params['project']['random_seed'] is not None,
     )
+    use_GPU = params['project']['use_GPU']
 
 
-    directory_project = params['project']['directory_project']
-    directory_videos  = params['paths_videos']['directory_videos']
+    directory_project = str(params['project']['directory_project'])
+    directory_videos  = str(params['paths_videos']['directory_videos'])
 
     filename_videos_strMatch = params['paths_videos']['filename_videos_strMatch']
 
@@ -215,7 +225,7 @@ def pipeline_basic(params):
         Fs = fr.util.load_run_info_file(path_run_info)['Dataset_videos']['frame_rate']
 
         params['VQT_Analyzer']['params_VQT']['Fs_sample'] = Fs
-        params['VQT_Analyzer']['params_VQT']['DEVICE_compute'] = fr.helpers.set_device(use_GPU=True)
+        params['VQT_Analyzer']['params_VQT']['DEVICE_compute'] = fr.helpers.set_device(use_GPU=use_GPU)
 
         spec = fr.spectral_analysis.VQT_Analyzer(**params['VQT_Analyzer'])
 
@@ -296,7 +306,7 @@ def pipeline_basic(params):
         ## - GPU memory can be saved by setting `'init'` method to `'random'`. However, fastest convergence and highest accuracy typically come from `'init': 'svd'`.
 
         tca.fit(
-            DEVICE=fr.helpers.set_device(use_GPU=True),
+            DEVICE=fr.helpers.set_device(use_GPU=use_GPU),
             **params['TCA']['fit'],
         )
 
@@ -375,6 +385,16 @@ def pipeline_basic(params):
     ########################################
 
     print(f'RUN COMPLETE')
+
+    results = {
+        'path_config': path_config,
+        'path_run_info': path_run_info,
+        'directory_project': directory_project,
+        'SEED': SEED,
+        'params': params,
+    }
+
+    return results
 
 
 def _set_random_seed(seed=None, deterministic=False):
