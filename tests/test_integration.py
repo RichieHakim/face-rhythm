@@ -10,8 +10,8 @@ from face_rhythm import helpers, util, h5_handling, pipelines
 def test_pipeline_tracking_simple(dir_data_test):
     dir_temp = str(tempfile.TemporaryDirectory().name)
     dir_project = str(Path(dir_temp).resolve() / 'project')
-    dir_inputs = str(Path(dir_data_test).resolve() / 'inputs')
-    dir_outputs = str(Path(dir_temp).resolve() / 'outputs')
+    dir_inputs       = str(Path(dir_data_test).resolve() / 'inputs')
+    dir_outputs_true = str(Path(dir_data_test).resolve() / 'outputs')
 
     defaults = util.get_default_parameters(
         directory_project=dir_project,
@@ -182,10 +182,10 @@ def test_pipeline_tracking_simple(dir_data_test):
     ## Check run_data equality
     print(f"Checking run_data equality")
     paths_rundata_true = helpers.find_paths(
-        dir_outer=dir_outputs,
+        dir_outer=dir_outputs_true,
         reMatch=r'.*',
     )
-    paths_rundata_relative = [str(Path(p).relative_to(dir_outputs)) for p in paths_rundata_true]
+    paths_rundata_relative = [str(Path(p).relative_to(dir_outputs_true)) for p in paths_rundata_true]
     paths_rundata_test = [str(Path(dir_project) / Path(p)) for p in paths_rundata_relative]
 
     def load_file(path):
