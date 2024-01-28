@@ -1,9 +1,0 @@
-name: face_rhythm
-channels:
-  - conda-forge
-dependencies:
-  - python=3.9
-  - pip
-  - pip:
-  # install from requirements.txt
-    - -r requirements.txt

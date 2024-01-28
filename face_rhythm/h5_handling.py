@@ -3,7 +3,9 @@
 ###########################
 
 import gc
+
 import h5py
+import numpy as np
 
 def close_all_h5():
     '''
@@ -135,11 +137,13 @@ def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False, tra
             h5_obj[group_string].create_group(key)
             make_h5_tree(val , h5_obj[group_string] , f'{group_string}/{key}', use_compression=use_compression)
         else:
+            ## cast to 'S' type if string so that it doesn't become '|O' object type in h5 file
+            if isinstance(val, str):
+                val = np.array(val, dtype=np.string_)
+            
             # print(f'saving:  {group_string}: {key}')
-            if use_compression:
-                h5_obj[group_string].create_dataset(key , data=val, compression='gzip', compression_opts=9)
-            else:
-                h5_obj[group_string].create_dataset(key , data=val)
+            kwargs_compression = {'compression': 'gzip', 'compression_opts': 9} if use_compression else {}
+            h5_obj[group_string].create_dataset(key , data=val, **kwargs_compression)
 def write_dict_to_h5(
     path_save, 
     input_dict, 

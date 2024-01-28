@@ -13,17 +13,9 @@ I prefer to use conda for package management, so I'll explain set up using conda
 
 2. Create a conda environment:
 
-If you intend to use a GPU (recommended):
-
 .. code-block:: console
 
-    conda env create --file environment_GPU.yml
-
-Otherwise, 
-
-.. code-block:: console
-
-    conda env create --file environment_CPU_only.yml
+    conda env create --file environment.yml
 
 Then activate the conda environment 
 
@@ -31,7 +23,7 @@ Then activate the conda environment
 
     conda activate face_rhythm 
 
-3. Run the set up script:
+1. Run the set up script:
 
 .. code-block:: console
 

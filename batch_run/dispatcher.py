@@ -13,7 +13,7 @@ path_self, path_script, dir_save, dir_videos, dir_ROIs, name_job, name_slurm, na
 
 # date = '20221011'
 
-# path_script = f'/n/data1/hms/neurobio/sabatini/rich/github_repos/face-rhythm/scripts/pipeline_basic.py'
+# path_script = f'/n/data1/hms/neurobio/sabatini/rich/github_repos/face-rhythm/scripts/run_pipeline_basic.py'
 # dir_save = f'/n/data1/hms/neurobio/sabatini/rich/analysis/faceRhythm/{mouse}/run_20230701/'
 # name_job = f'faceRhythm_{date}_'
 # name_slurm = f'rh_{date}'
@@ -238,7 +238,7 @@ sbatch_config_list = \
 #SBATCH --output={path}
 #SBATCH --constraint=intel
 #SBATCH --partition=short
-#SBATCH -c 4
+#SBATCH -c 8
 #SBATCH -n 1
 #SBATCH --mem=48GB
 #SBATCH --time=0-00:30:00

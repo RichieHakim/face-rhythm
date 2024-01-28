@@ -7,6 +7,7 @@ __all__=[
     'helpers',
     # 'neural',
     # 'optic_flow',
+    'pipelines',
     'point_tracking',
     'project',
     'rois',
@@ -22,4 +23,4 @@ import torch  ## For some reason, it crashes if I don't import torch before othe
 for pkg in __all__:
     exec('from . import ' + pkg)
 
-__version__ = '0.1.3'
+__version__ = '0.1.5'

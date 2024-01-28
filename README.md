@@ -10,9 +10,13 @@ Learn more at https://face-rhythm.readthedocs.io/
 # Installation
 
 #### 0. Requirements <br>
+- Operating system:
+  - Ubuntu >= 18.04 (other linux versions usually okay but not actively maintained)
+  - Windows >= 10
+  - Mac >= 12
 - [Anaconda](https://www.anaconda.com/distribution/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
 - If using linux/unix: GCC >= 5.4.0, ideally == 9.2.0. Google how to do this on your operating system. Check with: `gcc --version`.
-- **Optional:** [CUDA compatible NVIDIA GPU](https://developer.nvidia.com/cuda-gpus) and [drivers](https://developer.nvidia.com/cuda-toolkit-archive). Using a GPU can increase ROICaT speeds ~5-50x, though without it, ROICaT will still run reasonably quick. GPU support is not available for Macs.
+- **Optional:** [CUDA compatible NVIDIA GPU](https://developer.nvidia.com/cuda-gpus) and [drivers](https://developer.nvidia.com/cuda-toolkit-archive). Using a GPU can increase the speeds for the TCA step, but is not necessary.
 - The below commands should be run in the terminal (Mac/Linux) or Anaconda Prompt (Windows).
 <br>
 
@@ -42,9 +46,9 @@ you analyze a new dataset. You may want to save a copy of the .ipynb file you us
 
 #### 2. Copy the interactive notebook to your project directory 
 We recommend copying the interactive notebook from your face-rhythm repository to your project folder each time you make a new project. This will allow you to have one notebook per project, which will keep your analyses from potentially conflicting if you run different datasets through the same notebooks. 
-**`cp /path to face-rhythm repo/face-rhythm/notebooks/interactive_pipeline_basic.ipynb.ipynb /path to project/face_rhythm_run/`**<br>
+**`cp /path to face-rhythm repo/face-rhythm/notebooks/interactive_pipeline_basic.ipynb /path to project/face_rhythm_run/`**<br>
 
-`interactive_pipeline_basic.ipynb.ipynb` is a basic demo notebook that runs through the entire pipeline.
+`interactive_pipeline_basic.ipynb` is a basic demo notebook that runs through the entire pipeline.
 See the `notebooks/other` folder for some notebooks demonstrating other kinds of analyses. These are more experimental and are subject to change as we develop new analyses. 
 
 #### 3. Open up jupyter notebook! The plots display better using Jupyter Notebook than Jupyter Lab or VSCode. <br>

@@ -7,15 +7,19 @@ import json
 from pathlib import Path
 import copy
 import re
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict, Any, Callable, MutableMapping
 import os
 from functools import partial
+import warnings
 
 import numpy as np
 import cv2
 import decord
 import torch
 from tqdm import tqdm
+import yaml
+import zipfile
+import pickle
 
 import scipy
 import scipy.sparse
@@ -135,38 +139,46 @@ def find_paths(
 ########################################################### FILE HELPERS ############################################################
 #####################################################################################################################################
 
-def prepare_path(path, mkdir=False, exist_ok=True):
+def prepare_path(
+    path: str, 
+    mkdir: bool = False, 
+    exist_ok: bool = True,
+) -> str:
     """
-    Checks if a directory or filepath for validity for different
-     purposes: saving, loading, etc.
-    If exists:
-        If exist_ok=True: all good
-        If exist_ok=False: raises error
-    If doesn't exist:
-        If file:
-            If parent directory exists:
-                All good
-            If parent directory doesn't exist:
-                If mkdir=True: creates parent directory
-                If mkdir=False: raises error
-        If directory:
-            If mkdir=True: creates directory
-            If mkdir=False: raises error
-   
-    Returns a resolved path.
+    Checks if a directory or file path is valid for different purposes: 
+    saving, loading, etc.
+    RH 2023
+
+    * If exists:
+        * If exist_ok=True: all good
+        * If exist_ok=False: raises error
+    * If doesn't exist:
+        * If file:
+            * If parent directory exists:
+                * All good
+            * If parent directory doesn't exist:
+                * If mkdir=True: creates parent directory
+                * If mkdir=False: raises error
+        * If directory:
+            * If mkdir=True: creates directory
+            * If mkdir=False: raises error
+            
     RH 2023
 
     Args:
-        path (str):
-            Path to check.
-        mkdir (bool):
-            If True, creates parent directory if it does not exist.
-        exist_ok (bool):
-            If True, allows overwriting of existing file.
+        path (str): 
+            Path to be checked.
+        mkdir (bool): 
+            If ``True``, creates parent directory if it does not exist. 
+            (Default is ``False``)
+        exist_ok (bool): 
+            If ``True``, allows overwriting of existing file. 
+            (Default is ``True``)
 
     Returns:
-        path (str):
-            Resolved path.
+        (str): 
+            path (str):
+                Resolved path.
     """
     ## check if path is valid
     try:
@@ -217,69 +229,632 @@ def prepare_path(path, mkdir=False, exist_ok=True):
 
     return str(path_obj)
 
-### Custom functions for preparing paths for saving and loading files and directories
-def prepare_filepath_for_saving(filepath, mkdir=False, allow_overwrite=True):
+def prepare_filepath_for_saving(
+    filepath: str, 
+    mkdir: bool = False, 
+    allow_overwrite: bool = True
+) -> str:
+    """
+    Prepares a file path for saving a file. Ensures the file path is valid and has the necessary permissions. 
+
+    Args:
+        filepath (str): 
+            The file path to be prepared for saving.
+        mkdir (bool): 
+            If set to ``True``, creates parent directory if it does not exist. (Default is ``False``)
+        allow_overwrite (bool): 
+            If set to ``True``, allows overwriting of existing file. (Default is ``True``)
+
+    Returns:
+        (str): 
+            path (str): 
+                The prepared file path for saving.
+    """
     return prepare_path(filepath, mkdir=mkdir, exist_ok=allow_overwrite)
-def prepare_filepath_for_loading(filepath, must_exist=True):
+def prepare_filepath_for_loading(
+    filepath: str, 
+    must_exist: bool = True
+) -> str:
+    """
+    Prepares a file path for loading a file. Ensures the file path is valid and has the necessary permissions. 
+
+    Args:
+        filepath (str): 
+            The file path to be prepared for loading.
+        must_exist (bool): 
+            If set to ``True``, the file at the specified path must exist. (Default is ``True``)
+
+    Returns:
+        (str): 
+            path (str): 
+                The prepared file path for loading.
+    """
     path = prepare_path(filepath, mkdir=False, exist_ok=must_exist)
     if must_exist:
         assert Path(path).is_file(), f'{path} is not a file.'
     return path
-def prepare_directory_for_saving(directory, mkdir=False, exist_ok=True):
-    """Rarely used."""
+def prepare_directory_for_saving(
+    directory: str, 
+    mkdir: bool = False, 
+    exist_ok: bool = True
+) -> str:
+    """
+    Prepares a directory path for saving a file. This function is rarely used.
+
+    Args:
+        directory (str): 
+            The directory path to be prepared for saving.
+        mkdir (bool): 
+            If set to ``True``, creates parent directory if it does not exist. (Default is ``False``)
+        exist_ok (bool): 
+            If set to ``True``, allows overwriting of existing directory. (Default is ``True``)
+
+    Returns:
+        (str): 
+            path (str): 
+                The prepared directory path for saving.
+    """
     return prepare_path(directory, mkdir=mkdir, exist_ok=exist_ok)
-def prepare_directory_for_loading(directory, must_exist=True):
-    """Rarely used."""
+def prepare_directory_for_loading(
+    directory: str, 
+    must_exist: bool = True
+) -> str:
+    """
+    Prepares a directory path for loading a file. This function is rarely used.
+
+    Args:
+        directory (str): 
+            The directory path to be prepared for loading.
+        must_exist (bool): 
+            If set to ``True``, the directory at the specified path must exist. (Default is ``True``)
+
+    Returns:
+        (str): 
+            path (str): 
+                The prepared directory path for loading.
+    """
     path = prepare_path(directory, mkdir=False, exist_ok=must_exist)
     if must_exist:
         assert Path(path).is_dir(), f'{path} is not a directory.'
     return path
 
 
-def json_save(obj, path_save, indent=4, mode='w', mkdir=False, allow_overwrite=True):
+def pickle_save(
+    obj: Any, 
+    filepath: str, 
+    mode: str = 'wb', 
+    zipCompress: bool = False, 
+    mkdir: bool = False, 
+    allow_overwrite: bool = True,
+    **kwargs_zipfile: Dict[str, Any],
+) -> None:
     """
-    Saves an object to a json file.
-    Uses json.dump.
+    Saves an object to a pickle file using `pickle.dump`.
+    Allows for zipping of the file.
+
     RH 2022
 
     Args:
-        obj (object):
-            Object to save.
-        path_save (str):
-            Path to save object to.
-        mode (str):
-            Mode to open file in.
-            Can be:
-                'wb' (write binary)
-                'ab' (append binary)
-                'xb' (exclusive write binary. Raises FileExistsError if file already exists.)
-        mkdir (bool):
-            If True, creates parent directory if it does not exist.
-        allow_overwrite (bool):
-            If True, allows overwriting of existing file.        
+        obj (Any): 
+            The object to save.
+        filepath (str): 
+            The path to save the object to.
+        mode (str): 
+            The mode to open the file in. Options are: \n
+            * ``'wb'``: Write binary.
+            * ``'ab'``: Append binary.
+            * ``'xb'``: Exclusive write binary. Raises FileExistsError if the
+              file already exists. \n
+            (Default is ``'wb'``)
+        zipCompress (bool): 
+            If ``True``, compresses pickle file using zipfileCompressionMethod,
+            which is similar to ``savez_compressed`` in numpy (with
+            ``zipfile.ZIP_DEFLATED``). Useful for saving redundant and/or sparse
+            arrays objects. (Default is ``False``)
+        mkdir (bool): 
+            If ``True``, creates parent directory if it does not exist. (Default
+            is ``False``)
+        allow_overwrite (bool): 
+            If ``True``, allows overwriting of existing file. (Default is
+            ``True``)
+        kwargs_zipfile (Dict[str, Any]): 
+            Keyword arguments that will be passed into `zipfile.ZipFile`.
+            compression=``zipfile.ZIP_DEFLATED`` by default.
+            See https://docs.python.org/3/library/zipfile.html#zipfile-objects.
+            Other options for 'compression' are (input can be either int or object): \n
+                * ``0``:  zipfile.ZIP_STORED (no compression)
+                * ``8``:  zipfile.ZIP_DEFLATED (usual zip compression)
+                * ``12``: zipfile.ZIP_BZIP2 (bzip2 compression) (usually not as
+                  good as ZIP_DEFLATED)
+                * ``14``: zipfile.ZIP_LZMA (lzma compression) (usually better
+                  than ZIP_DEFLATED but slower)
     """
-    prepare_filepath_for_saving(path_save, mkdir=mkdir, allow_overwrite=allow_overwrite)
-    with open(path_save, mode) as f:
-        json.dump(obj, f, indent=indent)
+    path = prepare_filepath_for_saving(filepath, mkdir=mkdir, allow_overwrite=allow_overwrite)
 
-def json_load(filename, mode='r'):
+    if len(kwargs_zipfile)==0:
+        kwargs_zipfile = {
+            'compression': zipfile.ZIP_DEFLATED,
+        }
+
+    if zipCompress:
+        with zipfile.ZipFile(path, 'w', **kwargs_zipfile) as f:
+            f.writestr('data', pickle.dumps(obj))
+    else:
+        with open(path, mode) as f:
+            pickle.dump(obj, f)
+
+def pickle_load(
+    filepath: str, 
+    zipCompressed: bool = False,
+    mode: str = 'rb',
+) -> Any:
     """
-    Loads a json file.
+    Loads an object from a pickle file.
     RH 2022
 
     Args:
-        filename (str):
-            Path to pickle file.
-        mode (str):
-            Mode to open file in.
+        filepath (str): 
+            Path to the pickle file.
+        zipCompressed (bool): 
+            If ``True``, the file is assumed to be a .zip file. The function
+            will first unzip the file, then load the object from the unzipped
+            file. 
+            (Default is ``False``)
+        mode (str): 
+            The mode to open the file in. (Default is ``'rb'``)
 
     Returns:
-        obj (object):
-            Object loaded from pickle file.
+        (Any): 
+            obj (Any): 
+                The object loaded from the pickle file.
     """
-    with open(filename, mode) as f:
+    path = prepare_filepath_for_loading(filepath, must_exist=True)
+    if zipCompressed:
+        with zipfile.ZipFile(path, 'r') as f:
+            return pickle.loads(f.read('data'))
+    else:
+        with open(path, mode) as f:
+            return pickle.load(f)
+
+def json_save(
+    obj: Any, 
+    filepath: str, 
+    indent: int = 4, 
+    mode: str = 'w', 
+    mkdir: bool = False, 
+    allow_overwrite: bool = True,
+) -> None:
+    """
+    Saves an object to a json file using `json.dump`.
+    RH 2022
+
+    Args:
+        obj (Any): 
+            The object to save.
+        filepath (str): 
+            The path to save the object to.
+        indent (int): 
+            Number of spaces for indentation in the output json file. (Default
+            is *4*)
+        mode (str): 
+            The mode to open the file in. Options are: \n
+            * ``'wb'``: Write binary.
+            * ``'ab'``: Append binary.
+            * ``'xb'``: Exclusive write binary. Raises FileExistsError if the
+              file already exists. \n
+            (Default is ``'w'``)
+        mkdir (bool): 
+            If ``True``, creates parent directory if it does not exist. (Default
+            is ``False``)
+        allow_overwrite (bool): 
+            If ``True``, allows overwriting of existing file. (Default is
+            ``True``)
+    """
+    import json
+    path = prepare_filepath_for_saving(filepath, mkdir=mkdir, allow_overwrite=allow_overwrite)
+    with open(path, mode) as f:
+        json.dump(obj, f, indent=indent)
+
+def json_load(
+    filepath: str, 
+    mode: str = 'r',
+) -> Any:
+    """
+    Loads an object from a json file.
+    RH 2022
+
+    Args:
+        filepath (str): 
+            Path to the json file.
+        mode (str): 
+            The mode to open the file in. (Default is ``'r'``)
+
+    Returns:
+        (Any): 
+            obj (Any): 
+                The object loaded from the json file.
+    """
+    import json
+    path = prepare_filepath_for_loading(filepath, must_exist=True)
+    with open(path, mode) as f:
         return json.load(f)
+
+
+def yaml_save(
+    obj: object, 
+    filepath: str, 
+    indent: int = 4, 
+    mode: str = 'w', 
+    mkdir: bool = False, 
+    allow_overwrite: bool = True,
+) -> None:
+    """
+    Saves an object to a YAML file using the ``yaml.dump`` method.
+    RH 2022
+
+    Args:
+        obj (object): 
+            The object to be saved.
+        filepath (str): 
+            Path to save the object to.
+        indent (int): 
+            The number of spaces for indentation in the saved YAML file.
+            (Default is *4*)
+        mode (str): 
+            Mode to open the file in. \n
+            * ``'w'``: write (default)
+            * ``'wb'``: write binary
+            * ``'ab'``: append binary
+            * ``'xb'``: exclusive write binary. Raises ``FileExistsError`` if
+              file already exists. \n
+            (Default is ``'w'``)
+        mkdir (bool): 
+            If ``True``, creates the parent directory if it does not exist.
+            (Default is ``False``)
+        allow_overwrite (bool): 
+            If ``True``, allows overwriting of existing files. (Default is
+            ``True``)
+    """
+    path = prepare_filepath_for_saving(filepath, mkdir=mkdir, allow_overwrite=allow_overwrite)
+    with open(path, mode) as f:
+        yaml.dump(obj, f, indent=indent)
+
+def yaml_load(
+    filepath: str, 
+    mode: str = 'r', 
+    loader: object = yaml.FullLoader,
+) -> object:
+    """
+    Loads a YAML file.
+    RH 2022
+
+    Args:
+        filepath (str): 
+            Path to the YAML file to load.
+        mode (str): 
+            Mode to open the file in. (Default is ``'r'``)
+        loader (object): 
+            The YAML loader to use. \n
+            * ``yaml.FullLoader``: Loads the full YAML language. Avoids
+              arbitrary code execution. (Default for PyYAML 5.1+)
+            * ``yaml.SafeLoader``: Loads a subset of the YAML language, safely.
+              This is recommended for loading untrusted input.
+            * ``yaml.UnsafeLoader``: The original Loader code that could be
+              easily exploitable by untrusted data input.
+            * ``yaml.BaseLoader``: Only loads the most basic YAML. All scalars
+              are loaded as strings. \n
+            (Default is ``yaml.FullLoader``)
+
+    Returns:
+        (object): 
+            loaded_obj (object):
+                The object loaded from the YAML file.
+    """
+    path = prepare_filepath_for_loading(filepath, must_exist=True)
+    with open(path, mode) as f:
+        return yaml.load(f, Loader=loader)    
+            
+
+def download_file(
+    url: Optional[str],
+    path_save: str,
+    check_local_first: bool = True,
+    check_hash: bool = False,
+    hash_type: str = 'MD5',
+    hash_hex: Optional[str] = None,
+    mkdir: bool = False,
+    allow_overwrite: bool = True,
+    write_mode: str = 'wb',
+    verbose: bool = True,
+    chunk_size: int = 1024,
+) -> None:
+    """
+    Downloads a file from a URL to a local path using requests. Checks if file
+    already exists locally and verifies the hash of the downloaded file against
+    a provided hash if required.
+    RH 2023
+
+    Args:
+        url (Optional[str]): 
+            URL of the file to download. If ``None``, then no download is
+            attempted. (Default is ``None``)
+        path_save (str): 
+            Path to save the file to.
+        check_local_first (bool): 
+            Whether to check if the file already exists locally. If ``True`` and
+            the file exists locally, the download is skipped. If ``True`` and
+            ``check_hash`` is also ``True``, the hash of the local file is
+            checked. If the hash matches, the download is skipped. If the hash
+            does not match, the file is downloaded. (Default is ``True``)
+        check_hash (bool): 
+            Whether to check the hash of the local or downloaded file against
+            ``hash_hex``. (Default is ``False``)
+        hash_type (str): 
+            Type of hash to use. Options are: ``'MD5'``, ``'SHA1'``,
+            ``'SHA256'``, ``'SHA512'``. (Default is ``'MD5'``)
+        hash_hex (Optional[str]): 
+            Hash to compare to, in hexadecimal format (e.g., 'a1b2c3d4e5f6...').
+            Can be generated using ``hash_file()`` or ``hashlib.hexdigest()``.
+            If ``check_hash`` is ``True``, ``hash_hex`` must be provided.
+            (Default is ``None``)
+        mkdir (bool): 
+            If ``True``, creates the parent directory of ``path_save`` if it
+            does not exist. (Default is ``False``)
+        write_mode (str): 
+            Write mode for saving the file. Options include: ``'wb'`` (write
+            binary), ``'ab'`` (append binary), ``'xb'`` (write binary, fail if
+            file exists). (Default is ``'wb'``)
+        verbose (bool): 
+            If ``True``, prints status messages. (Default is ``True``)
+        chunk_size (int): 
+            Size of chunks in which to download the file. (Default is *1024*)
+    """
+    import os
+    import requests
+
+    # Check if file already exists locally
+    if check_local_first:
+        if os.path.isfile(path_save):
+            print(f'File already exists locally: {path_save}') if verbose else None
+            # Check hash of local file
+            if check_hash:
+                hash_local = hash_file(path_save, type_hash=hash_type)
+                if hash_local == hash_hex:
+                    print('Hash of local file matches provided hash_hex.') if verbose else None
+                    return True
+                else:
+                    print('Hash of local file does not match provided hash_hex.') if verbose else None
+                    print(f'Hash of local file: {hash_local}') if verbose else None
+                    print(f'Hash provided in hash_hex: {hash_hex}') if verbose else None
+                    print('Downloading file...') if verbose else None
+            else:
+                return True
+        else:
+            print(f'File does not exist locally: {path_save}. Will attempt download from {url}') if verbose else None
+
+    # Download file
+    if url is None:
+        print('No URL provided. No download attempted.') if verbose else None
+        return None
+    try:
+        response = requests.get(url, stream=True)
+    except requests.exceptions.RequestException as e:
+        print(f'Error downloading file: {e}') if verbose else None
+        return False
+    # Check response
+    if response.status_code != 200:
+        print(f'Error downloading file. Response status code: {response.status_code}') if verbose else None
+        return False
+    # Create parent directory if it does not exist
+    prepare_filepath_for_saving(path_save, mkdir=mkdir, allow_overwrite=allow_overwrite)
+    # Download file with progress bar
+    total_size = int(response.headers.get('content-length', 0))
+    wrote = 0
+    with open(path_save, write_mode) as f:
+        with tqdm(total=total_size, disable=(verbose==False), unit='B', unit_scale=True, unit_divisor=1024) as pbar:
+            for data in response.iter_content(chunk_size):
+                wrote = wrote + len(data)
+                f.write(data)
+                pbar.update(len(data))
+    if total_size != 0 and wrote != total_size:
+        print("ERROR, something went wrong")
+        return False
+    # Check hash
+    hash_local = hash_file(path_save, type_hash=hash_type)
+    if check_hash:
+        if hash_local == hash_hex:
+            print('Hash of downloaded file matches hash_hex.') if verbose else None
+            return True
+        else:
+            print('Hash of downloaded file does not match hash_hex.') if verbose else None
+            print(f'Hash of downloaded file: {hash_local}') if verbose else None
+            print(f'Hash provided in hash_hex: {hash_hex}') if verbose else None
+            return False
+    else:
+        print(f'Hash of downloaded file: {hash_local}') if verbose else None
+        return True
+
+
+def hash_file(
+    path: str, 
+    type_hash: str = 'MD5', 
+    buffer_size: int = 65536,
+) -> str:
+    """
+    Computes the hash of a file using the specified hash type and buffer size.
+    RH 2022
+
+    Args:
+        path (str):
+            Path to the file to be hashed.
+        type_hash (str):
+            Type of hash to use. (Default is ``'MD5'``). Either \n
+            * ``'MD5'``: MD5 hash algorithm.
+            * ``'SHA1'``: SHA1 hash algorithm.
+            * ``'SHA256'``: SHA256 hash algorithm.
+            * ``'SHA512'``: SHA512 hash algorithm.
+        buffer_size (int):
+            Buffer size (in bytes) for reading the file. 
+            65536 corresponds to 64KB. (Default is *65536*)
+
+    Returns:
+        (str): 
+            hash_val (str):
+                The computed hash of the file.
+    """
+    import hashlib
+
+    if type_hash == 'MD5':
+        hasher = hashlib.md5()
+    elif type_hash == 'SHA1':
+        hasher = hashlib.sha1()
+    elif type_hash == 'SHA256':
+        hasher = hashlib.sha256()
+    elif type_hash == 'SHA512':
+        hasher = hashlib.sha512()
+    else:
+        raise ValueError(f'{type_hash} is not a valid hash type.')
+
+    with open(path, 'rb') as f:
+        while True:
+            data = f.read(buffer_size)
+            if not data:
+                break
+            hasher.update(data)
+
+    hash_val = hasher.hexdigest()
         
+    return hash_val
+    
+
+def get_dir_contents(
+    directory: str,
+) -> Tuple[List[str], List[str]]:
+    """
+    Retrieves the names of the folders and files in a directory (does not
+    include subdirectories).
+    RH 2021
+
+    Args:
+        directory (str):
+            The path to the directory.
+
+    Returns:
+        (tuple): tuple containing:
+            folders (List[str]):
+                A list of folder names.
+            files (List[str]):
+                A list of file names.
+    """
+    walk = os.walk(directory, followlinks=False)
+    folders = []
+    files = []
+    for ii,level in enumerate(walk):
+        folders, files = level[1:]
+        if ii==0:
+            break
+    return folders, files
+
+
+def compare_file_hashes(
+    hash_dict_true: Dict[str, Tuple[str, str]],
+    dir_files_test: Optional[str] = None,
+    paths_files_test: Optional[List[str]] = None,
+    verbose: bool = True,
+) -> Tuple[bool, Dict[str, bool], Dict[str, str]]:
+    """
+    Compares hashes of files in a directory or list of paths to provided hashes.
+    RH 2022
+
+    Args:
+        hash_dict_true (Dict[str, Tuple[str, str]]):
+            Dictionary of hashes to compare. Each entry should be in the format:
+            *{'key': ('filename', 'hash')}*.
+        dir_files_test (str): 
+            Path to directory containing the files to compare hashes. 
+            Unused if paths_files_test is not ``None``. (Optional)
+        paths_files_test (List[str]): 
+            List of paths to files to compare hashes. 
+            dir_files_test is used if ``None``. (Optional)
+        verbose (bool): 
+            If ``True``, failed comparisons are printed out. (Default is ``True``)
+
+    Returns:
+        (tuple): tuple containing:
+            total_result (bool):
+                ``True`` if all hashes match, ``False`` otherwise.
+            individual_results (Dict[str, bool]):
+                Dictionary indicating whether each hash matched.
+            paths_matching (Dict[str, str]):
+                Dictionary of paths that matched. Each entry is in the format:
+                *{'key': 'path'}*.
+    """
+    if paths_files_test is None:
+        if dir_files_test is None:
+            raise ValueError('Must provide either dir_files_test or path_files_test.')
+        
+        ## make a dict of {filename: path} for each file in dir_files_test
+        files_test = {filename: (Path(dir_files_test).resolve() / filename).as_posix() for filename in get_dir_contents(dir_files_test)[1]} 
+    else:
+        files_test = {Path(path).name: path for path in paths_files_test}
+
+    paths_matching = {}
+    results_matching = {}
+    for key, (filename, hash_true) in hash_dict_true.items():
+        match = True
+        if filename not in files_test:
+            print(f'{filename} not found in test directory: {dir_files_test}.') if verbose else None
+            match = False
+        elif hash_true != hash_file(files_test[filename]):
+            print(f'{filename} hash mismatch with {key, filename}.') if verbose else None
+            match = False
+        if match:
+            paths_matching[key] = files_test[filename]
+        results_matching[key] = match
+
+    return all(results_matching.values()), results_matching, paths_matching
+
+
+def extract_zip(
+    path_zip: str,
+    path_extract: Optional[str] = None,
+    verbose: bool = True,
+) -> List[str]:
+    """
+    Extracts a zip file.
+    RH 2022
+
+    Args:
+        path_zip (str): 
+            Path to the zip file.
+        path_extract (Optional[str]): 
+            Path (directory) to extract the zip file to.
+            If ``None``, extracts to the same directory as the zip file.
+            (Default is ``None``)
+        verbose (bool): 
+            Whether to print progress. (Default is ``True``)
+
+    Returns:
+        (List[str]): 
+            paths_extracted (List[str]):
+                List of paths to the extracted files.
+    """
+    import zipfile
+
+    if path_extract is None:
+        path_extract = str(Path(path_zip).resolve().parent)
+    path_extract = str(Path(path_extract).resolve().absolute())
+
+    print(f'Extracting {path_zip} to {path_extract}.') if verbose else None
+
+    with zipfile.ZipFile(path_zip, 'r') as zip_ref:
+        zip_ref.extractall(path_extract)
+        paths_extracted = [str(Path(path_extract) / p) for p in zip_ref.namelist()]
+
+    print('Completed zip extraction.') if verbose else None
+
+    return paths_extracted
+
 
 #####################################################################################################################################
 ############################################################# INDEXING ##############################################################
@@ -438,6 +1013,39 @@ def deep_update_dict(dictionary, key, new_val=None, new_key=None, in_place=False
         helper_deep_update_dict(d, key)
         return d
 
+
+def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str ='.') -> MutableMapping:
+    """
+    Flattens a dictionary of dictionaries into a single dictionary. NOTE: Turns
+    all keys into strings. Stolen from https://stackoverflow.com/a/6027615.
+    RH 2022
+
+    Args:
+        d (Dict):
+            Dictionary to flatten
+        parent_key (str):
+            Key to prepend to flattened keys IGNORE: USED INTERNALLY FOR
+            RECURSION
+        sep (str):
+            Separator to use between keys IGNORE: USED INTERNALLY FOR RECURSION
+
+    Returns:
+        (Dict):
+            flattened dictionary (dict):
+                Flat dictionary with the keys to deeper dictionaries joined by
+                the separator.
+    """
+
+    items = []
+    for k, v in d.items():
+        new_key = str(parent_key) + str(sep) + str(k) if parent_key else str(k)
+        if isinstance(v, MutableMapping):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
 def find_subDict_key(d: dict, s: str, max_depth: int=9999999):
     """
     Recursively search for a sub-dictionary that contains the given string.
@@ -475,6 +1083,123 @@ def find_subDict_key(d: dict, s: str, max_depth: int=9999999):
                 if isinstance(v, dict):
                     yield from helper_find_subDict_key(v, s, depth, _k_all + [k])
     return list(helper_find_subDict_key(d, s, depth=max_depth, _k_all=[]))
+
+
+## parameter dictionary helpers ##
+
+def fill_in_dict(
+    d: Dict, 
+    defaults: Dict,
+    verbose: bool = True,
+    hierarchy: List[str] = ['dict'], 
+):
+    """
+    In-place. Fills in dictionary ``d`` with values from ``defaults`` if they
+    are missing. Works hierachically.
+    RH 2023
+
+    Args:
+        d (Dict):
+            Dictionary to fill in.
+            In-place.
+        defaults (Dict):
+            Dictionary of defaults.
+        verbose (bool):
+            Whether to print messages.
+        hierarchy (List[str]):
+            Used internally for recursion.
+            Hierarchy of keys to d.
+    """
+    from copy import deepcopy
+    for key in defaults:
+        if key not in d:
+            print(f"Key '{key}' not found in params dictionary: {' > '.join([f'{str(h)}' for h in hierarchy])}. Using default value: {defaults[key]}") if verbose else None
+            d.update({key: deepcopy(defaults[key])})
+        elif isinstance(defaults[key], dict):
+            assert isinstance(d[key], dict), f"Key '{key}' is a dict in defaults, but not in params. {' > '.join([f'{str(h)}' for h in hierarchy])}."
+            fill_in_dict(d[key], defaults[key], hierarchy=hierarchy+[key])
+            
+
+def check_keys_subset(
+    d, 
+    default_dict, 
+    error_on_missing_keys=True,
+    hierarchy=['defaults'],
+):
+    """
+    Checks that the keys in d are all in default_dict. Raises an error if not.
+    RH 2023
+
+    Args:
+        d (Dict):
+            Dictionary to check.
+        default_dict (Dict):
+            Dictionary containing the keys to check against.
+        error_on_missing_keys (bool):
+            Whether to raise an error if any keys in ``params`` are not in
+             ``defaults``.
+        hierarchy (List[str]):
+            Used internally for recursion.
+            Hierarchy of keys to d.
+    """
+    default_keys = list(default_dict.keys())
+    for key in d.keys():
+        if error_on_missing_keys:
+            assert key in default_keys, f"Key '{key}' not found in defaults dictionary: {' > '.join([f'{str(h)}' for h in hierarchy])}."
+        else:
+            if key not in default_keys:
+                warnings.warn(f"Key '{key}' not found in defaults dictionary: {' > '.join([f'{str(h)}' for h in hierarchy])}.")
+                continue
+        if isinstance(default_dict[key], dict) and isinstance(d[key], dict):
+            check_keys_subset(
+                d=d[key], 
+                default_dict=default_dict[key], 
+                error_on_missing_keys=error_on_missing_keys,
+                hierarchy=hierarchy+[key],
+            )
+
+
+def prepare_params(
+    params, 
+    defaults, 
+    error_on_missing_keys=True,
+    verbose=True,
+):
+    """
+    Does the following:
+        * Checks that all keys in ``params`` are in ``defaults``.
+        * Fills in any missing keys in ``params`` with values from ``defaults``.
+        * Returns a deepcopy of the filled-in ``params``.
+
+    Args:
+        params (Dict):
+            Dictionary of parameters.
+        defaults (Dict):
+            Dictionary of defaults.
+        error_on_missing_keys (bool):
+            Whether to raise an error if any keys in ``params`` are not in
+             ``defaults``.
+        verbose (bool):
+            Whether to print messages.
+    """
+    from copy import deepcopy
+    ## Check inputs
+    assert isinstance(params, dict), f"p must be a dict. Got {type(params)} instead."
+    ## Make sure all the keys in p are valid
+    check_keys_subset(
+        d=params, 
+        default_dict=defaults,
+        error_on_missing_keys=error_on_missing_keys,
+    )
+    ## Fill in any missing keys with defaults
+    params_out = deepcopy(params)
+    fill_in_dict(
+        d=params_out, 
+        defaults=defaults, 
+        verbose=verbose,
+    )
+
+    return params_out
 
 
 #####################################################################################################################################
@@ -3141,3 +3866,187 @@ class _RepeatTimer(Timer):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
 
+
+##########################################################################################################################################
+########################################################### TESTING ######################################################################
+##########################################################################################################################################
+
+class Equivalence_checker():
+    """
+    Class for checking if all items are equivalent or allclose (almost equal) in
+    two complex data structures. Can check nested lists, dicts, and other data
+    structures. Can also optionally assert (raise errors) if all items are not
+    equivalent. 
+    RH 2023
+
+    Attributes:
+        _kwargs_allclose (Optional[dict]): 
+            Keyword arguments for the `numpy.allclose` function.
+        _assert_mode (bool):
+            Whether to raise an assertion error if items are not close.
+
+    Args:
+        kwargs_allclose (Optional[dict]): 
+            Keyword arguments for the `numpy.allclose` function. (Default is
+            ``{'rtol': 1e-7, 'equal_nan': True}``)
+        assert_mode (bool): 
+            Whether to raise an assertion error if items are not close.
+        verbose (bool):
+            How much information to print out:
+                * ``False`` / ``0``: No information printed out.
+                * ``True`` / ``1``: Mismatched items only.
+                * ``2``: All items printed out.
+    """
+    def __init__(
+        self,
+        kwargs_allclose: Optional[dict] = {'rtol': 1e-7, 'equal_nan': True},
+        assert_mode=False,
+        verbose=False,
+    ) -> None:
+        """
+        Initializes the Allclose_checker.
+        """
+        self._kwargs_allclose = kwargs_allclose
+        self._assert_mode = assert_mode
+        self._verbose = verbose
+        
+    def _checker(
+        self, 
+        test: Any,
+        true: Any, 
+        path: Optional[List[str]] = None,
+    ) -> bool:
+        """
+        Compares the test and true values using numpy's allclose function.
+
+        Args:
+            test (Union[dict, list, tuple, set, np.ndarray, int, float, complex,
+            str, bool, None]): 
+                Test value to compare.
+            true (Union[dict, list, tuple, set, np.ndarray, int, float, complex,
+            str, bool, None]): 
+                True value to compare.
+            path (Optional[List[str]]): 
+                The path of the data structure that is currently being compared.
+                (Default is ``None``)
+
+        Returns:
+            (bool): 
+                result (bool): 
+                    Returns True if all elements in test and true are close.
+                    Otherwise, returns False.
+        """
+        try:
+            ## If the dtype is a kind of string (or byte string) or object, then allclose will raise an error. In this case, just check if the values are equal.
+            if np.issubdtype(test.dtype, np.str_) or np.issubdtype(test.dtype, np.bytes_) or test.dtype == np.object_:
+                out = bool(np.all(test == true))
+                print(f"Equivalence check {'passed' if out else 'failed'}. Path: {path}.") if self._verbose > 1 else None
+            else:
+                out = np.allclose(test, true, **self._kwargs_allclose)
+            print(f"Equivalence check passed. Path: {path}") if self._verbose > 1 else None
+        except Exception as e:
+            out = None  ## This is not False because sometimes allclose will raise an error if the arrays have a weird dtype among other reasons.
+            warnings.warn(f"WARNING. Equivalence check failed. Path: {path}. Error: {e}") if self._verbose else None
+            
+        if out == False:
+            if self._assert_mode:
+                raise AssertionError(f"Equivalence check failed. Path: {path}.")
+            if self._verbose:
+                ## Come up with a way to describe the difference between the two values. Something like the following:
+                ### IF the arrays are numeric, then calculate the relative difference
+                dtypes_numeric = (np.number, np.bool_, np.integer, np.floating, np.complexfloating)
+                if any([np.issubdtype(test.dtype, dtype) and np.issubdtype(true.dtype, dtype) for dtype in dtypes_numeric]):
+                    diff = np.abs(test - true)
+                    r_diff = diff / np.abs(true)
+                    r_diff_mean, r_diff_max, any_nan = np.nanmean(r_diff), np.nanmax(r_diff), np.any(np.isnan(r_diff))
+                    print(f"Equivalence check failed. Path: {path}. Relative difference: mean={r_diff_mean}, max={r_diff_max}, any_nan={any_nan}") if self._verbose > 0 else None
+                else:
+                    print(f"Equivalence check failed. Path: {path}. Value is non-numerical.") if self._verbose > 0 else None
+        return out
+
+    def __call__(
+        self,
+        test: Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None], 
+        true: Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None], 
+        path: Optional[List[str]] = None,
+    ) -> Dict[str, Tuple[bool, str]]:
+        """
+        Compares the test and true values and returns the comparison result.
+        Handles various data types including dictionaries, iterables,
+        np.ndarray, scalars, strings, numbers, bool, and None.
+
+        Args:
+            test (Union[dict, list, tuple, set, np.ndarray, int, float, complex,
+            str, bool, None]): 
+                Test value to compare.
+            true (Union[dict, list, tuple, set, np.ndarray, int, float, complex,
+            str, bool, None]): 
+                True value to compare.
+            path (Optional[List[str]]): 
+                The path of the data structure that is currently being compared.
+                (Default is ``None``)
+
+        Returns:
+            Dict[Tuple[bool, str]]: 
+                result Dict[Tuple[bool, str]]: 
+                    The comparison result as a dictionary or a tuple depending
+                    on the data types of test and true.
+        """
+        if path is None:
+            path = ['']
+
+        if len(path) > 0:
+            if path[-1].startswith('_'):
+                return (None, 'excluded from testing')
+
+        ## NP.NDARRAY
+        if isinstance(true, np.ndarray):
+            r = self._checker(test, true, path)
+            result = (r, 'equivalence')
+        ## NP.SCALAR
+        elif np.isscalar(true):
+            if isinstance(test, (int, float, complex, np.number)):
+                r = self._checker(np.array(test), np.array(true), path)
+                result = (r, 'equivalence')
+            else:
+                result = (test == true, 'equivalence')
+        ## NUMBER
+        elif isinstance(true, (int, float, complex)):
+            r = self._checker(test, true, path)
+            result = (result, 'equivalence')
+        ## DICT
+        elif isinstance(true, dict):
+            result = {}
+            for key in true:
+                if key not in test:
+                    result[str(key)] = (False, 'key not found')
+                    print(f"Equivalence check failed. Path: {path}. Key {key} not found.") if self._verbose > 0 else None
+                else:
+                    result[str(key)] = self.__call__(test[key], true[key], path=path + [str(key)])
+        ## ITERATABLE
+        elif isinstance(true, (list, tuple, set)):
+            if len(true) != len(test):
+                result = (False, 'length_mismatch')
+                print(f"Equivalence check failed. Path: {path}. Length mismatch.") if self._verbose > 0 else None
+            else:
+                result = {}
+                for idx, (i, j) in enumerate(zip(test, true)):
+                    result[str(idx)] = self.__call__(i, j, path=path + [str(idx)])
+        ## STRING
+        elif isinstance(true, str):
+            result = (test == true, 'equivalence')
+            print(f"Equivalence check {'passed' if result[0] else 'failed'}. Path: {path}.") if self._verbose > 0 else None
+        ## BOOL
+        elif isinstance(true, bool):
+            result = (test == true, 'equivalence')
+            print(f"Equivalence check {'passed' if result[0] else 'failed'}. Path: {path}.") if self._verbose > 0 else None
+        ## NONE
+        elif true is None:
+            result = (test is None, 'equivalence')
+            print(f"Equivalence check {'passed' if result[0] else 'failed'}. Path: {path}.") if self._verbose > 0 else None
+        ## N/A
+        else:
+            result = (None, 'not tested')
+            print(f"Equivalence check not performed. Path: {path}.") if self._verbose > 0 else None
+
+        return result

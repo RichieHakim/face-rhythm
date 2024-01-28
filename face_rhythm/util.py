@@ -13,6 +13,207 @@ import numpy as np
 from . import h5_handling
 from . import helpers
 
+
+def get_default_parameters(
+    path_defaults=None,
+    directory_project=None,
+    directory_videos=None,
+    filename_videos_strMatch=None,
+    path_ROIs=None,
+):
+    """
+    This function returns a dictionary of parameters that can be used to run
+    different pipelines. RH 2023
+
+    Args:
+        path_defaults (str):
+            A path to a json file containing a parameters dictionary. The
+            parameters from the file will be loaded. If None, the default
+            parameters will be used.
+        directory_project (str):
+            The directory to use as the project directory. Used in
+            fr.project.prepare_project.
+        directory_videos (str):
+            The directory containing the videos. Used in fr.helpers.find_paths
+            to find the video paths.
+        filename_videos_strMatch (str):
+            A string that the video filenames must match. Used in
+            fr.helpers.find_paths to find the video paths.
+        path_ROIs (str):
+            The path to the file containing the ROIs. Used in fr.rois.ROIs to
+            load the ROIs if using 'file' mode instead of 'gui' as in the
+            interactive notebook.
+
+    Returns:
+        (dict):
+            params (dict):
+                A dictionary containing the default parameters.
+    """
+
+    if path_defaults is not None:
+        defaults = helpers.json_load(path_defaults)
+    else:
+        defaults = {
+            "steps": [
+                "load_videos",
+                "ROIs",
+                "point_tracking",
+                "VQT",
+                "TCA",
+            ],
+            "project": {
+                "directory_project": directory_project,
+                "overwrite_config": True,
+                "update_project_paths": True,
+                "initialize_visualization": False,
+                "use_GPU": True,
+                "random_seed": None,
+                "verbose": 2,
+            },
+            "figure_saver": {
+                "formats_save": [
+                    "png"
+                ],
+                "kwargs_savefig": {
+                    "bbox_inches": "tight",
+                    "pad_inches": 0.1,
+                    "transparent": True,
+                    "dpi": 300,
+                },
+                "overwrite": True,
+                "verbose": 2
+            },
+            "paths_videos": {
+                "directory_videos": directory_videos,
+                "filename_videos_strMatch": filename_videos_strMatch,
+                # "filename_videos_strMatch": "test\.avi",
+                "depth": 1,
+            },
+            "BufferedVideoReader": {
+                "buffer_size": 1000,
+                "prefetch": 1,
+                "posthold": 1,
+                "method_getitem": "by_video",
+                "verbose": 1,
+            },
+            "Dataset_videos": {
+                "contiguous": False,
+                "frame_rate_clamp": None,
+                "verbose": 2,
+            },
+            "ROIs": {
+                "initialize":{
+                    "select_mode": "file",
+                    "path_file": path_ROIs,
+                    "verbose": 2,
+                },
+                "make_rois": {
+                    "rois_points_idx": [
+                        0,
+                    ],
+                    "point_spacing": 9,
+                },
+            },
+            "PointTracker": {
+                "contiguous": False,
+                "params_optical_flow": {
+                    "method": "lucas_kanade",
+                    "mesh_rigidity": 0.025,
+                    "mesh_n_neighbors": 8,
+                    "relaxation": 0.0015,
+                    "kwargs_method": {
+                        "winSize": [
+                            20,
+                            20,
+                        ],
+                        "maxLevel": 2,
+                        "criteria": [
+                            3,
+                            2,
+                            0.03,
+                        ],
+                    },
+                },
+                "visualize_video": False,
+                "params_visualization": {
+                    "alpha": 0.2,
+                    "point_sizes": 2,
+                },
+                "params_outlier_handling": {
+                    "threshold_displacement": 150,
+                    "framesHalted_before": 10,
+                    "framesHalted_after": 10,
+                },
+                "verbose": 2,
+            },
+            "VQT_Analyzer": {
+                "params_VQT": {
+                    "Q_lowF": 4,
+                    "Q_highF": 10,
+                    "F_min": 1.0,
+                    "F_max": 60,
+                    "n_freq_bins": 36,
+                    "win_size": 501,
+                    "symmetry": 'center',
+                    "taper_asymmetric": True,
+                    "plot_pref": False,
+                    "downsample_factor": 20,
+                    "padding": "valid",
+                    "batch_size": 10,
+                    "return_complex": False,
+                    "progressBar": True,
+                },
+                "normalization_factor": 0.95,
+                "spectrogram_exponent": 1.0,
+                "one_over_f_exponent": 0.5,
+                "verbose": 2
+            },
+            "TCA": {
+                "verbose": 2,
+                "rearrange_data": {
+                    "names_dims_array": [
+                        "xy",
+                        "points",
+                        "frequency",
+                        "time",
+                    ],
+                    "names_dims_concat_array": [
+                        [
+                            "xy",
+                            "points",
+                        ]
+                    ],
+                    "concat_complexDim": False,
+                    "name_dim_concat_complexDim": "time",
+                    "name_dim_dictElements": "session",
+                    "method_handling_dictElements": "separate",
+                    "name_dim_concat_dictElements": "time",
+                    "idx_windows": None,
+                    "name_dim_array_window": "time",
+                },
+                "fit": {
+                    "method": "CP_NN_HALS",
+                    "params_method": {
+                        "rank": 10,
+                        "n_iter_max": 200,
+                        "init": "random",
+                        "svd": "truncated_svd",
+                        "tol": 1e-09,
+                        "random_state": None,
+                        "verbose": True,
+                    },
+                    "verbose": 2,
+                },
+                "rearrange_factors": {
+                    "undo_concat_complexDim": False,
+                    "undo_concat_dictElements": False,
+                },
+            },
+        }
+
+    return defaults
+
+
 class FR_Module:
     """
     The superclass for all of the Face Rhythm module classes.
