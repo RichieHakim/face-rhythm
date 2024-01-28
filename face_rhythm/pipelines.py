@@ -53,6 +53,12 @@ def pipeline_basic(params):
     ## Initialize paths
     fr.util.system_info(verbose=True);
 
+    SEED = _set_random_seed(
+        seed=params['project']['random_seed'],
+        deterministic=params['project']['random_seed'] is not None,
+    )
+
+
     directory_project = params['project']['directory_project']
     directory_videos  = params['paths_videos']['directory_videos']
 
@@ -369,3 +375,41 @@ def pipeline_basic(params):
     ########################################
 
     print(f'RUN COMPLETE')
+
+
+def _set_random_seed(seed=None, deterministic=False):
+    """
+    Set random seed for reproducibility.
+    RH 2023
+
+    Args:
+        seed (int, optional):
+            Random seed.
+            If None, a random seed (spanning int32 integer range) is generated.
+        deterministic (bool, optional):
+            Whether to make packages deterministic.
+
+    Returns:
+        (int):
+            seed (int):
+                Random seed.
+    """
+    ### random seed (note that optuna requires a random seed to be set within the pipeline)
+    import numpy as np
+    seed = int(np.random.randint(0, 2**31 - 1, dtype=np.uint32)) if seed is None else seed
+
+    np.random.seed(seed)
+    import torch
+    torch.manual_seed(seed)
+    import random
+    random.seed(seed)
+    import cv2
+    cv2.setRNGSeed(seed)
+
+    ## Make torch deterministic
+    torch.use_deterministic_algorithms(deterministic)
+    ## Make cudnn deterministic
+    torch.backends.cudnn.deterministic = deterministic
+    torch.backends.cudnn.benchmark = not deterministic
+    
+    return seed
