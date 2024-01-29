@@ -9,7 +9,7 @@ Learn more at https://face-rhythm.readthedocs.io/
 
 # Installation
 
-#### 0. Requirements <br>
+### 0. Requirements <br>
 - Operating system:
   - Ubuntu >= 18.04 (other linux versions usually okay but not actively maintained)
   - Windows >= 10
@@ -20,17 +20,23 @@ Learn more at https://face-rhythm.readthedocs.io/
 - The below commands should be run in the terminal (Mac/Linux) or Anaconda Prompt (Windows).
 <br>
 
-#### 1. Clone this repo <br>
+### 1. Clone this repo <br>
+This will create a folder called **face-rhythm** in your current directory. This repository folder contains the source code AND the interactive notebooks needed to run the pipeline. <br>
 **`git clone https://github.com/RichieHakim/face-rhythm/`**<br>
 **`cd face-rhythm`**<br>
 
-#### 2. Create a conda environment
+### 2. Create a conda environment
+This will also install the **face-rhythm** package and all of its dependencies into the environment. <br>
 **`conda env create --file environment.yml`**<br>
 
-In either case, this step will create a conda environment named face-rhythm. Activate it: 
+Activate the environment: <br>
 **`conda activate face_rhythm`** <br>
 
-#### 3. Run the set up script <br>
+### Optional Direct installation <br>
+You can also directly install the **face-rhythm** package from PyPI into the environment of your choice. Note that you will still need to download/clone the repository for the notebooks. <br>
+##### Option 1: Install from PyPI <br>
+**`pip install face-rhythm`**<br>
+##### Option 2: Install from source <br>
 **`pip install -e .`**<br>
 
 <br>
@@ -38,25 +44,14 @@ In either case, this step will create a conda environment named face-rhythm. Act
 
 # Usage
 
-#### 1. Create a "project directory" where we will save intermediate files, videos, and config files. <br>
-This project directory should ideally be outside of the repo, and you'll create a new one each time
-you analyze a new dataset. You may want to save a copy of the .ipynb file you use for the run there.
-**`cd directory/where/you/want/to/save/your/project`**<br>
-**`mkdir face_rhythm_run`**<br>
+#### Notebooks
+The easiest way to use **face-rhythm** is through the interactive notebooks. They are found in the following directory: `face-rhythm/notebooks/`. <br>
+- The `interactive_pipeline_basic.ipynb` notebook contains the main pipeline and instructions on how to use it. <br>
+- The `interactive_set_ROIs_only.ipynb` notebook is useful for when you want to run a batch job of many videos/sessions and need to set the ROIs for each video/session ahead of time. <br>
 
-#### 2. Copy the interactive notebook to your project directory 
-We recommend copying the interactive notebook from your face-rhythm repository to your project folder each time you make a new project. This will allow you to have one notebook per project, which will keep your analyses from potentially conflicting if you run different datasets through the same notebooks. 
-**`cp /path to face-rhythm repo/face-rhythm/notebooks/interactive_pipeline_basic.ipynb /path to project/face_rhythm_run/`**<br>
+#### Command line
+The basic pipeline in the interactive notebook is also provided as a function within the `face_rhythm/pipelines.py` module. In the `scripts` folder, you'll find a script called `run_pipeline_basic.py` that can be used to run the pipeline from the command line. An example `params.json` file is also in that folder to use as a template for your runs. <br>
 
-`interactive_pipeline_basic.ipynb` is a basic demo notebook that runs through the entire pipeline.
-See the `notebooks/other` folder for some notebooks demonstrating other kinds of analyses. These are more experimental and are subject to change as we develop new analyses. 
-
-#### 3. Open up jupyter notebook! The plots display better using Jupyter Notebook than Jupyter Lab or VSCode. <br>
-**`jupyter notebook`**<br>
-If you run into a kernel error at this stage and are a Windows user, check out: 
-https://jupyter-notebook.readthedocs.io/en/stable/troubleshooting.html#pywin32-issues
-
-Navigate to your folder containing your interactive notebook and launch it by clicking on it! 
 
 
 <br>
@@ -66,7 +61,7 @@ Navigate to your folder containing your interactive notebook and launch it by cl
     face-rhythm
     ├── notebooks  <- Jupyter notebooks containing the main pipeline and some demos.
     |   ├── basic_face_rhythm_notebook.ipynb  <- Main pipeline notebook.
-    |   └── demo_align_temporal_factors.ipynb <- Demo notebook for aligning temporal factors.
+    |   └── interactive_set_ROIs_only.ipynb   <- Notebook for setting ROIs only.
     |
     ├── face-rhythm  <- Source code for use in this project.
     │   ├── project.py           <- Contains methods for project directory organization and preparation

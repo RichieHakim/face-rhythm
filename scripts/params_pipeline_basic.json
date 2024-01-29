@@ -10,6 +10,7 @@
         "directory_project": "/path/to/new/project/directory/",
         "overwrite_config": false,
         "update_project_paths": true,
+        "random_seed": null,
         "initialize_visualization": false,
         "verbose": 2
     },
@@ -140,6 +141,7 @@
                 "n_iter_max": 200,
                 "init": "random",
                 "svd": "truncated_svd",
+                "random_state": null,
                 "tol": 1e-09,
                 "verbose": true
             },

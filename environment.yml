@@ -5,5 +5,4 @@ dependencies:
   - python=3.11
   - pip
   - pip:
-  # install from requirements.txt
-    - -r requirements.txt
+    - face-rhythm
