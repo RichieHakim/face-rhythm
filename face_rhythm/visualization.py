@@ -413,7 +413,7 @@ class FrameVisualizer:
     def close(self):
         if self.video_writer is not None:
             self.video_writer.release()
-            cv2.destroyAllWindows()
+            cv2.destroyWindow(self.handle_cv2Imshow)
 
     def __call__(self, *args, **kwds):
         """
