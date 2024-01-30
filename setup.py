@@ -129,7 +129,13 @@ setup(
     # packages=setuptools.find_packages(),
     packages=['face_rhythm'],
 
-    install_requires=[deps_core,],
+    install_requires=[],
+
+    extras_require={
+        'all': list(deps_all_dict.values()),
+        'all_latest': list(deps_all_latest.values()),
+        'core': deps_core,
+    },
 
     include_package_data=True,
 )
