@@ -73,6 +73,13 @@ deps_core = [deps_all_dict[dep] for dep in [
 ]]
 
 
+## Make versions with cv2 headless (for servers)
+deps_all_dict_cv2Headless = copy.deepcopy(deps_all_dict)
+deps_all_dict_cv2Headless['opencv-contrib-python'] = 'opencv-contrib-python-headless' + deps_all_dict_cv2Headless['opencv-contrib-python'][20:]
+deps_all_latest_cv2Headless = copy.deepcopy(deps_all_latest)
+deps_all_latest_cv2Headless['opencv-contrib-python'] = 'opencv-contrib-python-headless'
+
+
 ## Get README.md
 with open(str(dir_parent / "README.md"), "r") as f:
     readme = f.read()
@@ -133,6 +140,8 @@ setup(
     extras_require={
         'all': list(deps_all_dict.values()),
         'all_latest': list(deps_all_latest.values()),
+        'all_cv2Headless': list(deps_all_dict_cv2Headless.values()),
+        'all_latest_cv2Headless': list(deps_all_latest_cv2Headless.values()),
         'core': deps_core,
     },
 
