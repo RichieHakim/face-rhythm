@@ -55,7 +55,7 @@ def prepare_project(
     """
     ## initialize cv2.imshow
     print('Initializing cv2.imshow') if verbose > 1 else None
-    helpers.prepare_cv2_imshow() if initialize_visualization else None
+    # helpers.prepare_cv2_imshow() if initialize_visualization else None
 
     def _create_config_file():
         """
