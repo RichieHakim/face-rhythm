@@ -29,7 +29,6 @@ deps_all = read_requirements()
 ### remove everything starting and after the first =,>,<,! sign
 deps_names = [req.split('=')[0].split('>')[0].split('<')[0].split('!')[0] for req in deps_all]
 deps_all_dict = dict(zip(deps_names, deps_all))
-
 deps_all_latest = dict(zip(deps_names, deps_names))
 
 
@@ -72,6 +71,13 @@ deps_core = [deps_all_dict[dep] for dep in [
     'GPUtil',
     'psutil',
 ]]
+
+
+## Make versions with cv2 headless (for servers)
+deps_all_dict_cv2Headless = copy.deepcopy(deps_all_dict)
+deps_all_dict_cv2Headless['opencv-contrib-python'] = 'opencv-contrib-python-headless' + deps_all_dict_cv2Headless['opencv-contrib-python'][21:]
+deps_all_latest_cv2Headless = copy.deepcopy(deps_all_latest)
+deps_all_latest_cv2Headless['opencv-contrib-python'] = 'opencv-contrib-python-headless'
 
 
 ## Get README.md
@@ -129,7 +135,15 @@ setup(
     # packages=setuptools.find_packages(),
     packages=['face_rhythm'],
 
-    install_requires=[deps_core,],
+    install_requires=[],
+
+    extras_require={
+        'all': list(deps_all_dict.values()),
+        'all_latest': list(deps_all_latest.values()),
+        'all_cv2Headless': list(deps_all_dict_cv2Headless.values()),
+        'all_latest_cv2Headless': list(deps_all_latest_cv2Headless.values()),
+        'core': deps_core,
+    },
 
     include_package_data=True,
 )

@@ -7,12 +7,8 @@ import re
 
 import numpy as np
 from tqdm import tqdm
-import decord
-import cv2
 import torch
-import scipy.sparse
 import tensorly as tl
-import tensorly.decomposition
 import einops
 
 from . import util

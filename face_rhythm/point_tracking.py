@@ -218,11 +218,12 @@ class PointTracker(FR_Module):
         self._violation_event = False
         
         ## Prepare a playback visualizer
+        self._handle_cv2Imshow = "PointTracker"
         if self._visualize_video:
             print("FR: Preparing playback visualizer") if self._verbose > 1 else None
             self.visualizer = FrameVisualizer(
                 display=True,
-                handle_cv2Imshow='point_tracking',
+                handle_cv2Imshow=self._handle_cv2Imshow,
                 path_save=None,
                 frame_height_width=self.buffered_video_reader.frame_height_width,
                 error_checking=False,
@@ -344,6 +345,10 @@ class PointTracker(FR_Module):
             )
             self.points_tracked.append(points)
             self.violations.append(self.violations_currentVideo.tocoo())
+
+        ## Destroy the cv2.imshow window
+        if self._visualize_video:
+            cv2.destroyWindow(self._handle_cv2Imshow)
 
         print(f"FR: Tracking complete") if self._verbose > 1 else None
         print(f"FR: Placing points_tracked into dictionary self.points_tracked where keys are video indices") if self._verbose > 1 else None
