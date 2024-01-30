@@ -29,7 +29,6 @@ deps_all = read_requirements()
 ### remove everything starting and after the first =,>,<,! sign
 deps_names = [req.split('=')[0].split('>')[0].split('<')[0].split('!')[0] for req in deps_all]
 deps_all_dict = dict(zip(deps_names, deps_all))
-
 deps_all_latest = dict(zip(deps_names, deps_names))
 
 
