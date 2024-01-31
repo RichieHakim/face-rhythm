@@ -37,7 +37,7 @@ You can also directly install the **face-rhythm** package from PyPI into the env
 ##### Option 1: Install from PyPI <br>
 **`pip install face-rhythm`**<br>
 ##### Option 2: Install from source <br>
-**`pip install -e .`**<br>
+**`pip install -e .[all]`**<br>
 
 <br>
 <br>
