@@ -32,13 +32,24 @@ deps_all_dict = dict(zip(deps_names, deps_all))
 deps_all_latest = dict(zip(deps_names, deps_names))
 
 
-## Operating system specific dependencies
-### OpenCV >= 4.9 is not supported on macOS < 12
-system, version = platform.system(), platform.mac_ver()[0]
-if system == "Darwin" and version and ('opencv_contrib_python' in deps_all_dict):
-    if tuple(map(int, version.split('.'))) < (12, 0, 0):
-        version_opencv_macosSub12 = "opencv_contrib_python<=4.8.1.78"
-        deps_all_dict['opencv_contrib_python'], deps_all_latest['opencv_contrib_python'] = version_opencv_macosSub12, version_opencv_macosSub12
+# Operating system specific dependencies
+# OpenCV >= 4.9 is not supported on macOS < 12
+system, version_macos = platform.system(), platform.mac_ver()[0]
+print(f"System: {system}")
+if (system == "Darwin"):
+    # Safely convert version string components to integers
+    version_parts = version_macos.split('.')
+    version_major_macos = int(version_parts[0])
+
+    # Check macOS version and adjust the OpenCV version accordingly
+    if (version_major_macos < 12) and ('opencv_contrib_python' in deps_all_dict):
+        version_opencv_macos_sub12 = "opencv_contrib_python<=4.8.1.78"
+        print(f"Detected macOS version {version_major_macos}, which is < 12. Installing an older version of OpenCV: {version_opencv_macos_sub12}")
+        deps_all_dict['opencv_contrib_python'] = version_opencv_macos_sub12
+        deps_all_latest['opencv_contrib_python'] = version_opencv_macos_sub12
+import re
+## find the numbers in the string
+version_opencv = '.'.join(re.findall(r'[0-9]+', deps_all_dict['opencv_contrib_python']))
 
 
 ## Make different versions of dependencies
@@ -48,16 +59,16 @@ deps_core = [deps_all_dict[dep] for dep in [
     'jupyter',
     'notebook',
     'tensorly',
-    'opencv-contrib-python',
+    'opencv_contrib_python',
     'matplotlib',
-    'scikit-learn',
-    'scikit-image',
+    'scikit_learn',
+    'scikit_image',
     'pyyaml',
     'tqdm',
     'h5py',
     'ipywidgets',
     'Pillow',
-    'eva-decord',
+    'eva_decord',
     'natsort',
     'pandas',
     'tables',
@@ -66,8 +77,8 @@ deps_core = [deps_all_dict[dep] for dep in [
     'torch',
     'torchvision',
     'torchaudio',
-    'nvidia-ml-py3',
-    'py-cpuinfo',
+    'nvidia_ml_py3',
+    'py_cpuinfo',
     'GPUtil',
     'psutil',
 ]]
@@ -75,9 +86,9 @@ deps_core = [deps_all_dict[dep] for dep in [
 
 ## Make versions with cv2 headless (for servers)
 deps_all_dict_cv2Headless = copy.deepcopy(deps_all_dict)
-deps_all_dict_cv2Headless['opencv-contrib-python'] = 'opencv-contrib-python-headless' + deps_all_dict_cv2Headless['opencv-contrib-python'][21:]
+deps_all_dict_cv2Headless['opencv_contrib_python'] = 'opencv_contrib_python_headless' + version_opencv
 deps_all_latest_cv2Headless = copy.deepcopy(deps_all_latest)
-deps_all_latest_cv2Headless['opencv-contrib-python'] = 'opencv-contrib-python-headless'
+deps_all_latest_cv2Headless['opencv_contrib_python'] = 'opencv_contrib_python_headless'
 
 
 ## Get README.md
