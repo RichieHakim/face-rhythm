@@ -1,12 +1,5 @@
 # Face-Rhythm
 
-Learn more at https://face-rhythm.readthedocs.io/
-
---------
-
-<br>
-<br>
-
 # Installation
 
 ### 0. Requirements <br>
