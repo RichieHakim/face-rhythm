@@ -1,6 +1,6 @@
 ## requirements.txt
 
-numpy==1.26.3
+numpy==1.26.4
 jupyter
 notebook<7
 tensorly==0.8.1
