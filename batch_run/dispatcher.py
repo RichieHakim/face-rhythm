@@ -8,7 +8,7 @@ print(f"dispatcher environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
 from face_rhythm import util
 
-path_self, path_script, dir_save, dir_videos, dir_ROIs, name_job, name_slurm, name_env = sys.argv
+path_self, path_script, dir_save, dir_videos, path_ROIs, name_job, name_slurm, name_env = sys.argv
 
 
 # date = '20221011'
@@ -27,15 +27,16 @@ params_template = {
     "steps": [
         "load_videos",
         "ROIs",
-        # "point_tracking",
+        "point_tracking",
         "VQT",
-        # "TCA",
+        "TCA",
     ],
     "project": {
-        "directory_project": dir_save,
-        "overwrite_config": False,
+        "overwrite_config": True,
         "update_project_paths": True,
         "initialize_visualization": False,
+        "use_GPU": False,
+        "random_seed": 0,
         "verbose": 2,
     },
     "figure_saver": {
@@ -72,7 +73,7 @@ params_template = {
     "ROIs": {
         "initialize":{
             "select_mode": "file",
-            "path_file": dir_ROIs,
+            "path_file": path_ROIs,
             "verbose": 2,
         },
         "make_rois": {
@@ -167,6 +168,7 @@ params_template = {
                 "init": "random",
                 "svd": "truncated_svd",
                 "tol": 1e-09,
+                "random_state": 0,
                 "verbose": True,
             },
             "verbose": 2,
@@ -219,7 +221,9 @@ with open(str(Path(dir_save) / 'parameters_batch.json'), 'w') as f:
 
 # with open(str(Path(dir_save) / 'parameters_batch.json')) as f:
 #     test = json.load(f)
-
+    
+## change permissions of the data files
+[os.system(f"chmod -R 777 {p}") for p in [dir_save, dir_videos, path_ROIs]]
 
 ## run batch_run function
 paths_scripts = [path_script]
@@ -237,11 +241,12 @@ sbatch_config_list = \
 #SBATCH --job-name={name_slurm}
 #SBATCH --output={path}
 #SBATCH --constraint=intel
-#SBATCH --partition=short
-#SBATCH -c 8
+#SBATCH --gres=gpu:1,vram:23G
+#SBATCH --partition=gpu_requeue
+#SBATCH -c 4
 #SBATCH -n 1
-#SBATCH --mem=48GB
-#SBATCH --time=0-00:30:00
+#SBATCH --mem=36GB
+#SBATCH --time=0-0:30:00
 
 unset XDG_RUNTIME_DIR
 
@@ -265,6 +270,9 @@ python "$@"
 
 # SBATCH --partition=gpu_quad
 # SBATCH --gres=gpu:1,vram:31G
+
+# SBATCH --constraint=intel
+# SBATCH --partition=short
 
 
 util.batch_run(
