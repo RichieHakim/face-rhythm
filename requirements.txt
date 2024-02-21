@@ -1,12 +1,12 @@
 ## requirements.txt
 
-numpy==1.26.3
+numpy==1.26.4
 jupyter
 notebook<7
 tensorly==0.8.1
 opencv_contrib_python==4.9.0.80
 matplotlib
-scikit_learn==1.4.0
+scikit_learn==1.4.1.post1
 scikit_image
 pyyaml
 tqdm
