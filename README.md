@@ -35,7 +35,7 @@ Activate the environment: <br>
 ### Optional Direct installation <br>
 You can also directly install the **face-rhythm** package from PyPI into the environment of your choice. Note that you will still need to download/clone the repository for the notebooks. <br>
 ##### Option 1: Install from PyPI <br>
-**`pip install face-rhythm`**<br>
+**`pip install face-rhythm[all]`**<br>
 ##### Option 2: Install from source <br>
 **`pip install -e .[all]`**<br>
 
