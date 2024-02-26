@@ -26,3 +26,4 @@ nvidia_ml_py3
 py_cpuinfo
 GPUtil
 psutil
+requests

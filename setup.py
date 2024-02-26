@@ -83,6 +83,7 @@ deps_core = [deps_all_dict[dep] for dep in [
     'py_cpuinfo',
     'GPUtil',
     'psutil',
+    'requests',
 ]]
 
 
