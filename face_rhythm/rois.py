@@ -1366,7 +1366,7 @@ class Image_Aligner(FR_Module):
         if warpMat_or_remapIdx == 'warpMat':
             fn_compose = helpers.compose_transform_matrices
         elif warpMat_or_remapIdx == 'remapIdx':
-            fn_compose = helpers.compose_remappingIdx
+            fn_compose = functools.partial(helpers.compose_remappingIdx, method='linear', fill_value=None, bounds_error=False)
         else:
             raise ValueError(f'warpMat_or_remapIdx must be one of ["warpMat", "remapIdx"]')
         
