@@ -257,6 +257,9 @@ class FrameVisualizer:
             if points is not None:
                 if isinstance(points, np.ndarray):
                     points = points.astype(np.int_)
+                    ## Clamp points to image
+                    points[:,0] = np.clip(points[:,0], 0, image.shape[1])
+                    points[:,1] = np.clip(points[:,1], 0, image.shape[0])
                     points = [points]
                 assert isinstance(points, list), 'points must be a list.'
                 assert len(points) > 0, 'points must have at least one element.'
