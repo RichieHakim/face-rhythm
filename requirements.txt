@@ -2,7 +2,7 @@
 
 numpy==1.26.4
 jupyter
-notebook<7
+notebook<8
 tensorly==0.8.1
 opencv_contrib_python==4.9.0.80
 matplotlib
