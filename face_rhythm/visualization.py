@@ -26,6 +26,7 @@ class FrameVisualizer:
         path_save=None,
         frame_height_width=(480, 640),
         frame_rate=None,
+        fourcc="MJPG",
         error_checking=True,
         verbose: int=1,
 
@@ -60,6 +61,9 @@ class FrameVisualizer:
                 Frame rate of played back and/or saved video.
                 If None, will playback at top speed, and saved videos
                  will have frame rate of 60.
+            fourcc (str):
+                Codec for cv2.VideoWriter video compression.
+                Defaults to `MJPG`
             error_checking (bool):
                 If True: Perform error checking.
             verbose (bool or int):
@@ -138,14 +142,15 @@ class FrameVisualizer:
         self.path_save = str(Path(path_save).resolve()) if path_save is not None else None
         self.frame_height_width = tuple(frame_height_width)
         self.frame_rate = int(frame_rate) if frame_rate is not None else None
+        self.fourcc = str(fourcc)
         self._verbose = int(verbose)
 
         ## Make video writer
         if self.path_save is not None:
-            print(f'Initializing video writer with frame_rate={self.frame_rate}, fourcc="MJPG", frame_height_width={self.frame_height_width}, path_save={self.path_save}') if self._verbose > 1 else None
+            print(f'Initializing video writer with frame_rate={self.frame_rate}, fourcc={self.fourcc}, frame_height_width={self.frame_height_width}, path_save={self.path_save}') if self._verbose > 1 else None
             self.video_writer = cv2.VideoWriter(
                     self.path_save,
-                    cv2.VideoWriter_fourcc(*'MJPG'),
+                    cv2.VideoWriter_fourcc(*self.fourcc),
                     frame_rate,
                     frame_height_width[::-1],
                 ) 
