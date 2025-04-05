@@ -238,9 +238,9 @@ class SFTPVideoFrameExtractor:
             # Use ffmpeg with a select filter to output multiple frames as PNG images.
             # Replace the ffmpeg output command with this version that explicitly forces lossless PNG output:
             ## Get fps
-            print(f"probing video url") if self.verbose else None
-            probe = ffmpeg.probe(sftp_url)
             if fps is None:
+                print(f"probing video url") if self.verbose else None
+                probe = ffmpeg.probe(sftp_url)
                 print(f"getting fps of video")
                 fps = eval(probe['streams'][0]['avg_frame_rate'])
                 print(f"found fps: {fps}")
