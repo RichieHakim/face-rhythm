@@ -143,7 +143,7 @@ class PointTracker(FR_Module):
         self._verbose = int(verbose)
         self._visualize_video = bool(visualize_video)
         self._params_visualization = params_visualization.copy()
-        self._params_clahe = params_clahe.copy()
+        self._params_clahe = params_clahe.copy() if params_clahe is not None else None
         self._params_outlier_handling = params_outlier_handling.copy()
         self._frame_start = int(idx_start)
 

@@ -15,6 +15,7 @@ __all__=[
     'util',
     'visualization',
     'data_importing',
+    'alignment',
     # 'tests',
 ]
 
@@ -66,4 +67,4 @@ for pkg in __all__:
     exec('from . import ' + pkg)
 
 
-__version__ = '0.2.5'
+__version__ = '0.2.7'
