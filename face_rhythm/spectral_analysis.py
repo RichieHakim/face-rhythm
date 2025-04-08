@@ -51,7 +51,7 @@ class VQT_Analyzer(FR_Module):
             'plot_pref': False,
         },
         batch_size: int=10,
-        DEVICE_compute='cpu',
+        device='cpu',
         normalization_factor: float=0.99,
         spectrogram_exponent: float=1.0,
         one_over_f_exponent: float=1.0,
@@ -62,7 +62,7 @@ class VQT_Analyzer(FR_Module):
         ## Set attributes
         self._params_VQT = params_VQT
         self._batch_size = int(batch_size)
-        self._DEVICE_compute = DEVICE_compute
+        self._device = device
         self._normalization_factor = float(normalization_factor)
         self._spectrogram_exponent = float(spectrogram_exponent)
         self._one_over_f_exponent = float(one_over_f_exponent)
@@ -84,7 +84,7 @@ class VQT_Analyzer(FR_Module):
         self.config = {
             'params_VQT': params_VQT,
             'batch_size': batch_size,
-            'DEVICE_compute': DEVICE_compute,
+            'device': device,
             'normalization_factor': normalization_factor,
             'spectrogram_exponent': spectrogram_exponent,
             'one_over_f_exponent': one_over_f_exponent,
@@ -135,9 +135,9 @@ class VQT_Analyzer(FR_Module):
         freqs = self.vqt_model.freqs
         xAxis = self.vqt_model.get_xAxis(points_tracked.shape[-1])
         ### send vqt_model to device
-        self.vqt_model.to(self._DEVICE_compute)
+        self.vqt_model.to(self._device)
         spec = torch.cat([
-            self.vqt_model(p.to(self._DEVICE_compute)).cpu()
+            self.vqt_model(p.to(self._device)).cpu()
             for p in tqdm(helpers.make_batches(points_tracked, batch_size=self._batch_size), disable=not self._verbose > 1, desc='Computing spectrograms', leave=True, position=0, total=int(math.ceil(points_tracked.shape[0] / self._batch_size)))
         ], dim=0)
         self.vqt_model.to('cpu')

@@ -222,7 +222,7 @@ def pipeline_basic(params):
         ## - `downsample_factor`: How much to downsample the spectrogram by in time.
         ## - `return_complex`: Whether or not to return the complex spectrogram. Generally set to False unless you want to try something fancy.
 
-        params['VQT_Analyzer']['params_VQT']['DEVICE_compute'] = fr.helpers.set_device(use_GPU=use_GPU)
+        params['VQT_Analyzer']['device'] = fr.helpers.set_device(use_GPU=use_GPU)
 
         spec = fr.spectral_analysis.VQT_Analyzer(**params['VQT_Analyzer'])
 
