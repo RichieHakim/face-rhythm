@@ -138,7 +138,7 @@ class VQT_Analyzer(FR_Module):
         self.vqt_model.to(self._device)
         spec = torch.cat([
             self.vqt_model(p.to(self._device)).cpu()
-            for p in tqdm(helpers.make_batches(points_tracked, batch_size=self._batch_size), disable=not self._verbose > 1, desc='Computing spectrograms', leave=True, position=0, total=int(math.ceil(points_tracked.shape[0] / self._batch_size)))
+            for p in tqdm(helpers.make_batches(points_tracked, batch_size=self._batch_size), disable=not self._verbose > 1, desc='Computing spectrograms', leave=True, position=0, total=int(math.ceil(points_tracked.shape[0] / self._batch_size)), mininterval=1.0)
         ], dim=0)
         self.vqt_model.to('cpu')
         ## Reshape and normalize spectrograms
