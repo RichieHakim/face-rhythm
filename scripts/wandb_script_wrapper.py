@@ -4,7 +4,7 @@ WandB Script Wrapper
 
 This script is intended to serve as a wrapper to execute an existing target Python script
 without any modifications, while capturing its standard output, standard error, and system 
-metrics (CPU, memory, and GPU) with Weights & Biases (WandB). It leverages WandB’s 
+metrics (CPU, memory, and GPU) with Weights & Biases (WandB). It leverages WandB's 
 built-in GPU monitoring (via monitor_gpus=True) to automatically capture GPU metrics, and 
 streams subprocess output (stdout and stderr) to the WandB dashboard in real time.
 
@@ -153,6 +153,7 @@ if __name__ == "__main__":
         sys.exit(1)
             
     # Initialize WandB using the provided kwargs. Use 'period_logger' (if provided) to set the stats sampling interval.
+    kwargs_wandb_init['dir'] = directory_save
     wandb.init(
         settings=wandb.Settings(x_stats_sampling_interval=params_wrapper.get('period_logger', 30)), 
         **kwargs_wandb_init
