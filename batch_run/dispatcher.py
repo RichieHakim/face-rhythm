@@ -9,6 +9,7 @@ print(f"dispatcher environment: {os.environ['CONDA_DEFAULT_ENV']}")
 from face_rhythm import util
 
 path_self, \
+path_wandb_script_wrapper, \
 path_script, \
 dir_save, \
 dir_videos, \
@@ -257,7 +258,7 @@ with open(str(Path(dir_save) / 'parameters_batch.json'), 'w') as f:
 [os.system(f"chmod -R 777 {p}") for p in [dir_save, dir_videos, path_ROIs]]
 
 ## run batch_run function
-paths_scripts = [path_script]
+paths_scripts = [path_wandb_script_wrapper]
 params_list = params
 max_n_jobs=1
 name_save=name_job

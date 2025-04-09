@@ -220,7 +220,7 @@ def pipeline_basic(params):
         ## - `F_min`: Lowest frequency band to use.
         ## - `F_max`: Highest frequency band to use.
         ## - `downsample_factor`: How much to downsample the spectrogram by in time.
-        ## - `return_complex`: Whether or not to return the complex spectrogram. Generally set to False unless you want to try something fancy.
+        ## - `take_abs`: Whether or not to return the complex spectrogram. Generally set to True unless you want to try something fancy.
 
         params['VQT_Analyzer']['device'] = fr.helpers.set_device(use_GPU=use_GPU)
 
