@@ -102,9 +102,9 @@ if __name__ == "__main__":
     # Parse command-line arguments.
     parser = argparse.ArgumentParser(description="WandB Script Wrapper")
     ## 'path_params' is sys.argv[1]
-    parser.add_argument("path_params", type=str, help="Path to the JSON file containing parameters for the target script. Include a field 'kwargs_wandb_init' for WandB initialization.")
+    parser.add_argument("--path_params", type=str, help="Path to the JSON file containing parameters for the target script. Include a field 'kwargs_wandb_init' for WandB initialization.")
     ## 'directory_save' is sys.argv[2]
-    parser.add_argument("directory_save", type=str, help="Directory to save the output of the target script.")
+    parser.add_argument("--directory_save", type=str, help="Directory to save the output of the target script.")
     args = parser.parse_args()
     path_params = args.path_params
     directory_save = args.directory_save
