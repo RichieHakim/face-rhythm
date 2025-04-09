@@ -103,7 +103,6 @@ path_run_complete = str(Path(directory_save) / 'SCRIPT_COMPLETED__' + datetime.n
 with open(path_run_complete, 'w') as f:
     json.dump(script_run_info, f, indent=4)
 print(f"Run completed successfully. Script run info saved to: {path_run_complete}")
-    
 
 
 ## End the job and kill the kernel
