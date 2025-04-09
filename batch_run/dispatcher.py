@@ -39,7 +39,6 @@ params_template = {
         "kwargs_wandb_init": {
             "project": "face_rhythm",
             "name": name_wandb,
-            "dir": dir_save,
         },
         "path_script": path_script,
         "period_logger": 2,
@@ -47,11 +46,11 @@ params_template = {
     
     "params_script": {
         "steps": [
-            # "load_videos",
-            # "ROIs",
-            # "point_tracking",
+            "load_videos",
+            "ROIs",
+            "point_tracking",
             "VQT",
-            "TCA",
+            # "TCA",
         ],
         "project": {
             "overwrite_config": True,
@@ -319,12 +318,12 @@ sbatch_config_list = \
 #SBATCH --account=kempner_bsabatini_lab  # The account name for the job.
 #SBATCH --job-name={name_slurm}          # Job name
 #SBATCH --output={path}                  # File to write: STDOUT (and STDERR if --error is not used)
-#SBATCH --partition=kempner              # Partition (job queue)
+#SBATCH --partition=kempner_requeue      # Partition (job queue)
 #SBATCH --gres=gpu:1                     # Number of GPUs
 #SBATCH -c 16                            # Number of cores (-c) on one node
 #SBATCH -n 1                             # Number of nodes (-n)
-#SBATCH --mem=128GB                      # Memory pool for all cores (see also --mem-per-cpu)
-#SBATCH --time=0-0:10:00                 # Runtime in D-HH:MM:SS
+#SBATCH --mem=48GB                       # Memory pool for all cores (see also --mem-per-cpu)
+#SBATCH --time=0-6:00:00                 # Runtime in D-HH:MM:SS
 #SBATCH --requeue                        # Requeue the job if it is preempted
 #SBATCH --export=WANDB_API_KEY           # Export the WANDB_API_KEY environment variable to the job
 
