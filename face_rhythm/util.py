@@ -1226,7 +1226,8 @@ def batch_run(
 
         # Prepare the sbatch_config
         ## assert that the last line of the sbatch_config_list is 'python "$@"'
-        assert sbatch_config_list[ii].split('\n')[-1] == 'python "$@"', 'ERROR: last line of sbatch_config_list must be exactly: python "$@"'
+        last_line = sbatch_config_list[ii].split('\n')[-1]
+        assert last_line == 'python "$@"', f'ERROR: last line of sbatch_config_list must be exactly: python "$@"\nfound: {last_line}'
         ## Replace the "$@" with the arguments
         sbatch_config_list[ii] = sbatch_config_list[ii].replace(
             'python "$@"', 
