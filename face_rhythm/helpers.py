@@ -156,7 +156,6 @@ def find_paths(
             bytes,
             memoryview,
             np.bytes_,
-            np.unicode_,
             re.Pattern,
             re.Match,
         )):

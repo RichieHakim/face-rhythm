@@ -58,7 +58,7 @@ params_template = {
             "update_project_paths": True,
             "initialize_visualization": False,
             "use_GPU": True,
-            "random_seed": 0,
+            "random_seed": None,
             "verbose": 2,
         },
         "figure_saver": {
@@ -319,7 +319,7 @@ sbatch_config_list = \
 #SBATCH --account=kempner_bsabatini_lab  # The account name for the job.
 #SBATCH --job-name={name_slurm}          # Job name
 #SBATCH --output={path}                  # File to write: STDOUT (and STDERR if --error is not used)
-#SBATCH --partition=kempner_requeue              # Partition (job queue)
+#SBATCH --partition=kempner              # Partition (job queue)
 #SBATCH --gres=gpu:1                     # Number of GPUs
 #SBATCH -c 16                            # Number of cores (-c) on one node
 #SBATCH -n 1                             # Number of nodes (-n)

@@ -106,7 +106,7 @@
             "fast_length": true,
             "take_abs": true,
             "filters": null, 
-            "plot_pref": false,
+            "plot_pref": false
         },
         "batch_size": 10,
         "normalization_factor": 0.95,
