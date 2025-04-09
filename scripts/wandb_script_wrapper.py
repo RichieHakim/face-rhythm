@@ -152,11 +152,11 @@ if __name__ == "__main__":
         print("Error: WandB is not installed. Please install it using 'pip install wandb'.")
         sys.exit(1)
             
-    # Initialize WandB with the provided kwargs.
-    if kwargs_wandb_init:
-        wandb.init(**kwargs_wandb_init)
-    else:
-        wandb.init()
+    # Initialize WandB using the provided kwargs. Use 'period_logger' (if provided) to set the stats sampling interval.
+    wandb.init(
+        settings=wandb.Settings(x_stats_sampling_interval=params_wrapper.get('period_logger', 30)), 
+        **kwargs_wandb_init
+    )
 
     # Make command to run the target script.
     command = ["python", path_script, "--path_params", path_params_script, "--directory_save", directory_save]
