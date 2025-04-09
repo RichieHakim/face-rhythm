@@ -35,13 +35,15 @@ Path(dir_save).mkdir(parents=True, exist_ok=True)
 
 
 params_template = {
-    "kwargs_wandb_init": {
-        "project": "face_rhythm",
-        "name": name_wandb,
-        "dir_save": dir_save,
-        "reinit": True,
+    "params_wrapper": {
+        "kwargs_wandb_init": {
+            "project": "face_rhythm",
+            "name": name_wandb,
+            "dir": dir_save,
+        },
+        "path_script": path_script,
+        "period_logger": 2,
     },
-    "path_script": path_script,
     
     "params_script": {
         "steps": [
@@ -269,9 +271,6 @@ paths_log = [str(Path(dir_save) / f'{name_save}{jobNum}' / 'print_log_%j.log') f
 
 ## Prepare call str and set environment variables
 os.environ['WANDB_API_KEY'] = wandb_api_key
-# Initialize a wandb run with minimal settings.
-import wandb
-wandb.init(project='face_rhythm', name=name_wandb, config=params[0], reinit=True)
 
 ## define slurm SBATCH parameters
 # sbatch_config_list = \
@@ -320,12 +319,12 @@ sbatch_config_list = \
 #SBATCH --account=kempner_bsabatini_lab  # The account name for the job.
 #SBATCH --job-name={name_slurm}          # Job name
 #SBATCH --output={path}                  # File to write: STDOUT (and STDERR if --error is not used)
-#SBATCH --partition=kempner_requeue      # Partition (job queue)
+#SBATCH --partition=kempner_requeue              # Partition (job queue)
 #SBATCH --gres=gpu:1                     # Number of GPUs
 #SBATCH -c 16                            # Number of cores (-c) on one node
 #SBATCH -n 1                             # Number of nodes (-n)
-#SBATCH --mem=64GB                       # Memory pool for all cores (see also --mem-per-cpu)
-#SBATCH --time=0-1:00:00                 # Runtime in D-HH:MM:SS
+#SBATCH --mem=128GB                      # Memory pool for all cores (see also --mem-per-cpu)
+#SBATCH --time=0-0:10:00                 # Runtime in D-HH:MM:SS
 #SBATCH --requeue                        # Requeue the job if it is preempted
 #SBATCH --export=WANDB_API_KEY           # Export the WANDB_API_KEY environment variable to the job
 
@@ -335,7 +334,7 @@ unset XDG_RUNTIME_DIR                    # This prevents an error with the conda
 echo "activating environment"
 source activate {name_env}
 
-echo "starting job with call: python $@"
+echo "starting job"
 python "$@"
 """ for path in paths_log]
 

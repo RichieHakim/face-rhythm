@@ -12,11 +12,12 @@ How It Works:
   1. Parses command-line arguments, expecting two positional arguments:
        - path_params: Path to a JSON file containing parameters for the target script. This
          JSON must include at minimum:
-           * "path_script": String path to the target script to be executed.
-           * "kwargs_wandb_init": (Optional) A dictionary of keyword arguments for 
-             wandb.init().
-           * "params_script" can be provided, which will be saved as a JSON to the output
-             directory and --path_params will be passed to the target script.
+            * "params_wrapper": Containing the following:
+                * "path_script": String path to the target script to be executed.
+                * "kwargs_wandb_init": (Optional) A dictionary of keyword arguments for 
+                    wandb.init().
+            * "params_script" can be provided, which will be saved as a JSON to the output
+                directory and --path_params will be passed to the target script.
        - directory_save: Directory path where output files (such as logs and saved parameters)
          will be stored. Will be passed to the target script as --directory_save.
 
@@ -37,11 +38,14 @@ Example Usage:
   "/path/to/save_dir". The parameter JSON file should include entries like:
 
     {
-        "path_script": "/path/to/your_target_script.py",
-        "kwargs_wandb_init": {
-            "project": "face_rhythm",
-            "entity": "your_wandb_username",
-            "name": "example_run"
+        "params_wrapper": {
+            "path_script": "/path/to/your_target_script.py",
+            "kwargs_wandb_init": {
+                "project": "face_rhythm",
+                "entity": "your_wandb_username",
+                "name": "example_run"
+            },
+            "period_logger": 2,
         },
         "params_script": {
             "example_param": "value"
@@ -62,6 +66,8 @@ import threading
 import time
 import wandb
 import psutil
+import functools
+
 
 def stream_reader(pipe, log_label):
     """
@@ -113,11 +119,15 @@ if __name__ == "__main__":
     import json
     with open(path_params, 'r') as f:
         params = json.load(f)
+        
+    # Get sub parameters for wrapper
+    assert 'params_wrapper' in params, "Error: 'params_wrapper' is missing in the parameters file."
+    params_wrapper = params['params_wrapper']
 
     # Gather kwargs_wandb_init from the JSON file.
-    kwargs_wandb_init = params.get('kwargs_wandb_init', None)
+    kwargs_wandb_init = params_wrapper.get('kwargs_wandb_init', None)
     # Gather path_script from the JSON file. Error if missing
-    path_script = params.get('path_script', None)
+    path_script = params_wrapper.get('path_script', None)
     if path_script is None:
         print("Error: 'path_script' is missing in the parameters file.")
         sys.exit(1)
@@ -134,6 +144,9 @@ if __name__ == "__main__":
             json.dump(params_script, f)
     else:
         print("Warning: 'params_script' is not provided in the parameters file. Skipping saving parameters.")
+        
+    # Prepare call to monitor_system_metrics.
+    monitor_system_metrics = functools.partial(monitor_system_metrics, interval=params_wrapper.get('period_logger', 30))
     
     # Ensure WandB is installed.
     try:
