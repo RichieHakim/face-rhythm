@@ -1225,9 +1225,8 @@ def batch_run(
             json.dump(params_list[ii], f)
 
         # Prepare the sbatch_config
-        ## assert that the last line of the sbatch_config_list is 'python "$@"'
-        last_line = sbatch_config_list[ii].split('\n')[-1]
-        assert last_line == 'python "$@"', f'ERROR: last line of sbatch_config_list must be exactly: python "$@"\nfound: {last_line}'
+        ## assert the search term 'python "$@"' is in the sbatch_config_list
+        assert 'python "$@"' in sbatch_config_list[ii], "FR ERROR: sbatch_config_list must contain 'python \"$@\"' at the end"
         ## Replace the "$@" with the arguments
         sbatch_config_list[ii] = sbatch_config_list[ii].replace(
             'python "$@"', 
