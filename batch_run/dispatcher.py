@@ -8,7 +8,17 @@ print(f"dispatcher environment: {os.environ['CONDA_DEFAULT_ENV']}")
 
 from face_rhythm import util
 
-path_self, path_script, dir_save, dir_videos, path_ROIs, name_job, name_slurm, name_env = sys.argv
+path_self, \
+path_script, \
+dir_save, \
+dir_videos, \
+path_ROIs, \
+name_job, \
+name_slurm, \
+name_env, \
+name_wandb, \
+wandb_api_key, \
+    = sys.argv
 
 
 # date = '20221011'
@@ -24,169 +34,179 @@ Path(dir_save).mkdir(parents=True, exist_ok=True)
 
 
 params_template = {
-    "steps": [
-        "load_videos",
-        "ROIs",
-        "point_tracking",
-        "VQT",
-        "TCA",
-    ],
-    "project": {
-        "overwrite_config": True,
-        "update_project_paths": True,
-        "initialize_visualization": False,
-        "use_GPU": True,
-        "random_seed": 0,
-        "verbose": 2,
+    "kwargs_wandb_init": {
+        "project": "face_rhythm",
+        "name": name_wandb,
+        "dir_save": dir_save,
+        "reinit": True,
     },
-    "figure_saver": {
-        "formats_save": [
-            "png"
+    "path_script": path_script,
+    
+    "params_script": {
+        "steps": [
+            # "load_videos",
+            # "ROIs",
+            # "point_tracking",
+            "VQT",
+            "TCA",
         ],
-        "kwargs_savefig": {
-            "bbox_inches": "tight",
-            "pad_inches": 0.1,
-            "transparent": True,
-            "dpi": 300,
-        },
-        "overwrite": True,
-        "verbose": 2
-    },
-    "paths_videos": {
-        "directory_videos": dir_videos,
-        "filename_videos_strMatch": "video1.*avi",
-        # "filename_videos_strMatch": "test\.avi",
-        "depth": 2,
-    },
-    "BufferedVideoReader": {
-        "buffer_size": 1000,
-        "prefetch": 1,
-        "posthold": 1,
-        "method_getitem": "by_video",
-        "verbose": 1,
-    },
-    "Dataset_videos": {
-        "contiguous": False,
-        "frame_rate_clamp": None,
-        "verbose": 2,
-    },
-    "ROIs": {
-        "initialize":{
-            "select_mode": "file",
-            "path_file": path_ROIs,
+        "project": {
+            "overwrite_config": True,
+            "update_project_paths": True,
+            "initialize_visualization": False,
+            "use_GPU": True,
+            "random_seed": 0,
             "verbose": 2,
         },
-        "make_rois": {
-            "rois_points_idx": [
-                0,
+        "figure_saver": {
+            "formats_save": [
+                "png"
             ],
-            "point_spacing": 10,
+            "kwargs_savefig": {
+                "bbox_inches": "tight",
+                "pad_inches": 0.1,
+                "transparent": True,
+                "dpi": 300,
+            },
+            "overwrite": True,
+            "verbose": 2
         },
-    },
-    "PointTracker": {
-        "contiguous": True,
-        "params_optical_flow": {
-            "method": "lucas_kanade",
-            "mesh_rigidity": 0.005,
-            "mesh_n_neighbors": 80,
-            "relaxation": 0.001,
-            "kwargs_method": {
-                "winSize": [
-                    80,
-                    80,
+        "paths_videos": {
+            "directory_videos": dir_videos,
+            "filename_videos_strMatch": "video1.*avi",
+            # "filename_videos_strMatch": "test\.avi",
+            "depth": 2,
+        },
+        "BufferedVideoReader": {
+            "buffer_size": 1000,
+            "prefetch": 1,
+            "posthold": 1,
+            "method_getitem": "by_video",
+            "verbose": 1,
+        },
+        "Dataset_videos": {
+            "contiguous": False,
+            "frame_rate_clamp": None,
+            "verbose": 2,
+        },
+        "ROIs": {
+            "initialize":{
+                "select_mode": "file",
+                "path_file": path_ROIs,
+                "verbose": 2,
+            },
+            "make_rois": {
+                "rois_points_idx": [
+                    0,
                 ],
-                "maxLevel": 5,
-                "criteria": [
-                    3, ## leave as 3
-                    2,
-                    0.0003,
-                ],
+                "point_spacing": 10,
             },
         },
-        "params_clahe": {
-            "clipLimit": 40.0,
-            "tileGridSize": [
-                120,
-                120,
-            ],
+        "PointTracker": {
+            "contiguous": True,
+            "params_optical_flow": {
+                "method": "lucas_kanade",
+                "mesh_rigidity": 0.005,
+                "mesh_n_neighbors": 80,
+                "relaxation": 0.001,
+                "kwargs_method": {
+                    "winSize": [
+                        80,
+                        80,
+                    ],
+                    "maxLevel": 5,
+                    "criteria": [
+                        3, ## leave as 3
+                        2,
+                        0.0003,
+                    ],
+                },
+            },
+            "params_clahe": {
+                "clipLimit": 40.0,
+                "tileGridSize": [
+                    120,
+                    120,
+                ],
+            },
+            "visualize_video": False,
+            "params_visualization": {
+                "alpha": 0.2,
+                "point_sizes": 2,
+            },
+            "params_outlier_handling": {
+                "threshold_displacement": 250,
+                "framesHalted_before": 20,
+                "framesHalted_after": 20,
+            },
+            "idx_start": 0,
+            "verbose": 2,
         },
-        "visualize_video": False,
-        "params_visualization": {
-            "alpha": 0.2,
-            "point_sizes": 2,
+        "VQT_Analyzer": {
+            "params_VQT": {
+                'Fs_sample': 250,
+                'Q_lowF': 3.0,
+                'Q_highF': 10.0,
+                'F_min': 0.5,
+                'F_max': 60,
+                'n_freq_bins': 30,
+                'window_type': 'hann',
+                'symmetry': 'center',
+                'taper_asymmetric': True,
+                'downsample_factor': 20,
+                'padding': 'valid',
+                'fft_conv': True,
+                'fast_length': True,
+                'take_abs': True,
+                'filters': None, 
+                'plot_pref': True,
+            },
+            "batch_size": 10,
+            "normalization_factor": 0.6,
+            "spectrogram_exponent": 1.0,
+            "one_over_f_exponent": 0.5,
+            "verbose": 2
         },
-        "params_outlier_handling": {
-            "threshold_displacement": 250,
-            "framesHalted_before": 20,
-            "framesHalted_after": 20,
-        },
-        "idx_start": 0,
-        "verbose": 2,
-    },
-    "VQT_Analyzer": {
-        "params_VQT": {
-            'Fs_sample': 250,
-            'Q_lowF': 3.0,
-            'Q_highF': 10.0,
-            'F_min': 0.75,
-            'F_max': 60,
-            'n_freq_bins': 30,
-            'window_type': 'hann',
-            'symmetry': 'center',
-            'taper_asymmetric': True,
-            'downsample_factor': 10,
-            'padding': 'valid',
-            'fft_conv': True,
-            'fast_length': True,
-            'take_abs': True,
-            'filters': None, 
-            'plot_pref': True,
-        },
-        "batch_size": 10,
-        "normalization_factor": 0.6,
-        "spectrogram_exponent": 1.0,
-        "one_over_f_exponent": 0.75,
-        "verbose": 2
-    },
-    "TCA": {
-        "verbose": 2,
-        "rearrange_data": {
-            "names_dims_array": [
-                "xy",
-                "points",
-                "frequency",
-                "time",
-            ],
-            "names_dims_concat_array": [
-                [
+        "TCA": {
+            "verbose": 2,
+            "rearrange_data": {
+                "names_dims_array": [
                     "xy",
                     "points",
-                ]
-            ],
-            "concat_complexDim": False,
-            "name_dim_concat_complexDim": "time",
-            "name_dim_dictElements": "session",
-            "method_handling_dictElements": "separate",
-            "name_dim_concat_dictElements": "time",
-            "idx_windows": None,
-            "name_dim_array_window": "time",
-        },
-        "fit": {
-            "method": "CP_NN_HALS",
-            "params_method": {
-                "rank": 10,
-                "n_iter_max": 200,
-                "init": "random",
-                "svd": "truncated_svd",
-                "tol": 1e-09,
-                "random_state": 0,
-                "verbose": True,
+                    "frequency",
+                    "time",
+                ],
+                "names_dims_concat_array": [
+                    [
+                        "xy",
+                        "points",
+                    ]
+                ],
+                "concat_complexDim": False,
+                "name_dim_concat_complexDim": "time",
+                "name_dim_dictElements": "session",
+                "method_handling_dictElements": "separate",
+                "name_dim_concat_dictElements": "time",
+                "idx_windows": None,
+                "name_dim_array_window": "time",
             },
-            "verbose": 2,
-        },
-        "rearrange_factors": {
-            "undo_concat_complexDim": False,
-            "undo_concat_dictElements": False,
+            "fit": {
+                "method": "CP_NN_HALS",
+                "params_method": {
+                    "rank": 10,
+                    "n_iter_max": 200,
+                    "init": "random",
+                    "svd": "truncated_svd",
+                    "tol": 1e-09,
+                    "random_state": 0,
+                    "verbose": True,
+                },
+                "verbose": 2,
+            },
+            "rearrange_factors": {
+                "undo_concat_complexDim": False,
+                "undo_concat_dictElements": False,
+            },
         },
     },
 }
@@ -246,6 +266,12 @@ name_save=name_job
 ## define print log paths
 paths_log = [str(Path(dir_save) / f'{name_save}{jobNum}' / 'print_log_%j.log') for jobNum in range(len(params))]
 
+## Prepare call str and set environment variables
+os.environ['WANDB_API_KEY'] = wandb_api_key
+# Initialize a wandb run with minimal settings.
+import wandb
+wandb.init(project='face_rhythm', name=name_wandb, config=params[0], reinit=True)
+
 ## define slurm SBATCH parameters
 # sbatch_config_list = \
 # [f"""#!/usr/bin/bash
@@ -288,7 +314,6 @@ paths_log = [str(Path(dir_save) / f'{name_save}{jobNum}' / 'print_log_%j.log') f
 
 
 
-
 sbatch_config_list = \
 [f"""#!/usr/bin/bash
 #SBATCH --account=kempner_bsabatini_lab  # The account name for the job.
@@ -298,9 +323,10 @@ sbatch_config_list = \
 #SBATCH --gres=gpu:1                     # Number of GPUs
 #SBATCH -c 16                            # Number of cores (-c) on one node
 #SBATCH -n 1                             # Number of nodes (-n)
-#SBATCH --mem=48GB                       # Memory pool for all cores (see also --mem-per-cpu)
-#SBATCH --time=0-8:00:00                 # Runtime in D-HH:MM:SS
+#SBATCH --mem=64GB                       # Memory pool for all cores (see also --mem-per-cpu)
+#SBATCH --time=0-1:00:00                 # Runtime in D-HH:MM:SS
 #SBATCH --requeue                        # Requeue the job if it is preempted
+#SBATCH --export=WANDB_API_KEY           # Export the WANDB_API_KEY environment variable to the job
 
 echo "Unsetting XDG_RUNTIME_DIR"
 unset XDG_RUNTIME_DIR                    # This prevents an error with the conda environment
