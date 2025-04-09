@@ -145,9 +145,6 @@ if __name__ == "__main__":
     else:
         print("Warning: 'params_script' is not provided in the parameters file. Skipping saving parameters.")
         
-    # Prepare call to monitor_system_metrics.
-    monitor_system_metrics = functools.partial(monitor_system_metrics, interval=params_wrapper.get('period_logger', 30))
-    
     # Ensure WandB is installed.
     try:
         import wandb
@@ -174,10 +171,6 @@ if __name__ == "__main__":
     stderr_thread = threading.Thread(target=stream_reader, args=(target_process.stderr, "stderr"), daemon=True)
     stdout_thread.start()
     stderr_thread.start()
-
-    # Create a thread to monitor and log system metrics.
-    metrics_thread = threading.Thread(target=monitor_system_metrics, daemon=True)
-    metrics_thread.start()
 
     # Wait for the target process to complete and for threads to finish.
     target_process.wait()
