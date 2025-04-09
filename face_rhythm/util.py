@@ -1214,20 +1214,32 @@ def batch_run(
     for ii in range(n_jobs):
         dir_save_job = dir_save / f'{name_save[ii]}{ii}'
         dir_save_job.mkdir(parents=True, exist_ok=True)
-        # save the shell scripts
-        save_path_sbatchConfig = dir_save_job / 'sbatch_config.sh'
-        with open(save_path_sbatchConfig, 'w') as f:
-            f.write(sbatch_config_list[ii])
+
         # save the script
         path_script_job = dir_save_job / Path(paths_scripts[ii]).name
         shutil.copyfile(paths_scripts[ii], path_script_job);
+
         # save the parameters        
         path_params_job = dir_save_job / 'params.json'
         with open(path_params_job, 'w') as f:
             json.dump(params_list[ii], f)
-    
+
+        # Prepare the sbatch_config
+        ## assert that the last line of the sbatch_config_list is 'python "$@"'
+        assert sbatch_config_list[ii].split('\n')[-1] == 'python "$@"', 'ERROR: last line of sbatch_config_list must be exactly: python "$@"'
+        ## Replace the "$@" with the arguments
+        sbatch_config_list[ii] = sbatch_config_list[ii].replace(
+            'python "$@"', 
+            f'python {path_script_job} --path_params {path_params_job} --directory_save {dir_save_job}'
+        )
+        # save the shell scripts
+        save_path_sbatchConfig = dir_save_job / 'sbatch_config.sh'
+        with open(save_path_sbatchConfig, 'w') as f:
+            f.write(sbatch_config_list[ii])
+
         # run the job
         if verbose:
             print(f'Submitting job: {name_save[ii]} {ii}')
         # ! sbatch --job-name=${name_save}_${ii} --output=${dir_save_job}/log.txt --error=${dir_save_job}/err.txt --time=${sbatch_config_list[ii]["time"]} --mem=${sbatch_config_list[ii]["mem"]} --cpus-per-task=${sbatch_config_list[ii]["cpus"]} --wrap="${paths_scripts[ii]} ${params_list[ii]} ${sbatch_config_list[ii]} ${dir_save_job}"
-        os.system(f'sbatch {save_path_sbatchConfig} {path_script_job} --path_params {path_params_job} --directory_save {dir_save_job}')
+        # os.system(f'sbatch {save_path_sbatchConfig} {path_script_job} --path_params {path_params_job} --directory_save {dir_save_job}')
+        os.system(f'sbatch {save_path_sbatchConfig}')
