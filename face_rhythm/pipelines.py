@@ -382,6 +382,13 @@ def pipeline_basic(params):
     ########################################
 
     print(f'RUN COMPLETE')
+    
+    ## Save a small file with 'SCRIPT_COMPLETED__<datetime YMD_HMS>.txt' in the project directory.\
+    ## This is useful for tracking when the run was completed and if it was successful.
+    from datetime import datetime
+    path_run_complete = str(Path(directory_project) / 'SCRIPT_COMPLETED__' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.txt')
+    with open(path_run_complete, 'w') as f:
+        f.write(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
 
     results = {
         'path_config': path_config,
