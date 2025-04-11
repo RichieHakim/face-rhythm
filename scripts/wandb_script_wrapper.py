@@ -177,6 +177,16 @@ if __name__ == "__main__":
     target_process.wait()
     stdout_thread.join()
     stderr_thread.join()
+    
+    
+    import atexit
+
+    def flush_all():
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.fsync(sys.stdout.fileno())
+        os.fsync(sys.stderr.fileno())
+    atexit.register(flush_all)
 
     # Finalize the WandB run.
     wandb.finish()
