@@ -104,6 +104,9 @@ with open(path_run_complete, 'w') as f:
     json.dump(script_run_info, f, indent=4)
 print(f"Run completed successfully. Script run info saved to: {path_run_complete}")
 
+## Make sure the print log file updates
+os.system('sync')
+
 
 ## End the job and kill the kernel
 os._exit(0)
