@@ -185,6 +185,9 @@ if __name__ == "__main__":
     import signal
     import time
 
+    ## Make sure the print log file updates
+    os.system('sync')
+
     def flush_and_sync():
         try:
             sys.stdout.flush()
