@@ -99,7 +99,7 @@ script_run_info = {
     'directory_save': directory_save,
     'params': params,
 }
-path_run_complete = str(Path(directory_save) / 'SCRIPT_COMPLETED__' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.json')
+path_run_complete = str(Path(directory_save) / ('SCRIPT_COMPLETED__' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.json'))
 with open(path_run_complete, 'w') as f:
     json.dump(script_run_info, f, indent=4)
 print(f"Run completed successfully. Script run info saved to: {path_run_complete}")
