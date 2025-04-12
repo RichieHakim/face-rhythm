@@ -329,7 +329,27 @@ class ROIs(FR_Module):
         ## show figure
         plt.show()
         return fig, ax
+    
+    def fliplr(self):
+        """
+        Flip the ROIs left-right. In place
+        """
+        if hasattr(self, 'exampleImage'):
+            if self.exampleImage is not None:
+                self.exampleImage = np.fliplr(self.exampleImage)
 
+        if hasattr(self, 'mask_images'):
+            if self.mask_images is not None:
+                self.mask_images = {k: np.fliplr(m) for k, m in self.mask_images.items()}
+                
+        if hasattr(self, 'roi_points'):
+            if self.roi_points is not None:
+                for k, p in self.roi_points.items():
+                    self.roi_points[k][:, 0] = self.img_hw[1] - p[:, 0]
+                    
+        if hasattr(self, 'point_positions'):
+            if self.point_positions is not None:
+                self.point_positions[:, 0] = self.img_hw[1] - self.point_positions[:, 0]
 
 
 class _Select_ROI:
