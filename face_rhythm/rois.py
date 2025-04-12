@@ -144,7 +144,20 @@ class ROIs(FR_Module):
             )
             self.set_point_positions(point_positions) if point_positions is not None else None
         
+        self._fill_config_runInfo_runData(
+            path_file=self._path_file,
+            coords_rois=self.roi_points,
+            point_positions=self.point_positions,
+            mask_images=self.mask_images,
+        )
 
+    def _fill_config_runInfo_runData(
+        self,
+        path_file=None,
+        coords_rois=None,
+        point_positions=None,
+        mask_images=None,
+    ):
         ## For FR_Module compatibility
         self.config = {
             "select_mode": self._select_mode,
@@ -164,8 +177,6 @@ class ROIs(FR_Module):
             "point_positions": self.point_positions,
             "exampleImage": self.exampleImage,
         }
-        # ## Append the self.run_info data to self.run_data
-        # self.run_data.update(self.run_info)
 
     def make_points(self, rois, point_spacing=10):
         """
@@ -351,6 +362,12 @@ class ROIs(FR_Module):
             if self.point_positions is not None:
                 self.point_positions[:, 0] = self.img_hw[1] - self.point_positions[:, 0]
 
+        self._fill_config_runInfo_runData(
+            path_file=self._path_file,
+            coords_rois=self.roi_points,
+            point_positions=self.point_positions,
+            mask_images=self.mask_images,
+        )
 
 class _Select_ROI:
     """
