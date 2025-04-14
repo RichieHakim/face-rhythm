@@ -94,10 +94,13 @@ def pipeline_basic(params):
 
     if 'load_videos' in params['steps']:
 
+        ## Load video data from the specified directory.\
+        print(f'Loading video data from {directory_videos}...') if params['project']['verbose'] > 1 else None
         paths_videos = fr.helpers.find_paths(
             dir_outer=directory_videos,
             reMatch=filename_videos_strMatch,  ## string to use to search for files in directory. Uses regular expressions!
             depth=0,  ## how many folders deep to search
+            verbose=params['project']['verbose'],
         )[:]
 
         pprint('Paths to videos:') if params['project']['verbose'] > 1 else None
