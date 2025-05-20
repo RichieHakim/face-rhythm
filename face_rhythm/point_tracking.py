@@ -2,7 +2,7 @@ from typing import Union
 import time
 
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import decord
 import cv2
 import torch

@@ -4,7 +4,7 @@ from typing import List
 import multiprocessing as mp
 
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import decord
 
 from .util import FR_Module

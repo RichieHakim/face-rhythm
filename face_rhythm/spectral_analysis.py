@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 import torch
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .util import FR_Module
 from . import helpers

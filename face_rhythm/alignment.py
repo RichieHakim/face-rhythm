@@ -9,7 +9,7 @@ import numpy as np
 import ffmpeg
 import matplotlib.pyplot as plt
 import cv2
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from face_rhythm import rois
 

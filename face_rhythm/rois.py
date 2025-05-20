@@ -5,7 +5,7 @@ import functools
 import cv2
 import numpy as np
 import scipy.interpolate
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 
 from .util import FR_Module
