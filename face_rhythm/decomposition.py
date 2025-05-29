@@ -6,7 +6,7 @@ import copy
 import re
 
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import torch
 import tensorly as tl
 import einops

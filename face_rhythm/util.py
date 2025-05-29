@@ -148,21 +148,24 @@ def get_default_parameters(
             },
             "VQT_Analyzer": {
                 "params_VQT": {
-                    "Q_lowF": 4,
-                    "Q_highF": 10,
-                    "F_min": 1.0,
-                    "F_max": 60,
-                    "n_freq_bins": 36,
-                    "win_size": 501,
-                    "symmetry": 'center',
-                    "taper_asymmetric": True,
-                    "plot_pref": False,
-                    "downsample_factor": 20,
-                    "padding": "valid",
-                    "batch_size": 10,
-                    "return_complex": False,
-                    "progressBar": True,
+                    'Fs_sample': 120,
+                    'Q_lowF': 4.0,
+                    'Q_highF': 10.0,
+                    'F_min': 1.0,
+                    'F_max': 60,
+                    'n_freq_bins': 36,
+                    'window_type': 'hann',
+                    'symmetry': 'center',
+                    'taper_asymmetric': True,
+                    'downsample_factor': 20,
+                    'padding': 'valid',
+                    'fft_conv': True,
+                    'fast_length': True,
+                    'take_abs': True,
+                    'filters': None, 
+                    'plot_pref': False,
                 },
+                "batch_size": 10,
                 "normalization_factor": 0.95,
                 "spectrogram_exponent": 1.0,
                 "one_over_f_exponent": 0.5,
@@ -1214,20 +1217,32 @@ def batch_run(
     for ii in range(n_jobs):
         dir_save_job = dir_save / f'{name_save[ii]}{ii}'
         dir_save_job.mkdir(parents=True, exist_ok=True)
-        # save the shell scripts
-        save_path_sbatchConfig = dir_save_job / 'sbatch_config.sh'
-        with open(save_path_sbatchConfig, 'w') as f:
-            f.write(sbatch_config_list[ii])
+
         # save the script
         path_script_job = dir_save_job / Path(paths_scripts[ii]).name
         shutil.copyfile(paths_scripts[ii], path_script_job);
+
         # save the parameters        
         path_params_job = dir_save_job / 'params.json'
         with open(path_params_job, 'w') as f:
             json.dump(params_list[ii], f)
-    
+
+        # Prepare the sbatch_config
+        ## assert the search term 'python "$@"' is in the sbatch_config_list
+        assert 'python "$@"' in sbatch_config_list[ii], "FR ERROR: sbatch_config_list must contain 'python \"$@\"' at the end"
+        ## Replace the "$@" with the arguments
+        sbatch_config_list[ii] = sbatch_config_list[ii].replace(
+            'python "$@"', 
+            f'python {path_script_job} --path_params {path_params_job} --directory_save {dir_save_job}'
+        )
+        # save the shell scripts
+        save_path_sbatchConfig = dir_save_job / 'sbatch_config.sh'
+        with open(save_path_sbatchConfig, 'w') as f:
+            f.write(sbatch_config_list[ii])
+
         # run the job
         if verbose:
             print(f'Submitting job: {name_save[ii]} {ii}')
         # ! sbatch --job-name=${name_save}_${ii} --output=${dir_save_job}/log.txt --error=${dir_save_job}/err.txt --time=${sbatch_config_list[ii]["time"]} --mem=${sbatch_config_list[ii]["mem"]} --cpus-per-task=${sbatch_config_list[ii]["cpus"]} --wrap="${paths_scripts[ii]} ${params_list[ii]} ${sbatch_config_list[ii]} ${dir_save_job}"
-        os.system(f'sbatch {save_path_sbatchConfig} {path_script_job} --path_params {path_params_job} --directory_save {dir_save_job}')
+        # os.system(f'sbatch {save_path_sbatchConfig} {path_script_job} --path_params {path_params_job} --directory_save {dir_save_job}')
+        os.system(f'sbatch {save_path_sbatchConfig}')

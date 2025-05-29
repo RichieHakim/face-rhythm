@@ -2,7 +2,7 @@ from typing import Union
 import time
 
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import decord
 import cv2
 import torch
@@ -453,7 +453,7 @@ class PointTracker(FR_Module):
 
         self.i_frame = self._frame_start if idx_start is None else idx_start
         video.set_iterator_frame_idx(self._frame_start)
-        with tqdm(total=len(video), desc='frame #', position=0, leave=True, disable=self._verbose < 2, mininterval=1.0) as pbar:
+        with tqdm(total=len(video), desc='frame #', position=0, leave=True, disable=self._verbose < 2, mininterval=5.0) as pbar:
             while (self.i_frame < len(video)):
                 for frame in video:
                     frame_new = self._format_decordTorchVideo_for_opticalFlow(vid=frame[None,...], mask=self.mask)[0]

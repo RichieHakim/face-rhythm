@@ -94,10 +94,13 @@ def pipeline_basic(params):
 
     if 'load_videos' in params['steps']:
 
+        ## Load video data from the specified directory.\
+        print(f'Loading video data from {directory_videos}...') if params['project']['verbose'] > 1 else None
         paths_videos = fr.helpers.find_paths(
             dir_outer=directory_videos,
             reMatch=filename_videos_strMatch,  ## string to use to search for files in directory. Uses regular expressions!
             depth=0,  ## how many folders deep to search
+            verbose=params['project']['verbose'],
         )[:]
 
         pprint('Paths to videos:') if params['project']['verbose'] > 1 else None
@@ -220,12 +223,9 @@ def pipeline_basic(params):
         ## - `F_min`: Lowest frequency band to use.
         ## - `F_max`: Highest frequency band to use.
         ## - `downsample_factor`: How much to downsample the spectrogram by in time.
-        ## - `return_complex`: Whether or not to return the complex spectrogram. Generally set to False unless you want to try something fancy.
+        ## - `take_abs`: Whether or not to return the complex spectrogram. Generally set to True unless you want to try something fancy.
 
-        Fs = fr.util.load_run_info_file(path_run_info)['Dataset_videos']['frame_rate']
-
-        params['VQT_Analyzer']['params_VQT']['Fs_sample'] = Fs
-        params['VQT_Analyzer']['params_VQT']['DEVICE_compute'] = fr.helpers.set_device(use_GPU=use_GPU)
+        params['VQT_Analyzer']['device'] = fr.helpers.set_device(use_GPU=use_GPU)
 
         spec = fr.spectral_analysis.VQT_Analyzer(**params['VQT_Analyzer'])
 
@@ -385,7 +385,7 @@ def pipeline_basic(params):
     ########################################
 
     print(f'RUN COMPLETE')
-
+    
     results = {
         'path_config': path_config,
         'path_run_info': path_run_info,

@@ -139,7 +139,7 @@ def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False, tra
         else:
             ## cast to 'S' type if string so that it doesn't become '|O' object type in h5 file
             if isinstance(val, str):
-                val = np.array(val, dtype=np.string_)
+                val = np.array(val, dtype=np.bytes_)
             
             # print(f'saving:  {group_string}: {key}')
             kwargs_compression = {'compression': 'gzip', 'compression_opts': 9} if use_compression else {}
