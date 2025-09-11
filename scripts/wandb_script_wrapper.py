@@ -177,6 +177,44 @@ if __name__ == "__main__":
     target_process.wait()
     stdout_thread.join()
     stderr_thread.join()
+    
+    
+    
+    import sys
+    import os
+    import signal
+    import time
+
+    ## Make sure the print log file updates
+    os.system('sync')
+
+    def flush_and_sync():
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os.fsync(sys.stdout.fileno())
+            os.fsync(sys.stderr.fileno())
+        except Exception as e:
+            # In some environments (e.g. if stdout/stderr aren't regular files),
+            # fsync might throw an error.
+            print(f"Flush error: {e}", file=sys.stderr)
+
+    def graceful_exit(signum, frame):
+        flush_and_sync()
+        # Wait a moment to allow the OS to write to disk
+        time.sleep(1)
+        # Exit explicitly
+        sys.exit(0)
+
+    # Register the signal handlers for termination
+    signal.signal(signal.SIGTERM, graceful_exit)
+    signal.signal(signal.SIGINT, graceful_exit)
+
+    # Register an atexit hook for normal termination
+    import atexit
+    atexit.register(flush_and_sync)
+
+
 
     # Finalize the WandB run.
     wandb.finish()

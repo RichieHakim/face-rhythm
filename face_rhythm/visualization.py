@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 import torch
 # import scipy.sparse
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .helpers import BufferedVideoReader
 
