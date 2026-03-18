@@ -147,6 +147,32 @@ class PointTracker(FR_Module):
         self._params_outlier_handling = params_outlier_handling.copy()
         self._frame_start = int(idx_start)
 
+        ## Detect CUDA OpenCV support
+        ## cv2.cuda may not exist if OpenCV was built without CUDA, so
+        ## we check for the attribute explicitly rather than catching errors.
+        self._use_cuda_cv2 = (
+            hasattr(cv2, 'cuda')
+            and hasattr(cv2.cuda, 'getCudaEnabledDeviceCount')
+            and cv2.cuda.getCudaEnabledDeviceCount() > 0
+        )
+        if self._use_cuda_cv2:
+            print("FR: CUDA OpenCV detected, using GPU-accelerated optical flow and CLAHE") if verbose > 1 else None
+        else:
+            print("FR: CUDA OpenCV not available, using CPU optical flow") if verbose > 1 else None
+
+        ## Cache CLAHE object (avoid re-creating every frame)
+        if self._params_clahe is not None:
+            if self._use_cuda_cv2:
+                self._clahe = cv2.cuda.createCLAHE(**self._params_clahe)
+            else:
+                self._clahe = cv2.createCLAHE(**self._params_clahe)
+        else:
+            self._clahe = None
+
+        ## Setup CUDA optical flow if available
+        self._lk_gpu = None
+        self._frame_prev_gpu = None
+
         ## Assert that buffered_video_reader is a fr.helpers.BufferedVideoReader object
         type(buffered_video_reader), isinstance(buffered_video_reader, BufferedVideoReader)  ## line needed sometimes for next assert to work
         assert isinstance(buffered_video_reader, BufferedVideoReader), "buffered_video_reader must be a fr.helpers.BufferedVideoReader object."
@@ -214,6 +240,13 @@ class PointTracker(FR_Module):
         params_missing = {key: params_visualization_default[key] for key in params_visualization_default if key not in params_visualization}
         print(f"FR WARNING: Following parameters for visualization were not specified and will be set to default values: {params_missing}") if ((self._verbose > 0) and (len(params_missing) > 0)) else None
         self.params_visualization = {**params_visualization, **params_missing}
+
+        ## Setup CUDA LK optical flow (requires params_optical_flow to be set)
+        if self._use_cuda_cv2:
+            self._lk_gpu = cv2.cuda.SparsePyrLKOpticalFlow_create(
+                winSize=tuple(self.params_optical_flow['kwargs_method']['winSize']),
+                maxLevel=self.params_optical_flow['kwargs_method']['maxLevel'],
+            )
 
         ## Retrive point positions
         self.point_positions = point_positions
@@ -371,7 +404,9 @@ class PointTracker(FR_Module):
             total=len(self.videos)
         ):
             ## If the video is not contiguous, set the iterator to the first frame
-            frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(0), mask=self.mask)[0] if not self._contiguous else frame_prev
+            if not self._contiguous:
+                frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(0), mask=self.mask)[0]
+                self._frame_prev_gpu = None  ## Reset GPU frame cache for new video
 
             print(f"FR: Iterating through frames of video {ii}") if self._verbose > 2 else None
             points, frame_prev = self._track_points_singleVideo(
@@ -468,6 +503,7 @@ class PointTracker(FR_Module):
                         self._violation_event = False
                         self.i_frame = max(self.i_frame - self._params_outlier_handling['framesHalted_before'], 0)
                         frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(max(self.i_frame-1,0)), mask=self.mask)[0]
+                        self._frame_prev_gpu = None  ## Reset GPU frame cache on rewind
                         video.set_iterator_frame_idx(self.i_frame)
                         points_prev = points_tracked[self.i_frame]
                         break
@@ -553,31 +589,44 @@ class PointTracker(FR_Module):
 
     def _format_decordTorchVideo_for_opticalFlow(self, vid, mask=None):
         """
-        Format a decord video array properly for optical flow.
-        
+        Format a video array properly for optical flow.
+
         Args:
-            vid (decord NDAdarray):
-                A 4D array of numbers, where each element is a pixel
-                 value. Last dimension should be channels.
-                 (batch, height, width, channels)
-            mask (np.ndarray, bool):
+            vid (torch.Tensor):
+                4D uint8 tensor of shape ``(batch, height, width, channels)``.
+                Can be on CPU or CUDA. If on CUDA, grayscale conversion and
+                masking run on GPU before transferring to CPU for CLAHE.
+            mask (torch.Tensor):
+                2D bool tensor of shape ``(height, width)``. Pixels where
+                mask is False are zeroed out.
 
         Returns:
-            vid (np.ndarray, uint8):
-                A 3D array of integers, where each element is a pixel
-                 value.
-                 (batch, height, width)
+            (np.ndarray):
+                vid (np.ndarray):
+                    3D uint8 array of shape ``(batch, height, width)``.
+                    Grayscale, masked, and optionally CLAHE-enhanced.
         """
-        ## Collapse channels and mask video
+        ## Move mask to same device as vid for the JIT function
+        if mask is not None and mask.device != vid.device:
+            mask = mask.to(device=vid.device)
+
+        ## Grayscale + mask (runs on whatever device vid is on)
         vid = _helper_format_decordTorchVideo_for_opticalFlow(vid, mask=mask)
 
-        ## Convert to numpy array
-        vid = vid.numpy()
-        
+        ## Transfer to CPU numpy for CLAHE (cv2 requires numpy input)
+        vid = vid.cpu().numpy() if vid.is_cuda else vid.numpy()
+
         ## Perform CLAHE
-        if self._params_clahe is not None:
-            clahe = cv2.createCLAHE(**self._params_clahe)
-            vid = np.stack([clahe.apply(frame) for frame in vid], axis=0)
+        if self._clahe is not None:
+            if self._use_cuda_cv2:
+                frames_out = []
+                for frame in vid:
+                    gpu_mat = cv2.cuda_GpuMat()
+                    gpu_mat.upload(frame)
+                    frames_out.append(self._clahe.apply(gpu_mat, cv2.cuda.Stream_Null()).download())
+                vid = np.stack(frames_out, axis=0)
+            else:
+                vid = np.stack([self._clahe.apply(frame) for frame in vid], axis=0)
 
         return vid
 
@@ -599,7 +648,24 @@ class PointTracker(FR_Module):
         """
         ## Call optical flow function
         if self.params_optical_flow['method'] == 'lucas_kanade':
-            points_new, status, err = cv2.calcOpticalFlowPyrLK(frame_prev, frame_new, points_prev, None, **self.params_optical_flow['kwargs_method'])
+            if self._use_cuda_cv2 and self._lk_gpu is not None:
+                ## Upload frames and points to GPU
+                frame_new_gpu = cv2.cuda_GpuMat()
+                frame_new_gpu.upload(frame_new)
+                if self._frame_prev_gpu is None:
+                    self._frame_prev_gpu = cv2.cuda_GpuMat()
+                    self._frame_prev_gpu.upload(frame_prev)
+                pts_gpu = cv2.cuda_GpuMat()
+                pts_gpu.upload(points_prev.reshape(1, -1, 2))
+                ## Run CUDA LK
+                pts_new_gpu, status_gpu, err_gpu = self._lk_gpu.calc(
+                    self._frame_prev_gpu, frame_new_gpu, pts_gpu, None
+                )
+                points_new = pts_new_gpu.download().reshape(-1, 2)
+                ## Keep current frame on GPU for next iteration
+                self._frame_prev_gpu = frame_new_gpu
+            else:
+                points_new, status, err = cv2.calcOpticalFlowPyrLK(frame_prev, frame_new, points_prev, None, **self.params_optical_flow['kwargs_method'])
         else:
             raise ValueError("FR ERROR: optical flow method not recognized")
 

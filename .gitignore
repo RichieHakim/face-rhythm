@@ -135,3 +135,4 @@ data_test/
 .fuse_hidden*
 __pycache__/
 .fr-*
+agent_assets/

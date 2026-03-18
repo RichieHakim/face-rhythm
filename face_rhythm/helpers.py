@@ -14,7 +14,10 @@ import warnings
 
 import numpy as np
 import cv2
-import decord
+try:
+    import decord
+except ImportError:
+    decord = None
 import torch
 from tqdm.auto import tqdm
 import yaml
@@ -1275,22 +1278,108 @@ def prepare_params(
 ############################################################## VIDEO ################################################################
 #####################################################################################################################################
 
-class VideoReaderWrapper(decord.VideoReader):
+## VideoReaderWrapper is only defined if decord is available.
+## When using backend='torchcodec', decord is not required.
+if decord is not None:
+    class VideoReaderWrapper(decord.VideoReader):
+        """
+        Used to fix a memory leak bug in decord.VideoReader
+        Taken from here.
+        https://github.com/dmlc/decord/issues/208#issuecomment-1157632702
+        """
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.seek(0)
+
+            self.path = args[0]
+
+        def __getitem__(self, key):
+            frames = super().__getitem__(key)
+            self.seek(0)
+            return frames
+else:
+    VideoReaderWrapper = None
+
+
+class TorchCodecVideoReader:
     """
-    Used to fix a memory leak bug in decord.VideoReader
-    Taken from here.
-    https://github.com/dmlc/decord/issues/208#issuecomment-1157632702
+    Video reader backed by ``torchcodec.decoders.VideoDecoder``.
+    Provides the same ``__getitem__`` / ``__len__`` / ``get_avg_fps``
+    interface as ``VideoReaderWrapper`` (decord) so it can be used as a
+    drop-in replacement inside ``BufferedVideoReader``.
+
+    Frames are returned as ``torch.Tensor`` with shape ``(H, W, C)`` and
+    dtype ``uint8`` (NHWC layout), matching the output of decord's torch
+    bridge.
+
+    Thread safety is guaranteed by an internal lock — required because
+    ``BufferedVideoReader`` loads slots from background threads.
+
+    Args:
+        path_video (str):
+            Path to the video file.
+        device (str):
+            Decode device. ``'cpu'`` for software decode,
+            ``'cuda'`` or ``'cuda:0'`` for NVDEC hardware decode.
+            NVDEC requires torchcodec built with CUDA support and
+            an FFmpeg with ``--enable-cuda``.
+        num_ffmpeg_threads (int):
+            Number of FFmpeg internal threads for decoding.
+            ``0`` lets FFmpeg choose automatically (recommended).
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.seek(0)
-        
-        self.path = args[0]
+    def __init__(self, path_video: str, device: str = 'cpu', num_ffmpeg_threads: int = 0):
+        import threading
+        from torchcodec.decoders import VideoDecoder
+
+        self.path = str(path_video)
+        self._device = device
+        self._decoder = VideoDecoder(
+            self.path,
+            seek_mode='exact',
+            dimension_order='NHWC',
+            device=device,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+        )
+        self._num_frames = len(self._decoder)
+        self._lock = threading.Lock()
+
+    def __len__(self) -> int:
+        return self._num_frames
 
     def __getitem__(self, key):
-        frames = super().__getitem__(key)
-        self.seek(0)
-        return frames
+        """
+        Index frames by int, slice, or list of ints.
+
+        Args:
+            key (int, slice, or list):
+                Frame index or range.
+
+        Returns:
+            (torch.Tensor):
+                frames (torch.Tensor):
+                    Single frame ``(H, W, C)`` for int key, or batch
+                    ``(N, H, W, C)`` for slice/list key.
+        """
+        with self._lock:
+            if isinstance(key, (int, np.integer)):
+                return self._decoder[int(key)]
+            elif isinstance(key, slice):
+                start = key.start if key.start is not None else 0
+                stop = key.stop if key.stop is not None else self._num_frames
+                step = key.step
+                if step is not None and step != 1:
+                    indices = list(range(start, stop, step))
+                    return self._decoder.get_frames_at(indices).data
+                return self._decoder[start:stop]
+            elif isinstance(key, (list, np.ndarray)):
+                indices = [int(i) for i in key]
+                return self._decoder.get_frames_at(indices).data
+            else:
+                raise TypeError(f"TorchCodecVideoReader: unsupported key type {type(key)}. Expected int, slice, or list.")
+
+    def get_avg_fps(self) -> float:
+        """Return the average frame rate of the video."""
+        return self._decoder.metadata.average_fps
 
 
 class BufferedVideoReader:
@@ -1328,20 +1417,22 @@ class BufferedVideoReader:
         posthold: int=1,
         method_getitem: str='continuous',
         starting_seek_position: int=0,
+        backend: str='torchcodec',
+        device: str='cpu',
         decord_backend: str='torch',
         decord_ctx=None,
         verbose: int=1,
     ):
         """
-        video_readers (list of decord.VideoReader): 
-            list of decord.VideoReader objects.
-            Can also be single decord.VideoReader object.
+        video_readers (list):
+            list of video reader objects (decord.VideoReader or
+            TorchCodecVideoReader). Can also be a single reader.
             If None, then paths_videos must be provided.
         paths_videos (list of str):
             list of paths to videos.
             Can also be single str.
             If None, then video_readers must be provided.
-            If both paths_videos and video_readers are provided, 
+            If both paths_videos and video_readers are provided,
              then video_readers will be used.
         buffer_size (int):
             Number of frames per buffer slot.
@@ -1353,7 +1444,7 @@ class BufferedVideoReader:
             Number of buffers to prefetch.
             If 0, then no prefetching.
             Note that a single buffer slot can only contain frames
-             from a single video. Best to keep 
+             from a single video. Best to keep
              buffer_size <= video length.
         posthold (int):
             Number of buffers to hold after a new buffer is loaded.
@@ -1364,19 +1455,38 @@ class BufferedVideoReader:
             'continuous' - read frames continuously across videos.
                 Index behaves like videos are concatenated:
                 - reader[idx] where idx: slice=idx_frames
-            'by_video' - index must specify video index and frame 
+            'by_video' - index must specify video index and frame
                 index:
                 - reader[idx] where idx: tuple=(int: idx_video, slice: idx_frames)
         starting_seek_position (int):
             Starting frame index to start iterator from.
             Only used when method_getitem=='continuous' and
              using the iterator method.
+        backend (str):
+            Video decoding backend. Options:
+            'torchcodec' - (default) Uses torchcodec.decoders.VideoDecoder.
+                Frame-accurate seeking, actively maintained, supports GPU decode.
+            'decord' - Uses decord.VideoReader (legacy).
+                Unmaintained but well-tested. Requires decord to be installed.
+            Only used when paths_videos is provided (ignored if video_readers given).
+        device (str):
+            Device for video decoding. Options:
+            ``'cpu'`` (default) decodes on CPU. Works everywhere.
+            ``'cuda'`` or ``'cuda:0'`` decodes on GPU using NVDEC hardware
+            decoder. Frames are returned as CUDA tensors. Requires: (1)
+            NVIDIA GPU, (2) torchcodec installed with CUDA support
+            (``pip install torchcodec --index-url=...cu126``), and (3) FFmpeg
+            built with ``--enable-cuda``. Will raise an error if GPU decode
+            is not available.
+            Only used with ``backend='torchcodec'``.
         decord_backend (str):
             Backend to use for decord when loading frames.
+            Only used when backend='decord'.
             See decord documentation for options.
             ('torch', 'numpy', 'mxnet', ...)
         decord_ctx (decord.Context):
             Context to use for decord when loading frames.
+            Only used when backend='decord'.
             See decord documentation for options.
             (decord.cpu(), decord.gpu(), ...)
         verbose (int):
@@ -1391,11 +1501,16 @@ class BufferedVideoReader:
         self.buffer_size = buffer_size
         self.prefetch = prefetch
         self.posthold = posthold
+        self._backend = backend
+        self._device = device
         self._decord_backend = decord_backend
-        self._decord_ctx = decord.cpu(0) if decord_ctx is None else decord_ctx
+        self._decord_ctx = (decord.cpu(0) if decord_ctx is None else decord_ctx) if decord is not None else None
 
         ## Check inputs
-        if isinstance(video_readers, decord.VideoReader):
+        _single_reader_types = (TorchCodecVideoReader,)
+        if decord is not None:
+            _single_reader_types = (decord.VideoReader, TorchCodecVideoReader)
+        if isinstance(video_readers, _single_reader_types):
             video_readers = [video_readers]
         if isinstance(paths_videos, str):
             paths_videos = [paths_videos]
@@ -1405,22 +1520,29 @@ class BufferedVideoReader:
         if (video_readers is not None) and (paths_videos is not None):
             print(f"FR WARNING: Both video_readers and paths_videos were provided. Using video_readers and ignoring path_videos.")
             paths_videos = None
-        ## If paths are specified, import them as decord.VideoReader objects
+        ## If paths are specified, create video reader objects
         if paths_videos is not None:
-            print(f"FR: Loading lazy video reader objects...") if self._verbose > 1 else None
+            print(f"FR: Loading video reader objects (backend='{self._backend}')...") if self._verbose > 1 else None
             assert isinstance(paths_videos, list), "paths_videos must be list of str"
             assert all([isinstance(p, str) for p in paths_videos]), "paths_videos must be list of str"
-            video_readers = [VideoReaderWrapper(path_video, ctx=self._decord_ctx) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
+            if self._backend == 'torchcodec':
+                print(f"FR: Video decode device: {self._device}") if self._verbose > 1 else None
+                video_readers = [TorchCodecVideoReader(path_video, device=self._device) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
+            elif self._backend == 'decord':
+                assert decord is not None, "FR ERROR: decord is not installed. Install it with 'pip install decord' or use backend='torchcodec'."
+                video_readers = [VideoReaderWrapper(path_video, ctx=self._decord_ctx) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
+            else:
+                raise ValueError(f"FR ERROR: Unknown video backend '{self._backend}'. Use 'torchcodec' or 'decord'.")
             self.paths_videos = paths_videos
         else:
             print(f"FR: Using provided video reader objects...") if self._verbose > 1 else None
-            assert isinstance(video_readers, list), "video_readers must be list of decord.VideoReader objects"
+            assert isinstance(video_readers, list), "video_readers must be a list of video reader objects"
             self.paths_videos = [v.path for v in video_readers]
-            assert all([isinstance(v, decord.VideoReader) for v in video_readers]), "video_readers must be list of decord.VideoReader objects"
         ## Assert that method_getitem is valid
         assert method_getitem in ['continuous', 'by_video'], "method_getitem must be 'continuous' or 'by_video'"
-        ## Check if backend is valid by trying to set it here (only works fully when used in the _load_frames method)
-        decord.bridge.set_bridge(self._decord_backend)
+        ## Set decord bridge if using decord backend
+        if self._backend == 'decord':
+            decord.bridge.set_bridge(self._decord_backend)
 
         self.paths_videos = [str(path) for path in self.paths_videos]  ## ensure paths are str
         self.video_readers = video_readers
@@ -1588,8 +1710,9 @@ class BufferedVideoReader:
             blocking_thread (threading.Thread):
                 Thread to wait for before loading.
         """
-        ## Set backend of decord to PyTorch
-        decord.bridge.set_bridge(self._decord_backend)
+        ## Set backend of decord to PyTorch (only needed for decord)
+        if self._backend == 'decord':
+            decord.bridge.set_bridge(self._decord_backend)
         ## Wait for the previous slot to finish loading
         if blocking_thread is not None:
             blocking_thread.join()
@@ -1680,8 +1803,10 @@ class BufferedVideoReader:
                 prefetch=self.prefetch,
                 method_getitem='continuous',
                 starting_seek_position=0,
-                decord_backend='torch',
-                decord_ctx=None,
+                backend=self._backend,
+                device=self._device,
+                decord_backend=self._decord_backend,
+                decord_ctx=self._decord_ctx,
                 verbose=self._verbose,
             )
         print(f"FR: Getting item {idx}") if self._verbose > 1 else None
@@ -1837,8 +1962,10 @@ class BufferedVideoReader:
                 prefetch=self.prefetch,
                 method_getitem='continuous',
                 starting_seek_position=0,
-                decord_backend='torch',
-                decord_ctx=None,
+                backend=self._backend,
+                device=self._device,
+                decord_backend=self._decord_backend,
+                decord_ctx=self._decord_ctx,
                 verbose=self._verbose,
             ) for idx in range(len(self.video_readers))])
         elif self.method_getitem == 'continuous':
