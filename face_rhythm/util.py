@@ -1040,14 +1040,17 @@ def system_info(verbose: bool = False,) -> Dict:
         print('== CUDA is not available ==') if verbose else None
 
     ## all packages in environment
-    import pkg_resources
-    pkgs_dict = {i.key: i.version for i in pkg_resources.working_set}
+    from importlib.metadata import distributions
+    pkgs_dict = {d.metadata["Name"]: d.version for d in distributions() if d.metadata["Name"] is not None}
 
     ## face_rhythm
     import face_rhythm
     import time
     face_rhythm_version = face_rhythm.__version__
-    face_rhythm_fileDate = time.ctime(os.path.getctime(pkg_resources.get_distribution("face_rhythm").location))
+    from importlib.metadata import distribution
+    face_rhythm_dist = distribution("face_rhythm")
+    face_rhythm_location = str(face_rhythm_dist._path.parent) if hasattr(face_rhythm_dist, '_path') else os.path.dirname(face_rhythm.__file__)
+    face_rhythm_fileDate = time.ctime(os.path.getctime(face_rhythm_location))
     face_rhythm_stuff = {'version': face_rhythm_version, 'date_installed': face_rhythm_fileDate}
     print(f'== face_rhythm Version ==: {face_rhythm}') if verbose else None
     print(f'== face_rhythm date installed ==: {face_rhythm_fileDate}') if verbose else None

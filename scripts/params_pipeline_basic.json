@@ -50,7 +50,7 @@
             "path_file": "/path/to/ROIs.h5",
             "verbose": 2
         },
-        "make_rois": {
+        "make_points": {
             "rois_points_idx": [
                 0
             ],
