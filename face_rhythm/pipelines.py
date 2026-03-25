@@ -292,7 +292,9 @@ def pipeline_basic(params):
             **params['TCA']['rearrange_data'],
         )
 
-
+        tca.normalize_data(
+            **params['TCA']['normalize_data'],
+        )
 
         ## Fit TCA model.
         ##
