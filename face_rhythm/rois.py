@@ -412,9 +412,8 @@ class _Select_ROI:
             image = image.numpy()
 
         ## set jupyter notebook to use interactive matplotlib.
-        ## equivalent to %matplotlib notebook
-        mpl.use("nbagg")        
-        plt.ion()
+        ## equivalent to %matplotlib widget
+        mpl.use("module://ipympl.backend_nbagg")
 
         ## Set variables                
         self._img_input = image.copy()
@@ -437,6 +436,9 @@ class _Select_ROI:
         Disp.display(new_ROI_button)
         disconnect_button.on_click(self._disconnect_mpl)
         new_ROI_button.on_click(self._new_ROI)
+
+        ## Show the interactive figure (required for ipympl/widget backend in VSCode/JupyterLab)
+        plt.show()
 
     def _poly_img(self, img, pts):
         """
