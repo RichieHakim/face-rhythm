@@ -135,7 +135,8 @@ class Dataset_videos(FR_Module):
         self.num_channels = self.metadata["num_channels"][0]
         self.paths_videos = [str(path) for path in self.paths_videos]  ## ensure paths are strings
 
-        self.example_image = self.videos[0][0]
+        _img = self.videos[0][0]
+        self.example_image = np.asarray(_img.cpu() if hasattr(_img, 'cpu') else _img)
 
         ## For FR_Module compatibility
         self.config = {
