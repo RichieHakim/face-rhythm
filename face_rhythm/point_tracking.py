@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 import time
 
 import numpy as np
@@ -40,6 +40,8 @@ class PointTracker(FR_Module):
                         'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
                         'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
                     },
+        frames_freeze: Optional[np.ndarray]=None,
+        relaxation_during_freeze_frames: bool=True,
         idx_start: Union[int, list, np.ndarray]=0,
         visualize_video: bool=False,
         params_visualization: dict={
@@ -107,6 +109,23 @@ class PointTracker(FR_Module):
                         'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
                         'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
                     }
+            frames_freeze (np.ndarray, optional):
+                1D boolean array specifying frames where the optical flow
+                 displacement delta should be zeroed out (proactive freezing).
+                True = freeze OF delta for that frame.
+                Length should match the total number of frames across all
+                 videos (contiguous mode) or per video (non-contiguous mode,
+                 as a dict of {str(video_idx): 1D_bool_array}).
+                If None, no proactive freezing is applied (default).
+            relaxation_during_freeze_frames (bool, optional):
+                Controls behavior during proactively frozen frames.
+                If True (default), the OF delta is zeroed but mesh rigidity
+                 and relaxation forces still apply. This allows the mesh to
+                 maintain its shape and relax toward home positions even
+                 during frozen frames.
+                If False, points are fully frozen — their positions are
+                 copied exactly from the previous frame with no forces
+                 applied.
             idx_start (int, list, np.ndarray, optional):
                 The index of the first frame to track.
                 If an integer, this will be the index for all videos or for the
@@ -146,6 +165,18 @@ class PointTracker(FR_Module):
         self._params_clahe = params_clahe.copy() if params_clahe is not None else None
         self._params_outlier_handling = params_outlier_handling.copy()
         self._frame_start = int(idx_start)
+        self._relaxation_during_freeze_frames = bool(relaxation_during_freeze_frames)
+
+        ## Store and validate frames_freeze
+        if frames_freeze is not None:
+            assert isinstance(frames_freeze, np.ndarray), "FR ERROR: frames_freeze must be a 1D boolean numpy array."
+            assert frames_freeze.ndim == 1, "FR ERROR: frames_freeze must be a 1D array."
+            assert frames_freeze.dtype == bool, "FR ERROR: frames_freeze must have dtype bool."
+            self._frames_freeze = frames_freeze
+            print(f"FR: frames_freeze provided with {frames_freeze.sum()} frozen frames out of {len(frames_freeze)} total.") if self._verbose > 1 else None
+            print(f"FR: relaxation_during_freeze_frames={self._relaxation_during_freeze_frames}") if self._verbose > 1 else None
+        else:
+            self._frames_freeze = None
 
         ## Detect CUDA OpenCV support
         ## cv2.cuda may not exist if OpenCV was built without CUDA, so
@@ -307,6 +338,8 @@ class PointTracker(FR_Module):
             "params_optical_flow": self.params_optical_flow,
             "params_outlier_handling": self._params_outlier_handling,
             "params_visualization": self._params_visualization,
+            "frames_freeze": self._frames_freeze is not None,
+            "relaxation_during_freeze_frames": self._relaxation_during_freeze_frames,
             "verbose": self._verbose,
         }
         self.run_info = {
@@ -408,12 +441,25 @@ class PointTracker(FR_Module):
                 frame_prev = self._format_decordTorchVideo_for_opticalFlow(vid=video.get_frames_from_continuous_index(0), mask=self.mask)[0]
                 self._frame_prev_gpu = None  ## Reset GPU frame cache for new video
 
+            ## Determine per-video freeze array
+            if self._frames_freeze is not None:
+                if self._contiguous:
+                    frames_freeze_video = self._frames_freeze
+                else:
+                    ## Slice the freeze array for this video
+                    n_frames_before = sum(len(self.videos[jj]) for jj in range(ii))
+                    n_frames_video = len(video)
+                    frames_freeze_video = self._frames_freeze[n_frames_before : n_frames_before + n_frames_video]
+            else:
+                frames_freeze_video = None
+
             print(f"FR: Iterating through frames of video {ii}") if self._verbose > 2 else None
             points, frame_prev = self._track_points_singleVideo(
                 video=video,
                 points_prev=points_prev,
                 frame_prev=frame_prev,
                 idx_start=self.idx_start if self._contiguous else self.idx_start[ii],
+                frames_freeze=frames_freeze_video,
             )
             self.points_tracked.append(points)
             self.violations.append(self.violations_currentVideo.tocoo())
@@ -447,6 +493,7 @@ class PointTracker(FR_Module):
         points_prev,
         frame_prev,
         idx_start=None,
+        frames_freeze=None,
     ):
         """
         Track points in a single video.
@@ -467,8 +514,12 @@ class PointTracker(FR_Module):
                 Previous frame. Should be formatted correctly, as no
                  corrective formatting will be done here.
             idx_start (int, optional):
-                The index of the first frame to track. 
+                The index of the first frame to track.
                 If None, the index will defer to the idx_start defined in the __init__.
+            frames_freeze (np.ndarray, optional):
+                1D boolean array for this video. True = freeze OF delta for
+                 that frame. Length should match the number of frames in the
+                 video. If None, no proactive freezing is applied.
 
         Returns:
             points (np.ndarray, np.float32):
@@ -481,6 +532,13 @@ class PointTracker(FR_Module):
         assert isinstance(points_prev, np.ndarray), "FR ERROR: points_prev must be a numpy array"
         assert points_prev.ndim == 2, "FR ERROR: points_prev must be a 2D array"
         points_prev = points_prev.astype(np.float32)
+
+        ## Store per-video freeze array
+        if frames_freeze is not None:
+            assert len(frames_freeze) == len(video), f"FR ERROR: frames_freeze length ({len(frames_freeze)}) must match video length ({len(video)})."
+            self._frames_freeze_currentVideo = frames_freeze
+        else:
+            self._frames_freeze_currentVideo = None
 
         ## Preallocate points
         points_tracked = np.zeros((len(video), points_prev.shape[0], 2), dtype=np.float32)
@@ -669,7 +727,20 @@ class PointTracker(FR_Module):
         else:
             raise ValueError("FR ERROR: optical flow method not recognized")
 
-        ## Freeze violating points
+        ## Proactive freeze — zero OF delta for this frame
+        _is_frozen_frame = (
+            self._frames_freeze_currentVideo is not None
+            and self._frames_freeze_currentVideo[self.i_frame]
+        )
+        if _is_frozen_frame and not self._relaxation_during_freeze_frames:
+            ## Fully frozen: copy previous positions exactly, no forces applied
+            return points_prev.copy()
+
+        if _is_frozen_frame:
+            ## Zero the OF delta but allow mesh rigidity and relaxation to apply
+            points_new = points_prev.copy()
+
+        ## Freeze violating points (reactive)
         points_new[self._pointIdx_violations_current] = points_prev[self._pointIdx_violations_current]
 
         ## Apply mesh_rigity force

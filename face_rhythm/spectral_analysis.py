@@ -75,7 +75,6 @@ class VQT_Analyzer(FR_Module):
         self._demo_spectrogram = None
 
         ## Initalize VQT filters
-        # self.vqt_model = helpers.VQT(**params_VQT)
         import vqt
         self.vqt_model = vqt.VQT(**params_VQT)
         self.vqt_model.cpu()

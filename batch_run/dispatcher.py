@@ -141,6 +141,8 @@ params_template = {
                 "framesHalted_before": 20,
                 "framesHalted_after": 20,
             },
+            "frames_freeze": None,
+            "relaxation_during_freeze_frames": True,
             "idx_start": 0,
             "verbose": 2,
         },
