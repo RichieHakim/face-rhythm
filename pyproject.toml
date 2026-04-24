@@ -50,13 +50,11 @@ dependencies = [
     "tqdm",
     "h5py",
     "Pillow",
-    ## decord2 is an actively maintained fork of decord (same C++ codebase,
-    ## identical API; the installed module is named ``decord``). Ships
-    ## vendored FFmpeg 8.0 + cibuildwheel CI for Linux x86_64/aarch64 and
-    ## macOS arm64, Python 3.10-3.14. eva_decord is kept as a Windows-only
-    ## fallback (decord2 has no Windows wheels yet).
-    "decord2; sys_platform != 'win32'",
-    "eva_decord; sys_platform == 'win32'",
+    ## torchcodec is the primary video decoding backend. Ships wheels for
+    ## Linux x86_64 + macOS arm64/x86_64 (CPU and CUDA). Includes a
+    ## built-in workaround for issue #905 (H.264 AVI sequential-access
+    ## drain bug). See TorchCodecVideoReader in face_rhythm/helpers.py.
+    "torchcodec",
     "natsort",
     "pandas",
     "tables",
@@ -76,6 +74,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+## Decord fallback backend. decord2 is an actively maintained fork of decord
+## (same C++ codebase, identical API; the installed module is named ``decord``).
+## Ships vendored FFmpeg 8.0 + cibuildwheel CI for Linux x86_64/aarch64 and
+## macOS arm64, Python 3.10-3.14. eva_decord is kept as a Windows-only
+## fallback (decord2 has no Windows wheels yet).
+## Install via: pip install face-rhythm[decord]
+decord = [
+    "decord2; sys_platform != 'win32'",
+    "eva_decord; sys_platform == 'win32'",
+]
 ## Notebook / interactive widget stack.
 gui = [
     "jupyter",
@@ -109,6 +117,8 @@ multisession = [
 ## Meta-extra: full install used by README ("pip install -e .[all]").
 ## Explicit union (not self-referential) to keep pip error messages readable.
 all = [
+    "decord2; sys_platform != 'win32'",
+    "eva_decord; sys_platform == 'win32'",
     "jupyter",
     "notebook<7",
     "ipywidgets",

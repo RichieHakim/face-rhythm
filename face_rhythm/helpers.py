@@ -1319,7 +1319,9 @@ else:
 
 class TorchCodecVideoReader:
     """
-    Video reader backed by ``torchcodec.decoders.VideoDecoder``.
+    Video reader backed by ``torchcodec.decoders.VideoDecoder`` with a
+    workaround for torchcodec issue #905.
+
     Provides the same ``__getitem__`` / ``__len__`` / ``get_avg_fps``
     interface as ``VideoReaderWrapper`` (decord) so it can be used as a
     drop-in replacement inside ``BufferedVideoReader``.
@@ -1327,6 +1329,25 @@ class TorchCodecVideoReader:
     Frames are returned as ``torch.Tensor`` with shape ``(H, W, C)`` and
     dtype ``uint8`` (NHWC layout), matching the output of decord's torch
     bridge.
+
+    **Issue #905 workaround:** torchcodec's sequential access path skips
+    cursor reset; after reading ``n - has_b_frames`` frames on a single
+    decoder, FFmpeg's H.264 drain emits ``has_b_frames`` AVFrames with
+    ``pts = INT64_MIN``, which the internal PTS filter rejects, causing
+    ``EndOfFileException`` before the last frames are decoded. The fix is
+    to serve only frames ``[0, n - SAFETY)`` from the primary decoder
+    (which never reaches the drain), and route the trailing ``SAFETY``
+    frames through a fresh decoder that takes the non-sequential seek
+    branch (``avformat_seek_file`` + flush + forward-decode from keyframe)
+    where ``pkt_dts`` remains valid. ``SAFETY = max(has_b_frames, 2)``.
+    torchcodec's ``VideoStreamMetadata`` does not currently expose
+    ``has_b_frames``, so SAFETY always defaults to 2, which matches
+    ``ffprobe``-reported ``has_b_frames=2`` for H.264 AVIs and is a safe
+    overestimate for ``has_b_frames=0`` files.
+
+    The tail decoder is lazily created on first tail access and cached for
+    the lifetime of this reader (one decoder recreation per video pass,
+    versus one per chunk with earlier workarounds).
 
     Thread safety is guaranteed by an internal lock — required because
     ``BufferedVideoReader`` loads slots from background threads.
@@ -1337,61 +1358,108 @@ class TorchCodecVideoReader:
         device (str):
             Decode device. ``'cpu'`` for software decode,
             ``'cuda'`` or ``'cuda:0'`` for NVDEC hardware decode.
-            NVDEC requires torchcodec built with CUDA support and
-            an FFmpeg with ``--enable-cuda``.
+            NVDEC requires torchcodec built with CUDA support and an
+            FFmpeg built with ``--enable-cuda``.
         num_ffmpeg_threads (int):
             Number of FFmpeg internal threads for decoding.
             ``0`` lets FFmpeg choose automatically (recommended).
     """
     def __init__(self, path_video: str, device: str = 'cpu', num_ffmpeg_threads: int = 0):
         import threading
-        from torchcodec.decoders import VideoDecoder
 
         self.path = str(path_video)
         self._device = device
-        self._decoder = VideoDecoder(
+        self._num_ffmpeg_threads = num_ffmpeg_threads
+        self._lock = threading.Lock()
+
+        self._decoder = self._make_fresh_decoder()
+        self._num_frames = len(self._decoder)
+
+        ## SAFETY = max(has_b_frames, 2). torchcodec VideoStreamMetadata does
+        ## not expose has_b_frames, so getattr always falls back to 2 here.
+        ## 2 is correct for standard H.264 main/high AVIs (confirmed by ffprobe)
+        ## and is a safe overestimate for has_b_frames=0 files.
+        _has_b_frames = getattr(self._decoder.metadata, 'has_b_frames', None)
+        self._tail_safety = max(_has_b_frames if _has_b_frames is not None else 2, 2)
+        self._safe_last = max(self._num_frames - self._tail_safety, 0)
+
+        ## Tail decoder: lazily created on first tail-range access; cached to
+        ## avoid one-decoder-per-call cost on sequential tail reads.
+        self._tail_decoder = None
+
+    def _make_fresh_decoder(self):
+        """Return a new VideoDecoder for self.path with the configured options."""
+        from torchcodec.decoders import VideoDecoder
+        return VideoDecoder(
             self.path,
             seek_mode='exact',
             dimension_order='NHWC',
-            device=device,
-            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            num_ffmpeg_threads=self._num_ffmpeg_threads,
         )
-        self._num_frames = len(self._decoder)
-        self._lock = threading.Lock()
+
+    def _read_one(self, idx: int):
+        """
+        Read a single frame by index, routing tail frames to a fresh decoder.
+
+        Args:
+            idx (int):
+                Frame index in ``[0, len(self))``.
+
+        Returns:
+            (torch.Tensor):
+                frame (torch.Tensor): Shape ``(H, W, C)``, dtype ``uint8``.
+        """
+        if idx < self._safe_last:
+            ## Safe range: primary decoder, sequential access, no drain risk.
+            return self._decoder.get_frame_at(idx).data
+        ## Tail range: use a fresh decoder (takes the non-sequential seek
+        ## branch inside torchcodec), sidestepping the #905 drain bug.
+        if self._tail_decoder is None:
+            self._tail_decoder = self._make_fresh_decoder()
+        return self._tail_decoder.get_frame_at(idx).data
 
     def __len__(self) -> int:
         return self._num_frames
 
     def __getitem__(self, key):
         """
-        Index frames by int, slice, or list of ints.
+        Index frames by int, ``np.integer``, slice, list, or ``np.ndarray``.
+
+        All multi-frame access is implemented via scalar ``get_frame_at``
+        calls internally (avoids ``get_frames_at`` / ``get_frames_in_range``,
+        which share the buggy sequential access path from issue #905).
 
         Args:
-            key (int, slice, or list):
-                Frame index or range.
+            key (int | np.integer | slice | list | np.ndarray):
+                Frame index or indices.
 
         Returns:
             (torch.Tensor):
                 frames (torch.Tensor):
-                    Single frame ``(H, W, C)`` for int key, or batch
-                    ``(N, H, W, C)`` for slice/list key.
+                    Single frame ``(H, W, C)`` for scalar key, or batch
+                    ``(N, H, W, C)`` for slice / list / ndarray key.
         """
+        import torch
+
         with self._lock:
             if isinstance(key, (int, np.integer)):
-                return self._decoder[int(key)]
+                return self._read_one(int(key))
             elif isinstance(key, slice):
-                start = key.start if key.start is not None else 0
-                stop = key.stop if key.stop is not None else self._num_frames
-                step = key.step
-                if step is not None and step != 1:
-                    indices = list(range(start, stop, step))
-                    return self._decoder.get_frames_at(indices).data
-                return self._decoder[start:stop]
+                indices = list(range(*key.indices(self._num_frames)))
+                if not indices:
+                    return torch.empty((0,), dtype=torch.uint8)
+                return torch.stack([self._read_one(i) for i in indices])
             elif isinstance(key, (list, np.ndarray)):
                 indices = [int(i) for i in key]
-                return self._decoder.get_frames_at(indices).data
+                if not indices:
+                    return torch.empty((0,), dtype=torch.uint8)
+                return torch.stack([self._read_one(i) for i in indices])
             else:
-                raise TypeError(f"TorchCodecVideoReader: unsupported key type {type(key)}. Expected int, slice, or list.")
+                raise TypeError(
+                    f"TorchCodecVideoReader: unsupported key type {type(key)}. "
+                    "Expected int, np.integer, slice, list, or np.ndarray."
+                )
 
     def get_avg_fps(self) -> float:
         """Return the average frame rate of the video."""
@@ -1433,7 +1501,7 @@ class BufferedVideoReader:
         posthold: int=1,
         method_getitem: str='continuous',
         starting_seek_position: int=0,
-        backend: str='decord',
+        backend: str='torchcodec',
         device: str='cpu',
         decord_backend: str='torch',
         decord_ctx=None,
@@ -1480,15 +1548,19 @@ class BufferedVideoReader:
              using the iterator method.
         backend (str):
             Video decoding backend. Options:
-            'decord' - (default) Uses decord.VideoReader. Well-tested.
+            'torchcodec' - (default) Uses torchcodec.decoders.VideoDecoder.
+                Frame-accurate seeking, actively maintained, supports CPU
+                and GPU (NVDEC) decode. Includes a workaround for
+                torchcodec issue #905 (sequential-access drain bug near EOF
+                in H.264 AVIs): frames in ``[0, n − SAFETY)`` are read from
+                a persistent decoder; the trailing ``SAFETY = max(has_b_frames, 2)``
+                frames are routed through a fresh decoder, opening it once
+                per video pass and caching it as the tail decoder.
+            'decord' - Uses decord.VideoReader. Well-tested fallback.
                 Provided by the ``decord2`` PyPI package (a maintained fork
                 of decord with vendored FFmpeg 8 wheels for Linux + macOS
                 arm64, py3.10-3.14). On Windows, falls back to
-                ``eva_decord``.
-            'torchcodec' - Uses torchcodec.decoders.VideoDecoder.
-                Frame-accurate seeking, actively maintained, supports GPU
-                decode. Requires torchcodec + a system ffmpeg (4-8). On
-                CUDA, also requires NVDEC-enabled ffmpeg.
+                ``eva_decord``. Install via ``pip install face-rhythm[decord]``.
             Only used when paths_videos is provided (ignored if video_readers given).
         device (str):
             Device for video decoding. Options:
