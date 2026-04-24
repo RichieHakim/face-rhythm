@@ -152,6 +152,8 @@ def get_default_parameters(
                     "framesHalted_before": 10,
                     "framesHalted_after": 10,
                 },
+                "frames_freeze": None,
+                "relaxation_during_freeze_frames": True,
                 "verbose": 2,
             },
             "VQT_Analyzer": {
