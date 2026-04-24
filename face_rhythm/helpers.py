@@ -1372,7 +1372,15 @@ class TorchCodecVideoReader:
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._lock = threading.Lock()
 
-        self._decoder = self._make_fresh_decoder()
+        try:
+            self._decoder = self._make_fresh_decoder()
+        except (ImportError, ModuleNotFoundError) as e:
+            raise ImportError(
+                "torchcodec is not available on this platform (torchcodec has no Windows wheels). "
+                "Install face-rhythm with the [decord] extra:\n"
+                "    pip install \"face-rhythm[decord]\"\n"
+                "And construct BufferedVideoReader with backend='decord'."
+            ) from e
         self._num_frames = len(self._decoder)
 
         ## SAFETY = max(has_b_frames, 2). torchcodec VideoStreamMetadata does
@@ -1620,9 +1628,21 @@ class BufferedVideoReader:
             assert all([isinstance(p, str) for p in paths_videos]), "paths_videos must be list of str"
             if self._backend == 'torchcodec':
                 print(f"FR: Video decode device: {self._device}") if self._verbose > 1 else None
-                video_readers = [TorchCodecVideoReader(path_video, device=self._device) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
+                try:
+                    video_readers = [TorchCodecVideoReader(path_video, device=self._device) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
+                except (ImportError, ModuleNotFoundError) as e:
+                    raise ImportError(
+                        "torchcodec is not available on this platform (torchcodec has no Windows wheels). "
+                        "Install face-rhythm with the [decord] extra:\n"
+                        "    pip install \"face-rhythm[decord]\"\n"
+                        "And construct BufferedVideoReader with backend='decord'."
+                    ) from e
             elif self._backend == 'decord':
-                assert decord is not None, "FR ERROR: decord is not installed. Install it with 'pip install decord' or use backend='torchcodec'."
+                assert decord is not None, (
+                    "FR ERROR: decord is not installed. "
+                    "Install with: pip install \"face-rhythm[decord]\""
+                    "\nThen construct BufferedVideoReader with backend='decord'."
+                )
                 video_readers = [VideoReaderWrapper(path_video, ctx=self._decord_ctx) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
             else:
                 raise ValueError(f"FR ERROR: Unknown video backend '{self._backend}'. Use 'torchcodec' or 'decord'.")

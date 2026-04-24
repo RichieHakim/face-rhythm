@@ -50,6 +50,10 @@ If you have any issues during installation, please open a
 ### 0. Requirements
 - [Anaconda](https://www.anaconda.com/distribution/) or
   [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
+- **ffmpeg** (system library, required by torchcodec):
+  - Linux: `apt install ffmpeg`
+  - macOS: `brew install ffmpeg`
+  - conda (any OS): `conda install -c conda-forge ffmpeg`
 
 ### 1. Create a new conda environment
 ```shell
@@ -60,9 +64,23 @@ You will need to activate the environment with `conda activate face_rhythm`
 each time you want to use face-rhythm.
 
 ### 2. Install face-rhythm
+
+**Linux / macOS (recommended — uses torchcodec as default backend):**
 ```shell
 pip install "face-rhythm[all]"
 ```
+
+**Windows** (torchcodec has no Windows wheels — use the decord backend):
+```shell
+pip install "face-rhythm[decord]"
+```
+Then pass `backend='decord'` when constructing `BufferedVideoReader`.
+
+**Optional decord fallback on Linux/macOS** (useful if torchcodec fails to import):
+```shell
+pip install "face-rhythm[decord]"
+```
+Then pass `backend='decord'` to `BufferedVideoReader`.
 
 For headless installs on servers (where you can't visually view videos), you'll need to `pip uninstall opencv_contrib_python` and `pip install opencv_contrib_python_headless`.
 
@@ -156,10 +174,16 @@ See the upstream guide:
 
 ### NVDEC hardware video decoding
 
-face-rhythm's `BufferedVideoReader` accepts `device='cuda'`, which decodes
-on the GPU via NVIDIA NVDEC (through the
-[`torchcodec`](https://github.com/pytorch/torchcodec) backend). Setup is
-hardware-dependent; we defer to upstream docs:
+[`torchcodec`](https://github.com/pytorch/torchcodec) is the default video
+decoding backend on Linux and macOS. It supports both CPU software decoding
+and NVIDIA NVDEC GPU decoding. Pass `device='cuda'` (or `device='cuda:0'`)
+to `BufferedVideoReader` to activate NVDEC. GPU decoding requires
+torchcodec built with CUDA support and an FFmpeg build with `--enable-cuda`.
 
-- torchcodec: <https://pytorch.org/torchcodec/stable/>
+For CUDA-enabled torchcodec wheels and GPU setup instructions, see:
+- torchcodec CUDA install guide: <https://pytorch.org/torchcodec/stable/>
 - NVIDIA Video Codec SDK: <https://developer.nvidia.com/video-codec-sdk>
+
+**Windows users:** torchcodec has no Windows wheels. Install with
+`pip install "face-rhythm[decord]"` and use `backend='decord'` instead.
+GPU decoding via decord is not currently supported.

@@ -54,7 +54,10 @@ dependencies = [
     ## Linux x86_64 + macOS arm64/x86_64 (CPU and CUDA). Includes a
     ## built-in workaround for issue #905 (H.264 AVI sequential-access
     ## drain bug). See TorchCodecVideoReader in face_rhythm/helpers.py.
-    "torchcodec",
+    ## NOTE: torchcodec has no Windows wheels. Windows users should install
+    ## with the [decord] extra: pip install "face-rhythm[decord]"
+    ## and use BufferedVideoReader with backend='decord'.
+    "torchcodec; sys_platform != 'win32'",
     "natsort",
     "pandas",
     "tables",
