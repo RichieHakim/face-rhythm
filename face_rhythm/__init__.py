@@ -1,3 +1,14 @@
+"""face-rhythm: extract and decompose rhythmic facial movements from video.
+
+The top-level package eagerly imports its submodules so that the public API
+(e.g. ``face_rhythm.point_tracking``) is available directly after
+``import face_rhythm``. The version string is kept in :mod:`face_rhythm._version`
+so build-tooling and CI can read it without triggering the heavy imports here
+(``torch``, ``cv2``).
+"""
+
+from face_rhythm._version import __version__
+
 ## Import packages
 __all__=[
     # 'analysis',
@@ -16,6 +27,7 @@ __all__=[
     'visualization',
     'data_importing',
     'alignment',
+    'alignment_multisession',
     # 'tests',
 ]
 
@@ -65,6 +77,3 @@ if run_cv2_imshow:
 
 for pkg in __all__:
     exec('from . import ' + pkg)
-
-
-__version__ = '0.2.8'

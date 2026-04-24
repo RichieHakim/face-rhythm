@@ -1,3 +1,12 @@
+"""Point tracking via Lucas-Kanade optical flow, with mesh-relaxation and outlier handling.
+
+``PointTracker`` advects a set of (x, y) seed points through a
+``BufferedVideoReader`` using either CPU or CUDA OpenCV LK optical flow. Mesh
+distances to k-nearest neighbors are regularized toward their initial values,
+and frames with any point displaced beyond a threshold halt and replay the
+surrounding region to suppress outlier streaks.
+"""
+
 from typing import Union
 import time
 

@@ -1,3 +1,11 @@
+"""Spectral analysis of point-tracked motion via Variable-Q Transform (VQT).
+
+``VQT_Analyzer`` converts point trajectories (from :mod:`face_rhythm.point_tracking`)
+into per-point spectrograms with a Variable-Q transform, applies 1/f and
+per-timepoint normalization, and writes the resulting complex or magnitude
+tensors out for downstream :mod:`face_rhythm.decomposition`.
+"""
+
 from typing import Union
 from pathlib import Path
 import math

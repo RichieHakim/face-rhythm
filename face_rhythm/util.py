@@ -1,3 +1,11 @@
+"""Miscellaneous project utilities: FR_Module base class, config I/O, system info, batch launcher.
+
+Contains the shared ``FR_Module`` base class (save config / run_info / run_data
+for every pipeline stage), YAML helpers, matplotlib -> numpy array helpers, a
+system-info collector used to snapshot the environment in run_info.json, and a
+SLURM batch-run wrapper.
+"""
+
 from pathlib import Path
 import re
 import time
@@ -480,7 +488,7 @@ def load_yaml_safe(path, verbose=0):
     try:
         with open(path, 'r') as f:
             return yaml.load(f, Loader=yaml.FullLoader)
-    except:
+    except yaml.YAMLError:
         print(f'FR Warning: Failed to load {path} with Loader=yaml.FullLoader. A field is likely not yaml compatible. Trying with yaml.Loader.')
         with open(path, 'r') as f:
             return yaml.load(f, Loader=yaml.Loader)
@@ -961,7 +969,7 @@ def system_info(verbose: bool = False,) -> Dict:
     def try_fns(fn):
         try:
             return fn()
-        except:
+        except Exception:
             return None
     fns = {key: val for key, val in platform.__dict__.items() if (callable(val) and key[0] != '_')}
     operating_system = {key: try_fns(val) for key, val in fns.items() if (callable(val) and key[0] != '_')}
@@ -1084,7 +1092,7 @@ def batch_run(
     params_list, 
     sbatch_config_list, 
     max_n_jobs=2,
-    dir_save='/n/data1/hms/neurobio/sabatini/rich/analysis/', 
+    dir_save=None,
     name_save='jobNum_', 
     verbose=True,
 ):
@@ -1161,7 +1169,7 @@ def batch_run(
 
                     unset XDG_RUNTIME_DIR
 
-                    cd /n/data1/hms/neurobio/sabatini/rich/
+                    cd /path/to/working/directory/
 
                     date
 
@@ -1194,6 +1202,10 @@ def batch_run(
     import json
     import os
     import shutil
+
+    ## dir_save has no sensible default; caller must provide an explicit output directory.
+    if dir_save is None:
+        raise ValueError("dir_save must be provided")
 
     # make sure the arguments are matched in length
     n_jobs = max(len(paths_scripts), len(params_list), len(sbatch_config_list))

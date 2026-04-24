@@ -64,12 +64,12 @@ class Dataset_videos(FR_Module):
         
         ### Assert that either bufferedVideoReader or paths_videos is specified
         assert bufferedVideoReader is not None or paths_videos is not None, "FR ERROR: bufferedVideoReader or paths_videos must be specified"
-        
+
         ## Workflow if method is 'paths_videos'
         ### Assert that if using 'paths_videos', it is either a list of strings or a string
         if self._videoDataType == 'paths_videos':
-            if isinstance(paths_videos, list): 
-                assert all([isinstance(path, str) for path in paths_videos]), "FR ERROR: paths_videos must be a string or list of strings to paths of videos"  
+            if isinstance(paths_videos, list):
+                assert all([isinstance(path, str) for path in paths_videos]), "FR ERROR: paths_videos must be a string or list of strings to paths of videos"
             else:
                 assert isinstance(paths_videos, str), "FR ERROR: paths_videos must be a string or list of strings to paths of videos"
             ## If paths_videos is a string, convert it to a list of strings
@@ -99,7 +99,7 @@ class Dataset_videos(FR_Module):
             self.metadata["frame_rate"] = self.frame_rate
             self.metadata["frame_height_width"] = self.frame_height_width
             self.metadata["num_channels"] = self.num_channels
-                
+
 
             ## Assert that all videos must have at least one frame
             assert all([n > 0 for n in self.metadata["num_frames"]]), "FR ERROR: All videos must have at least one frame"
@@ -135,7 +135,19 @@ class Dataset_videos(FR_Module):
         self.num_channels = self.metadata["num_channels"][0]
         self.paths_videos = [str(path) for path in self.paths_videos]  ## ensure paths are strings
 
-        self.example_image = self.videos[0][0]
+        ## Materialize the example frame as a CPU numpy array. When the
+        ## underlying BufferedVideoReader uses NVDEC (device='cuda'), frames
+        ## come back as CUDA torch tensors, and h5py.create_dataset() later
+        ## fails to call .numpy() on them. Forcing CPU here keeps the on-disk
+        ## representation independent of the decode device.
+        _ex = self.videos[0][0]
+        if hasattr(_ex, 'detach'):
+            _ex = _ex.detach()
+        if hasattr(_ex, 'cpu'):
+            _ex = _ex.cpu()
+        if hasattr(_ex, 'numpy'):
+            _ex = _ex.numpy()
+        self.example_image = np.asarray(_ex)
 
         ## For FR_Module compatibility
         self.config = {

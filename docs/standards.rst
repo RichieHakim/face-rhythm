@@ -19,8 +19,9 @@ Data Standards
       Hz, **ideally >90 Hz.**
 
 2. In focus: if the image is blurred, a significant amount of critical
-   information is lost. The core optic flow algorithm (`see here for
-   details <https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_video/py_lucas_kanade/py_lucas_kanade.html>`__)
+   information is lost. The core optic flow algorithm (`see OpenCV's
+   Lucas-Kanade tutorial
+   <https://docs.opencv.org/4.x/d4/dee/tutorial_optical_flow.html>`__)
    depends on using high spatial frequency information to solve the
    optic flow equations.
 
@@ -100,13 +101,5 @@ kinds of data can work as well. Below are some of the constraints.
 
 10. If data streaming/saving is your bottleneck, and your camera is
     compatible with Bonsai: https://bonsai-rx.org/, try it out. It might
-    remove that bottleneck. Contact me if you’d like some code to run
-    FLIR cameras.
-
--- Rich Hakim
-
-Updates:
-
-2/12/2021 - doc made
-
-3/9/2021 - added 'minimize overexposed pixels; bonsai; typos'
+    remove that bottleneck. Open a GitHub issue if you would like
+    reference code for running FLIR cameras.

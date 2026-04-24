@@ -1,3 +1,10 @@
+"""Frame and video visualization: overlay points/text on images and write videos.
+
+``FrameVisualizer`` wraps OpenCV's video writer and draw primitives; helper
+functions play back buffered readers with overlaid trajectories and produce
+interactive image stacks for Jupyter contexts.
+"""
+
 from typing import Union, Tuple, List
 from pathlib import Path
 import copy
@@ -425,7 +432,7 @@ class FrameVisualizer:
             cv2.destroyWindow(self.handle_cv2Imshow)
             try:
                 self.video_writer.release()
-            except:
+            except Exception:
                 pass
 
     def __call__(self, *args, **kwds):
@@ -491,7 +498,10 @@ def play_video_with_points(
                 return self.frameVisualizer
             def __exit__(self, exc_type, exc_value, traceback):
                 self.frameVisualizer.close()
-                cv2.destroyWindow(self.frameVisualizer.handle_cv2Imshow)
+                try:
+                    cv2.destroyWindow(self.frameVisualizer.handle_cv2Imshow)
+                except cv2.error:
+                    pass  ## Headless (no GUI backend): nothing to destroy
                 gc.collect()
         with CM(frameVisualizer) as f:
             for idx_frame in tqdm(idx_frames):

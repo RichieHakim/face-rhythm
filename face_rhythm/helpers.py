@@ -1,3 +1,19 @@
+"""General-purpose helpers: video I/O wrappers, path tools, image warping, downloads.
+
+Collected utilities used across the face-rhythm package. Notable groups:
+
+* Video readers (``VideoReaderWrapper``, ``BufferedVideoReader``) around
+  ``decord`` / ``torchcodec`` with pre-fetch threads.
+* Path and file helpers (``find_paths``, ``prepare_filepath_for_saving``,
+  download + hash verification, zip extraction).
+* Image registration helpers (``find_geometric_transformation``, remap-index
+  and flow-field conversions) used by :mod:`face_rhythm.rois`.
+* Parameter dictionary utilities (``fill_missing_keys_with_defaults``,
+  ``flatten_dict``) and a handful of numerical / plotting / device utilities.
+
+Some routines are adapted from Rich Hakim's ``basic_neural_processing_modules``.
+"""
+
 import multiprocessing as mp
 import threading
 from typing import Union
@@ -4697,3 +4713,207 @@ def rolling_mean(tensor: torch.Tensor, dim: int) -> torch.Tensor:
     
     # Stack the list of running means back into a tensor along the specified dimension.
     return current_mean
+
+
+## Video helpers — ported from bnpm.video (bnpm 0.7.1, RH 2021/2024).
+## Used by the demo_event_alignment notebook for tiled trial playback.
+## bnpm is a personal-utility repo; these are the only pieces face-rhythm needs.
+
+
+def play_video_cv2(
+    array=None,
+    path_video=None,
+    frameRate=30,
+    path_save=None,
+    show=True,
+    fourcc_code='MJPG',
+    text=None,
+    kwargs_text={},
+):
+    """
+    Play or save a video using OpenCV.
+
+    Args:
+        array (np.ndarray, optional):
+            3-D ``(frames, H, W)`` or 4-D ``(frames, H, W, channels)`` uint8
+            array. Values are clipped to [0, 255]. If None, ``path_video``
+            must be supplied and ``decord`` will be used to read it.
+        path_video (str or Path, optional):
+            Path to a video file. Used only when ``array`` is None.
+        frameRate (float):
+            Playback / output frame rate in Hz.
+        path_save (str or Path, optional):
+            Destination path for the saved video file. If None the video is
+            not written to disk.
+        show (bool):
+            Whether to display the video in a cv2 window.
+        fourcc_code (str):
+            FourCC codec string passed to ``cv2.VideoWriter_fourcc``.
+        text (str or list of str, optional):
+            Text overlay. If a list, element ``i`` is drawn on frame ``i``.
+        kwargs_text (dict):
+            Keyword arguments forwarded to ``cv2.putText``.
+    """
+    wait_frames = max(int((1 / frameRate) * 1000), 1)
+    if path_save is not None:
+        size = tuple((np.flip(array.shape[1:3])))
+        fourcc = cv2.VideoWriter_fourcc(*fourcc_code)
+        print(f'saving to file {path_save}')
+        writer = cv2.VideoWriter(path_save, fourcc, frameRate, size)
+
+    if kwargs_text is None:
+        kwargs_text = {
+            'org': (5, 15),
+            'fontFace': 1,
+            'fontScale': 1,
+            'color': (255, 255, 255),
+            'thickness': 1,
+        }
+
+    if array is not None:
+        array[array < 0] = 0
+        array[array > 255] = 255
+        if array.dtype != 'uint8':
+            array = array.astype('uint8')
+        movie = array
+        if array.ndim == 4:
+            flag_convert_to_gray = True
+        elif array.ndim == 3:
+            flag_convert_to_gray = False
+        else:
+            raise Exception('Unsupported number of channels, check array shape')
+    else:
+        try:
+            import decord
+        except ImportError as e:
+            raise ImportError(
+                "decord is required when array=None. "
+                "Install with: pip install eva_decord"
+            ) from e
+        movie = decord.VideoReader(path_video)
+        flag_convert_to_gray = False
+
+    for i_frame, frame in enumerate(tqdm(movie)):
+        if array is None:
+            frame = frame.asnumpy()
+
+        if array is not None:
+            if flag_convert_to_gray:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        if text is not None:
+            text_frame = text[i_frame] if isinstance(text, list) else text
+            frame = cv2.putText(frame, text_frame, **kwargs_text)
+
+        if show:
+            cv2.imshow('handle', np.uint8(frame))
+            cv2.waitKey(wait_frames)
+        if path_save is not None:
+            writer.write(np.uint8(frame))
+
+    if path_save is not None:
+        writer.release()
+        print('Video saved')
+    if show:
+        cv2.destroyWindow('handle')
+
+
+def make_tiled_video_array(
+    videos: List[np.ndarray],
+    shape: Optional[Tuple[int, int]] = None,
+    verbose: bool = True,
+):
+    """
+    Tile a list of video arrays into a single grid array.
+
+    Order of videos is top to bottom, then left to right.
+
+    Args:
+        videos (List[np.ndarray]):
+            List of video arrays with shape ``(frames, H, W, channels)`` or
+            ``(frames, H, W)``. All videos must share the same dtype.
+        shape (Tuple[int, int], optional):
+            Grid layout ``(n_rows, n_cols)``. If None the smallest square
+            grid that fits all videos is used.
+        verbose (bool):
+            Whether to print progress messages.
+
+    Returns:
+        np.ndarray: Tiled video array of shape
+        ``(max_frames, total_H, total_W, channels)``.
+    """
+    assert isinstance(videos, list), f"videos must be a list. Got {type(videos)}"
+    assert all(isinstance(v, np.ndarray) for v in videos), \
+        f"All elements of videos must be numpy arrays. Got {[type(v) for v in videos]}"
+    assert all(v.dtype == videos[0].dtype for v in videos), \
+        f"All videos must have the same dtype. Got {[v.dtype for v in videos]}"
+    if shape is not None:
+        assert isinstance(shape, tuple), f"shape must be a tuple. Got {type(shape)}"
+        assert len(shape) == 2, f"shape must be a 2-tuple. Got {len(shape)} elements"
+        assert all(isinstance(val, int) for val in shape), \
+            f"shape must contain only integers. Got {shape}"
+
+    n_videos = len(videos)
+
+    if shape is None:
+        n_height = int(np.floor(np.sqrt(n_videos)))
+        n_width = int(np.ceil(np.sqrt(n_videos)))
+        shape = (n_height, n_width)
+    assert shape[0] * shape[1] >= n_videos, \
+        f"shape[0] * shape[1] must be >= number of videos. Got {shape[0] * shape[1]} < {n_videos}"
+    if verbose:
+        print(f"Making video array with shape: {shape} videos")
+
+    for ii, video in enumerate(videos):
+        assert video.ndim in [3, 4], \
+            f"videos[{ii}] must be 3D or 4D. Got {video.ndim} dimensions"
+        if video.ndim == 3:
+            videos[ii] = video[..., None]
+
+    n_frames, heights, widths, channels = (
+        np.array([video.shape[ii] for video in videos]) for ii in range(4)
+    )
+    max_frames = max(n_frames)
+    if verbose:
+        print(f"Max video length and total frames in output video array: {max_frames}")
+
+    dtype = videos[0].dtype
+    if verbose:
+        print(f"Video dtype: {dtype}")
+
+    idx_videoArray_videos = np.array(
+        [(ii % shape[0], ii // shape[0]) for ii in range(n_videos)]
+    )
+    if verbose:
+        print(f"Video array indices: {idx_videoArray_videos}")
+
+    widths_col = np.array([
+        np.max(widths[idx_videoArray_videos[:, 1] == ii])
+        for ii in np.unique(idx_videoArray_videos[:, 1])
+    ])
+    heights_row = np.array([
+        np.max(heights[idx_videoArray_videos[:, 0] == ii])
+        for ii in np.unique(idx_videoArray_videos[:, 0])
+    ])
+
+    final_shape = (max_frames, np.sum(heights_row), np.sum(widths_col), channels[0])
+    video_array = np.zeros(final_shape, dtype)
+    if verbose:
+        print(f"Final output array shape: {video_array.shape}")
+
+    idx_tops_rows = np.cumsum(np.concatenate(([0], heights_row)))[:-1]
+    idx_tops_cols = np.cumsum(np.concatenate(([0], widths_col)))[:-1]
+    if verbose:
+        print(f"idx_tops_rows: {idx_tops_rows}, idx_tops_cols: {idx_tops_cols}")
+
+    for ii, video in enumerate(videos):
+        idx_top = idx_tops_rows[idx_videoArray_videos[ii, 0]]
+        idx_left = idx_tops_cols[idx_videoArray_videos[ii, 1]]
+        video_array[
+            :video.shape[0],
+            idx_top:idx_top + video.shape[1],
+            idx_left:idx_left + video.shape[2],
+            :,
+        ] = video
+
+    return video_array

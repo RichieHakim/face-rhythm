@@ -1,3 +1,12 @@
+"""Tensor Component Analysis (TCA) wrapper around :mod:`tensorly`.
+
+Provides the ``TCA`` class for decomposing multi-way arrays (time x points x
+frequency x ...) produced upstream by the spectral pipeline. Handles dict-of-
+arrays ingestion, axis concatenation, complex-to-real unfolding, normalization,
+and the actual decomposition via tensorly's CP / NN-HALS / Randomized CP
+solvers on either numpy or pytorch backends.
+"""
+
 from typing import Union
 import time
 from functools import partial

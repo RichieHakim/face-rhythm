@@ -1,3 +1,10 @@
+"""Project bootstrap: creates the on-disk project layout and config files.
+
+``prepare_project`` builds ``<dir>/config.yaml``, ``<dir>/run_info.json`` and
+the ``analysis_files`` / ``visualizations`` subfolders used by the rest of the
+pipeline.
+"""
+
 import yaml
 from pathlib import Path
 

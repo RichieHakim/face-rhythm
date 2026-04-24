@@ -1,3 +1,10 @@
+"""ROI selection, point-grid generation, and image warping / registration.
+
+Provides the ``ROIs`` class (choose face regions via GUI, file, or explicit
+dict), the ``ImageAlignmentChecker`` and registration helpers used by the
+alignment module, and the interactive ``_Select_ROI`` Plotly/ipywidgets GUI.
+"""
+
 from pathlib import Path
 import warnings
 import functools
@@ -107,7 +114,6 @@ class ROIs(FR_Module):
         if select_mode == "gui":
             print(f"FR: Initializing GUI...") if self._verbose > 1 else None
             self._gui = _Select_ROI(exampleImage)
-            self._gui._ax.set_title('Select ROIs by clicking the image.')
             self.roi_points = self._gui.selected_points
             self.mask_images = self._gui.mask_frames
         
@@ -371,145 +377,313 @@ class ROIs(FR_Module):
 
 class _Select_ROI:
     """
-    A simple GUI to select ROIs from an image.
-    Uses matplotlib and ipywidgets.
-    Only works in a Jupyter notebook.
-    Select regions of interest in an image using matplotlib.
-    Use %matplotlib notebook or qt backend to use this.
-    It currently uses cv2.polylines to draw the ROIs.
-    Output is self.mask_frames
-    RH 2021
+    Interactive polygon ROI selector using Plotly FigureWidget and ipywidgets.
 
-    outputs:
-        self.selected_points (list):
-            List of points selected by the user.
-            Shape: (n_points, 2)
-            (x, y) coordinates of the points.
-        self.mask_frames (list):
-            List of mask images.
-            Shape: (n_roi, img_height, img_width)
-            Each mask image is a 2D array of booleans.
+    Replaces the original matplotlib/nbagg-based GUI, which only worked in
+    classic Jupyter Notebook. This version works in JupyterLab 3+, Notebook 7+,
+    VSCode Jupyter, and any frontend that supports FigureWidget (anywidget
+    backend, requires plotly >= 6.0).
+
+    Colab note: broken with plotly >= 6.0 (anywidget JS issue #5027). Workaround:
+    downgrade to plotly==5.24.1 and call
+    ``from google.colab import output; output.enable_custom_widget_manager()``.
+
+    Draw closed polygon regions on the displayed image using the
+    ``drawclosedpath`` modebar tool, then click "Confirm ROIs" to freeze the
+    selection and populate output attributes.
+
+    Attributes:
+        selected_points (dict):
+            Populated after "Confirm ROIs" is clicked.
+            Maps ``"ROI_0"``, ``"ROI_1"``, … → ``np.ndarray`` of shape
+            ``(N, 2)`` float64, columns = ``(x, y)`` in image-pixel coords
+            (top-left origin; x = column, y = row).
+        mask_frames (dict):
+            Populated after "Confirm ROIs" is clicked.
+            Maps ``"mask_0"``, ``"mask_1"``, … → boolean ``np.ndarray``
+            of shape ``(H, W)``. True inside the polygon.
+        _completed_status (bool):
+            True after "Confirm ROIs" has been clicked successfully.
     """
 
-    def __init__(self, image, kwargs_subplots={}, kwargs_imshow={}):
-        """
-        Initialize the class
+    _ROI_COLORS: list = [
+        "red", "blue", "lime", "orange", "purple",
+        "cyan", "magenta", "yellow",
+    ]
 
-        Args:
-            im:
-                Image to select the ROI from
-        """
-        from ipywidgets import widgets
-        import IPython.display as Disp
-        import matplotlib.pyplot as plt
-        import matplotlib as mpl
+    def __init__(
+        self,
+        image: np.ndarray,
+        n_rois: int = 1,
+        height=None,
+        width=None,
+        line_color: str = "red",
+    ) -> None:
+        import re as _re
+        import plotly.express as px
+        import plotly.graph_objects as go
+        import ipywidgets as widgets
+        from IPython.display import display
+        import skimage.draw
 
-        import torch
+        self._re = _re
+        self._skimage_draw = skimage.draw
 
-        ## Make sure that the image is a numpy array or torch.Tensor
-        assert isinstance(image, (np.ndarray, torch.Tensor)), "FR ERROR: 'image' must be a numpy array or torch.Tensor."
-        if isinstance(image, torch.Tensor):
-            image = image.numpy()
-
-        ## set jupyter notebook to use interactive matplotlib.
-        ## equivalent to %matplotlib notebook
-        mpl.use("nbagg")        
-        plt.ion()
-
-        ## Set variables                
-        self._img_input = image.copy()
-        self.selected_points = {}
-        self._selected_points_last_ROI = []
-        self.mask_frames = {}
-        self._completed_status = False
-
-        ## Prepare figure
-        self._fig, self._ax = plt.subplots(**kwargs_subplots)
-        self._img_current = self._ax.imshow(self._img_input.copy(), **kwargs_imshow)
-        self._fig.canvas.draw()
-
-        ## Connect the click event
-        self._buttonRelease = self._fig.canvas.mpl_connect('button_release_event', self._onclick)
-        ## Make and connect the buttons
-        disconnect_button = widgets.Button(description="Confirm ROI")
-        new_ROI_button = widgets.Button(description="New ROI")
-        Disp.display(disconnect_button)
-        Disp.display(new_ROI_button)
-        disconnect_button.on_click(self._disconnect_mpl)
-        new_ROI_button.on_click(self._new_ROI)
-
-    def _poly_img(self, img, pts):
-        """
-        Draw a polygon on an image.
-        """
-        pts = np.array(pts, np.int32)
-        pts = pts.reshape((-1, 1, 2))
-        cv2.polylines(
-            img=img, 
-            pts=[pts],
-            isClosed=True,
-            color=(255,255,255,),
-            thickness=2
+        assert isinstance(image, np.ndarray), (
+            "FR ERROR: '_Select_ROI' 'image' must be a numpy ndarray, "
+            f"got {type(image)}."
         )
-        return img
+        assert image.ndim in (2, 3), (
+            "FR ERROR: '_Select_ROI' 'image' must be 2D (H,W) or 3D (H,W,3), "
+            f"got shape {image.shape}."
+        )
 
-    def _onclick(self, event):
-        """
-        When the mouse is clicked, add the point to the list.
-        """
-        ## If the click is outside the image, ignore it
-        if (event.xdata is None) or (event.ydata is None):
-            return None
-        self._selected_points_last_ROI.append([float(event.xdata), float(event.ydata)])
-        if len(self._selected_points_last_ROI) > 1:
-            self._fig
-            im = self._img_input.copy()
-            for p in self.selected_points.values():
-                im = self._poly_img(im, p)
-            im = self._poly_img(im, self._selected_points_last_ROI)
-            self._img_current.set_data(im)
-        self._fig.canvas.draw()
+        self._image = image
 
+        ## Public attributes — initialised as empty dicts so that ROIs.__init__
+        ## can grab references before the user clicks Confirm.  _on_confirm
+        ## mutates them in place so the reference-sharers stay in sync.
+        self.selected_points: dict = {}
+        self.mask_frames: dict = {}
+        self._completed_status: bool = False
 
-    def _disconnect_mpl(self, _):
-        """
-        Disconnect the click event and collect the points.
-        """
-        self.selected_points.update({f"ROI_{len(self.selected_points)}": np.array(self._selected_points_last_ROI)})
+        ## Build the base figure using px.imshow.
+        ## binary_string=True PNG-encodes the array for fast rendering and
+        ## sets up a top-left origin (y=0 at top), matching NumPy indexing.
+        if image.ndim == 2:
+            fig_base = px.imshow(
+                image,
+                color_continuous_scale="gray",
+                binary_string=True,
+            )
+        else:
+            fig_base = px.imshow(image, binary_string=True)
 
-        self._fig.canvas.mpl_disconnect(self._buttonRelease)
+        layout_kwargs = dict(
+            dragmode="drawclosedpath",
+            newshape=dict(
+                line_color=line_color,
+                fillcolor="rgba(255,0,0,0.2)",
+                ## opacity > 0.5 required to click inside shape to select it
+                opacity=0.6,
+            ),
+            xaxis=dict(showticklabels=False, showgrid=False),
+            yaxis=dict(showticklabels=False, showgrid=False),
+            margin=dict(l=0, r=0, t=30, b=0),
+            title_text=f"Draw {n_rois} ROI polygon(s) → click Confirm ROIs",
+            coloraxis_showscale=False,
+        )
+        if height is not None:
+            layout_kwargs["height"] = height
+        if width is not None:
+            layout_kwargs["width"] = width
+
+        fig_base.update_layout(**layout_kwargs)
+
+        ## FigureWidget (anywidget-backed in plotly >= 6) enables Python-side
+        ## shape retrieval. Must display via IPython.display, NOT .show().
+        self._widget = go.FigureWidget(fig_base)
+
+        self._btn_confirm = widgets.Button(
+            description="Confirm ROIs",
+            button_style="success",
+            tooltip="Freeze current polygon selections and compute masks",
+        )
+        self._btn_clear = widgets.Button(
+            description="Clear",
+            button_style="warning",
+            tooltip="Remove all drawn shapes from the figure",
+        )
+        self._label = widgets.Label("Draw polygons using the toolbar, then click Confirm ROIs.")
+
+        self._btn_confirm.on_click(self._on_confirm)
+        self._btn_clear.on_click(self._on_clear)
+
+        self._label.layout = widgets.Layout(width='100%')
+        display(
+            widgets.VBox([
+                self._widget,
+                widgets.HBox([self._btn_confirm, self._btn_clear]),
+                self._label,
+            ])
+        )
+
+    def _on_confirm(self, _button_event) -> None:
+        """Read shapes from FigureWidget, parse SVG paths, compute masks."""
+        ## Use _props workaround: widget.layout["shapes"] returns empty tuple
+        ## due to plotly >= 6.x bug (plotly/plotly.py #5309, open Aug 2025).
+        shapes_raw = self._widget.layout._props.get("shapes", [])
+
+        path_shapes = [s for s in shapes_raw if s.get("type") == "path"]
+
+        if not path_shapes:
+            self._label.value = "No polygon shapes found. Draw at least one polygon."
+            return
+
+        selected_points: dict = {}
+        mask_frames: dict = {}
+
+        for idx, shape in enumerate(path_shapes):
+            path_str = shape["path"]
+            verts = self._parse_svg_path(path_str)
+            mask = self._compute_mask(
+                vertices_xy=verts,
+                image_shape=self._image.shape,
+            )
+            selected_points[f"ROI_{idx}"] = verts
+            mask_frames[f"mask_{idx}"] = mask
+
+        ## Mutate in place so that reference-sharers (ROIs.roi_points,
+        ## ROIs.mask_images) stay in sync after the user clicks Confirm.
+        self.selected_points.clear()
+        self.selected_points.update(selected_points)
+        self.mask_frames.clear()
+        self.mask_frames.update(mask_frames)
         self._completed_status = True
 
-        self.mask_frames.update(self._compute_mask_frames(
-            selected_points=self.selected_points, 
-            exampleImage=self._img_input,
-            verbose=True,
-        ))
+        n = len(selected_points)
+        vertex_counts = [v.shape[0] for v in selected_points.values()]
+        self._label.value = (
+            f"Captured {n} ROI(s) with {vertex_counts} vertices. "
+            "Access via .selected_points and .mask_frames."
+        )
+        print(
+            f"Select_ROI_Plotly: Captured {n} ROI(s) with "
+            f"{vertex_counts} vertices."
+        )
+
+    def _on_clear(self, _button_event) -> None:
+        """Remove all shapes from the figure."""
+        ## Bug workaround (plotly #5309): writing widget.layout.shapes = []
+        ## inside batch_update() doesn't push the clear to the JS frontend.
+        ## Use plotly_relayout to send the update directly; also reset _props
+        ## so that the next Confirm read sees an empty list.
+        self._widget.plotly_relayout({'shapes': []})
+        self._widget.layout._props['shapes'] = []
+        self._label.value = "Shapes cleared. Draw new polygons."
+
+    @staticmethod
+    def _parse_svg_path(path_str: str) -> np.ndarray:
+        """
+        Parse a Plotly ``drawclosedpath`` SVG path string into polygon vertices.
+
+        Handles the format Plotly actually emits: ``Mx,yLx,yLx,yZ``
+        (absolute M and L commands, comma-separated x,y pairs, Z close).
+        Also handles space-separated variants for robustness.
+
+        Args:
+            path_str (str):
+                SVG path string from ``widget.layout._props['shapes'][i]['path']``.
+
+        Returns:
+            np.ndarray: Shape ``(N, 2)``, dtype float64, columns = ``(x, y)``.
+
+        Raises:
+            ValueError: If path_str is empty or contains no vertices.
+        """
+        import re
+        if not path_str or not path_str.strip():
+            raise ValueError("Empty SVG path string.")
+
+        tokens = re.split(r"([MLZmlz])", path_str.strip())
+        tokens = [t.strip() for t in tokens if t.strip()]
+
+        coords: list = []
+        current_pos = np.array([0.0, 0.0])
+
+        i = 0
+        while i < len(tokens):
+            cmd = tokens[i]
+            i += 1
+
+            if cmd in ("M", "L"):
+                if i < len(tokens) and tokens[i] not in "MLZmlz":
+                    raw = tokens[i].replace(",", " ").split()
+                    i += 1
+                    for j in range(0, len(raw) - 1, 2):
+                        x, y = float(raw[j]), float(raw[j + 1])
+                        current_pos = np.array([x, y])
+                        coords.append(current_pos.copy())
+
+            elif cmd in ("m", "l"):
+                if i < len(tokens) and tokens[i] not in "MLZmlz":
+                    raw = tokens[i].replace(",", " ").split()
+                    i += 1
+                    for j in range(0, len(raw) - 1, 2):
+                        dx, dy = float(raw[j]), float(raw[j + 1])
+                        current_pos = current_pos + np.array([dx, dy])
+                        coords.append(current_pos.copy())
+
+            elif cmd in ("Z", "z"):
+                pass
+
+        if not coords:
+            raise ValueError(f"No vertices parsed from path: {path_str!r}")
+
+        return np.array(coords, dtype=np.float64)
 
     @staticmethod
     def _compute_mask_frames(
-        selected_points,
-        exampleImage,
-        verbose=False,
-    ):
-        import skimage
-        mask_frames = {}
+        selected_points: dict,
+        exampleImage: np.ndarray,
+        verbose: bool = False,
+    ) -> dict:
+        """
+        Batch-compute boolean masks from a dict of polygon vertex arrays.
+
+        Preserves the original signature so callers that invoke this as a
+        static method (e.g. ``_Select_ROI._compute_mask_frames(...)``) continue
+        to work unchanged.
+
+        Args:
+            selected_points (dict):
+                Maps ``"ROI_0"``, … → ``np.ndarray`` of shape ``(N, 2)`` (x, y).
+            exampleImage (np.ndarray):
+                Image whose ``(H, W)`` determines mask dimensions.
+            verbose (bool):
+                Print a confirmation line when done.
+
+        Returns:
+            dict: Maps ``"mask_0"``, … → boolean ``np.ndarray`` of shape ``(H, W)``.
+        """
+        import skimage.draw
+        mask_frames: dict = {}
         for ii, pts in enumerate(selected_points.values()):
             pts = np.array(pts)
             mask_frame = np.zeros((exampleImage.shape[0], exampleImage.shape[1]))
-            pts_y, pts_x = skimage.draw.polygon(pts[:, 1], pts[:, 0])
-            mask_frame[pts_y, pts_x] = 1
+            rr, cc = skimage.draw.polygon(pts[:, 1], pts[:, 0])
+            mask_frame[rr, cc] = 1
             mask_frame = mask_frame.astype(np.bool_)
-            mask_frames.update({f"mask_{ii}": mask_frame})
-        print(f'mask_frames computed') if verbose else None
+            mask_frames[f"mask_{ii}"] = mask_frame
+        if verbose:
+            print("mask_frames computed")
         return mask_frames
-        
-    def _new_ROI(self, _):
+
+    @staticmethod
+    def _compute_mask(
+        vertices_xy: np.ndarray,
+        image_shape: tuple,
+    ) -> np.ndarray:
         """
-        Start a new ROI.
+        Convert polygon vertices to a boolean image mask.
+
+        Args:
+            vertices_xy (np.ndarray):
+                Shape ``(N, 2)``, columns = ``(x, y)`` in pixel coords.
+            image_shape (tuple):
+                ``(height, width)`` or ``(height, width, channels)``.
+
+        Returns:
+            np.ndarray: Boolean mask, shape ``(height, width)``.
         """
-        self.selected_points.update({f"ROI_{len(self.selected_points)}": np.array(self._selected_points_last_ROI)})
-        self._selected_points_last_ROI = []
+        import skimage.draw
+        h, w = image_shape[:2]
+        rows = vertices_xy[:, 1]
+        cols = vertices_xy[:, 0]
+        rr, cc = skimage.draw.polygon(rows, cols, shape=(h, w))
+        mask = np.zeros((h, w), dtype=np.bool_)
+        mask[rr, cc] = True
+        return mask
         
         
 

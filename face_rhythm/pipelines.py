@@ -139,7 +139,6 @@ def pipeline_basic(params):
         ## Either select new ROIs (`select_mode='gui'`), or import existing ROIs (`path_file=path_to_ROIs.h5_file`).\
         ## Typically, you should make 1 or 2 ROIs. One for defining where the face points should be and one for cropping the frame.
 
-        # %matplotlib notebook
         rois = fr.rois.ROIs(**params['ROIs']['initialize'])
 
         rois.make_points(

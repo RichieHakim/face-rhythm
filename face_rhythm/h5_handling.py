@@ -1,6 +1,8 @@
-###########################
-####### H5_HANDLING #######
-###########################
+"""HDF5 utilities: hierarchical traversal, group I/O, and bulk-close helpers.
+
+Convenience wrappers around :mod:`h5py` for the face-rhythm project. Nothing
+here is CUDA- or video-specific; the module is safe to import anywhere.
+"""
 
 import gc
 
@@ -17,7 +19,7 @@ def close_all_h5():
             if isinstance(obj, h5py.File):   # Just HDF5 files
                 try:
                     obj.close()
-                except:
+                except (OSError, ValueError, RuntimeError):
                     pass # Was already closed
     except Exception as e:
         print(f"Error closing h5 files. Will try again using `tables._open_files.close_all()`. Error: {e}")

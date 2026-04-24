@@ -1,3 +1,11 @@
+"""Image alignment pipeline and video frame ingestion.
+
+``Image_preparation_pipeline`` builds a clean reference image for registration
+from a sequence of frames by downsampling, masking with a VQT spectrogram to
+keep only low-spectral-variance (non-behavior) frames, and applying CLAHE.
+Also provides SFTP / local video frame extractors used to seed alignment.
+"""
+
 from typing import Dict, Optional
 
 import os
@@ -298,14 +306,19 @@ def get_frames(path, time_start, time_end, verbose=False):
     ## Get number of frames
     num_frames = int(sample_end - sample_start)
     print(f"num_frames: {num_frames}")
-    ## Get frames
+    ## Get frames. If the request extends past EOF we stop early rather
+    ## than crashing — dtype is taken from the first successful read.
     frames = []
     for i in tqdm(range(num_frames), disable=not verbose):
-        ## Set the frame position
         vc.set(cv2.CAP_PROP_POS_FRAMES, int(sample_start + i))
         ret, frame = vc.read()
         if not ret:
             break
         frames.append(frame)
-    ims = np.array(frames, dtype=frame.dtype)
+    if not frames:
+        raise ValueError(
+            f"No frames could be read from {path} in the interval "
+            f"[{time_start}, {time_end}] s."
+        )
+    ims = np.array(frames, dtype=frames[0].dtype)
     return ims

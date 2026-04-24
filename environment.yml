@@ -1,8 +1,0 @@
-name: face_rhythm
-channels:
-  - conda-forge
-dependencies:
-  - python=3.11
-  - pip
-  - pip:
-    - face-rhythm[all]

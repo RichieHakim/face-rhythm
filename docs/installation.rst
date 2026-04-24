@@ -1,50 +1,72 @@
 Installation
 ============
-I prefer to use conda for package management, so I'll explain set up using conda
 
-1. Clone this repo to a good location:
+face-rhythm is published on PyPI and can also be installed directly from the
+GitHub repository. We recommend using a dedicated `conda
+<https://docs.conda.io/en/latest/miniconda.html>`_ or ``venv`` environment to
+keep the scientific Python stack isolated.
 
-.. code-block:: console
+Requirements
+------------
 
-    git clone https://github.com/RichieHakim/face-rhythm/
-    cd face-rhythm
-    git switch release
+- Python 3.10, 3.11, 3.12, or 3.13
+- A recent ``pip`` (``pip install --upgrade pip``)
+- (Optional) A CUDA-capable GPU. The ``[all]`` install works on CPU; for
+  hardware-accelerated video decoding (NVDEC) and optical flow, see the
+  "Optional: GPU-accelerated video decoding and tracking" section at the
+  end of the repository ``README.md``.
 
+.. _install-pypi:
 
-2. Create a conda environment:
+1. Install from PyPI (recommended)
+----------------------------------
 
-.. code-block:: console
-
-    conda env create --file environment.yml
-
-Then activate the conda environment 
-
-.. code-block:: console
-
-    conda activate face_rhythm 
-
-1. Run the set up script:
-
-.. code-block:: console
-
-    pip install -e .
-
-4. Create a "project directory" where we will save intermediate files, videos, and config files.
-This project directory should ideally be outside of the repo, and you'll create a new one each time
-you analyze a new dataset.
-Again, given that your ipynb will change a lot (get populated with plots and new parameters,
-it's good to copy this out of the repo while you're doing analysis. I typically put one notebook in
-each of my project folders.
+The fastest path is to install the release from PyPI into a fresh
+environment:
 
 .. code-block:: console
 
-    cd ..
-    mkdir face_rhythm_run
-    cp face-rhythm/notebooks/face_rhythm_notebook.ipynb face_rhythm_run/
+   conda create -n face_rhythm python=3.12 -y
+   conda activate face_rhythm
+   pip install --upgrade pip
+   pip install "face-rhythm[all]"
 
-5. Get started! I like to use jupyter notebook for this stuff:
+The ``[all]`` extra installs the notebook/GUI stack, test tooling, and the
+docs toolchain alongside the core dependencies. For a minimal install use
+``pip install face-rhythm``.
+
+.. _install-source:
+
+2. Install from source
+----------------------
+
+To work against the development branch or to contribute changes, clone the
+repository and install in editable mode:
 
 .. code-block:: console
 
-    jupyter notebook
+   conda create -n face_rhythm python=3.12 -y
+   conda activate face_rhythm
+   git clone https://github.com/RichieHakim/face-rhythm.git
+   cd face-rhythm
+   pip install -e ".[all]"
 
+.. _install-notebooks:
+
+3. Get the demo notebooks
+-------------------------
+
+The demo notebooks are not packaged on PyPI; they live in the
+``notebooks/`` directory of the source tree. Clone the repository (step 2)
+or download the folder directly from GitHub to follow along.
+
+See :doc:`notebooks` for a guided list.
+
+Verifying the install
+---------------------
+
+To confirm the package imports cleanly, run:
+
+.. code-block:: console
+
+   python -c "import face_rhythm; print(face_rhythm.__version__)"
