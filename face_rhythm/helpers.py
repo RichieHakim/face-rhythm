@@ -1433,7 +1433,7 @@ class BufferedVideoReader:
         posthold: int=1,
         method_getitem: str='continuous',
         starting_seek_position: int=0,
-        backend: str='torchcodec',
+        backend: str='decord',
         device: str='cpu',
         decord_backend: str='torch',
         decord_ctx=None,
@@ -1480,10 +1480,14 @@ class BufferedVideoReader:
              using the iterator method.
         backend (str):
             Video decoding backend. Options:
-            'torchcodec' - (default) Uses torchcodec.decoders.VideoDecoder.
-                Frame-accurate seeking, actively maintained, supports GPU decode.
-            'decord' - Uses decord.VideoReader (legacy).
-                Unmaintained but well-tested. Requires decord to be installed.
+            'decord' - (default) Uses decord.VideoReader. Well-tested but
+                unmaintained; the eva_decord wheels we depend on do not
+                cover macOS + python>=3.12, so users on that cell of the
+                matrix must opt into 'torchcodec' instead.
+            'torchcodec' - Uses torchcodec.decoders.VideoDecoder.
+                Frame-accurate seeking, actively maintained, supports GPU
+                decode. Requires torchcodec + a system ffmpeg (4-8). On
+                CUDA, also requires NVDEC-enabled ffmpeg.
             Only used when paths_videos is provided (ignored if video_readers given).
         device (str):
             Device for video decoding. Options:
@@ -4449,8 +4453,11 @@ class Equivalence_checker():
                 ### IF the arrays are numeric, then calculate the relative difference
                 dtypes_numeric = (np.number, np.bool_, np.integer, np.floating, np.complexfloating)
                 if any([np.issubdtype(test.dtype, dtype) and np.issubdtype(true.dtype, dtype) for dtype in dtypes_numeric]):
-                    diff = np.abs(test - true)
-                    r_diff = diff / np.abs(true)
+                    ## numpy 1.25+ removed the `-` operator on bool arrays; cast first.
+                    test_n = test.astype(np.int8) if test.dtype == bool else test
+                    true_n = true.astype(np.int8) if true.dtype == bool else true
+                    diff = np.abs(test_n - true_n)
+                    r_diff = diff / np.abs(true_n)
                     r_diff_mean, r_diff_max, any_nan = np.nanmean(r_diff), np.nanmax(r_diff), np.any(np.isnan(r_diff))
                     print(f"Equivalence check failed. Path: {path}. Relative difference: mean={r_diff_mean}, max={r_diff_max}, any_nan={any_nan}") if self._verbose > 0 else None
                 else:

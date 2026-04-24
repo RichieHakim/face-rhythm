@@ -12,7 +12,6 @@ import time
 
 import numpy as np
 from tqdm.auto import tqdm
-import decord
 import cv2
 import torch
 import scipy.sparse

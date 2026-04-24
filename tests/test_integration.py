@@ -158,6 +158,11 @@ def test_pipeline_tracking_simple(dir_data_test):
                     "idx_windows": None,
                     "name_dim_array_window": "time",
                 },
+                "normalize_data": {
+                    "mean_subtract": False,
+                    "std_divide": True,
+                    "dim_name": "time",
+                },
                 "fit": {
                     "method": "CP_NN_HALS",
                     "params_method": {

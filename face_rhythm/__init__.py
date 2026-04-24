@@ -55,9 +55,9 @@ else:
 if run_cv2_imshow:
     def prepare_cv2_imshow():
         """
-        This function is necessary because cv2.imshow() 
-        can crash the kernel if called after importing 
-        av and decord.
+        This function is necessary because cv2.imshow()
+        can crash the kernel if called after importing
+        other libraries that wrap libavcodec (e.g. torchcodec, av).
         RH 2022
         """
         import numpy as np
@@ -68,7 +68,7 @@ if run_cv2_imshow:
             cv2.putText(frame, "Prepping CV2", (10,100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
             cv2.putText(frame, "Calling this figure allows cv2.imshow ", (10,150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
             cv2.putText(frame, "to work without crashing if this function", (10,170), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-            cv2.putText(frame, "is called before importing av and decord", (10,190), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+            cv2.putText(frame, "is called before importing torchcodec/av", (10,190), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
             cv2.imshow('startup', frame)
             cv2.waitKey(1000)
         cv2.destroyWindow('startup')
