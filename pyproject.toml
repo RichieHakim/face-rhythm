@@ -50,11 +50,13 @@ dependencies = [
     "tqdm",
     "h5py",
     "Pillow",
-    ## eva_decord ships no macOS wheels for python>=3.12 (no sdist either),
-    ## so we exclude that cell of the matrix. Users hitting the gap can
-    ## opt into torchcodec by installing it themselves and passing
-    ## ``backend='torchcodec'`` to ``BufferedVideoReader``.
-    "eva_decord; sys_platform != 'darwin' or python_version < '3.12'",
+    ## decord2 is an actively maintained fork of decord (same C++ codebase,
+    ## identical API; the installed module is named ``decord``). Ships
+    ## vendored FFmpeg 8.0 + cibuildwheel CI for Linux x86_64/aarch64 and
+    ## macOS arm64, Python 3.10-3.14. eva_decord is kept as a Windows-only
+    ## fallback (decord2 has no Windows wheels yet).
+    "decord2; sys_platform != 'win32'",
+    "eva_decord; sys_platform == 'win32'",
     "natsort",
     "pandas",
     "tables",

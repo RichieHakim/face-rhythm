@@ -1480,10 +1480,11 @@ class BufferedVideoReader:
              using the iterator method.
         backend (str):
             Video decoding backend. Options:
-            'decord' - (default) Uses decord.VideoReader. Well-tested but
-                unmaintained; the eva_decord wheels we depend on do not
-                cover macOS + python>=3.12, so users on that cell of the
-                matrix must opt into 'torchcodec' instead.
+            'decord' - (default) Uses decord.VideoReader. Well-tested.
+                Provided by the ``decord2`` PyPI package (a maintained fork
+                of decord with vendored FFmpeg 8 wheels for Linux + macOS
+                arm64, py3.10-3.14). On Windows, falls back to
+                ``eva_decord``.
             'torchcodec' - Uses torchcodec.decoders.VideoDecoder.
                 Frame-accurate seeking, actively maintained, supports GPU
                 decode. Requires torchcodec + a system ffmpeg (4-8). On
@@ -4795,7 +4796,7 @@ def play_video_cv2(
         except ImportError as e:
             raise ImportError(
                 "decord is required when array=None. "
-                "Install with: pip install eva_decord"
+                "Install with: pip install decord2"
             ) from e
         movie = decord.VideoReader(path_video)
         flag_convert_to_gray = False
