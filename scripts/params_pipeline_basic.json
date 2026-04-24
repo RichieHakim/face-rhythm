@@ -137,6 +137,11 @@
             "idx_windows": null,
             "name_dim_array_window": "time"
         },
+        "normalize_data": {
+            "mean_subtract": false,
+            "std_divide": true,
+            "dim_name": "time"
+        },
         "fit": {
             "method": "CP_NN_HALS",
             "params_method": {
