@@ -85,7 +85,5 @@ jobs:
         python -c "import torch; print(f'torch=={torch.__version__}'); print('cuda:', torch.cuda.is_available())"
 
     - name: Run pytest
-      ## Test coverage is incomplete; failures are not yet blocking.
-      continue-on-error: true
       run: |
         pytest -x -v tests/ --cov=face_rhythm --cov-report=term-missing --color=yes

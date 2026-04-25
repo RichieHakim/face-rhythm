@@ -1376,10 +1376,11 @@ class TorchCodecVideoReader:
             self._decoder = self._make_fresh_decoder()
         except (ImportError, ModuleNotFoundError) as e:
             raise ImportError(
-                "torchcodec is not available on this platform (torchcodec has no Windows wheels). "
-                "Install face-rhythm with the [decord] extra:\n"
-                "    pip install \"face-rhythm[decord]\"\n"
-                "And construct BufferedVideoReader with backend='decord'."
+                "torchcodec is not available on this platform (torchcodec has no "
+                "Windows wheels). Use the decord backend instead — decord is "
+                "installed with face-rhythm by default. Construct your video "
+                "reader with backend='decord':\n"
+                "    BufferedVideoReader(paths_videos=..., backend='decord')"
             ) from e
         self._num_frames = len(self._decoder)
 
@@ -1564,11 +1565,12 @@ class BufferedVideoReader:
                 a persistent decoder; the trailing ``SAFETY = max(has_b_frames, 2)``
                 frames are routed through a fresh decoder, opening it once
                 per video pass and caching it as the tail decoder.
-            'decord' - Uses decord.VideoReader. Well-tested fallback.
+            'decord' - Uses decord.VideoReader. Well-tested fallback,
+                and the only video backend available on Windows.
                 Provided by the ``decord2`` PyPI package (a maintained fork
                 of decord with vendored FFmpeg 8 wheels for Linux + macOS
-                arm64, py3.10-3.14). On Windows, falls back to
-                ``eva_decord``. Install via ``pip install face-rhythm[decord]``.
+                arm64, py3.10-3.14); ``eva_decord`` on Windows. Both are
+                installed by face-rhythm's default dependencies.
             Only used when paths_videos is provided (ignored if video_readers given).
         device (str):
             Device for video decoding. Options:
@@ -1632,16 +1634,16 @@ class BufferedVideoReader:
                     video_readers = [TorchCodecVideoReader(path_video, device=self._device) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
                 except (ImportError, ModuleNotFoundError) as e:
                     raise ImportError(
-                        "torchcodec is not available on this platform (torchcodec has no Windows wheels). "
-                        "Install face-rhythm with the [decord] extra:\n"
-                        "    pip install \"face-rhythm[decord]\"\n"
-                        "And construct BufferedVideoReader with backend='decord'."
+                        "torchcodec is not available on this platform (torchcodec "
+                        "has no Windows wheels). Use the decord backend instead — "
+                        "decord is installed with face-rhythm by default. "
+                        "Construct BufferedVideoReader with backend='decord'."
                     ) from e
             elif self._backend == 'decord':
                 assert decord is not None, (
-                    "FR ERROR: decord is not installed. "
-                    "Install with: pip install \"face-rhythm[decord]\""
-                    "\nThen construct BufferedVideoReader with backend='decord'."
+                    "FR ERROR: decord is not installed (this is unexpected — "
+                    "decord2/eva_decord are face-rhythm required dependencies). "
+                    "Install with: pip install decord2  (or eva_decord on Windows)"
                 )
                 video_readers = [VideoReaderWrapper(path_video, ctx=self._decord_ctx) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
             else:

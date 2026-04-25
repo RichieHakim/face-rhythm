@@ -65,24 +65,23 @@ each time you want to use face-rhythm.
 
 ### 2. Install face-rhythm
 
-**Linux / macOS (recommended — uses torchcodec as default backend):**
 ```shell
 pip install "face-rhythm[all]"
 ```
 
-**Windows** (torchcodec has no Windows wheels — use the decord backend):
-```shell
-pip install "face-rhythm[decord]"
-```
-Then pass `backend='decord'` when constructing `BufferedVideoReader`.
+This installs both video backends (`torchcodec` and `decord`) where available:
 
-**Optional decord fallback on Linux/macOS** (useful if torchcodec fails to import):
-```shell
-pip install "face-rhythm[decord]"
-```
-Then pass `backend='decord'` to `BufferedVideoReader`.
+- **Linux / macOS:** torchcodec is the default. `BufferedVideoReader()` uses
+  it transparently and includes a built-in workaround for torchcodec issue
+  [#905](https://github.com/meta-pytorch/torchcodec/issues/905).
+- **Windows:** torchcodec has no Windows wheels, so only the decord backend
+  is available. Construct `BufferedVideoReader(..., backend='decord')`
+  explicitly. (The torchcodec wrapper raises a helpful error pointing to
+  this if you forget.)
 
-For headless installs on servers (where you can't visually view videos), you'll need to `pip uninstall opencv_contrib_python` and `pip install opencv_contrib_python_headless`.
+For headless installs on servers (where you can't visually view videos),
+you'll need to `pip uninstall opencv_contrib_python` and
+`pip install opencv_contrib_python_headless`.
 
 ### 3. Clone the repo to get the notebooks
 ```shell

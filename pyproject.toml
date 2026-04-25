@@ -54,10 +54,17 @@ dependencies = [
     ## Linux x86_64 + macOS arm64/x86_64 (CPU and CUDA). Includes a
     ## built-in workaround for issue #905 (H.264 AVI sequential-access
     ## drain bug). See TorchCodecVideoReader in face_rhythm/helpers.py.
-    ## NOTE: torchcodec has no Windows wheels. Windows users should install
-    ## with the [decord] extra: pip install "face-rhythm[decord]"
-    ## and use BufferedVideoReader with backend='decord'.
+    ## NOTE: torchcodec has no Windows wheels. The decord backend below
+    ## is installed everywhere as a guaranteed fallback; Windows users
+    ## must construct BufferedVideoReader with backend='decord'.
     "torchcodec; sys_platform != 'win32'",
+    ## decord backend (always installed). decord2 is an actively maintained
+    ## fork of decord (same C++ codebase, identical API; the installed module
+    ## is named ``decord``). Ships vendored FFmpeg 8.0 + cibuildwheel CI for
+    ## Linux x86_64/aarch64 and macOS arm64, Python 3.10-3.14. eva_decord is
+    ## the Windows fallback (decord2 has no Windows wheels yet).
+    "decord2; sys_platform != 'win32'",
+    "eva_decord; sys_platform == 'win32'",
     "natsort",
     "pandas",
     "tables",
@@ -77,16 +84,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-## Decord fallback backend. decord2 is an actively maintained fork of decord
-## (same C++ codebase, identical API; the installed module is named ``decord``).
-## Ships vendored FFmpeg 8.0 + cibuildwheel CI for Linux x86_64/aarch64 and
-## macOS arm64, Python 3.10-3.14. eva_decord is kept as a Windows-only
-## fallback (decord2 has no Windows wheels yet).
-## Install via: pip install face-rhythm[decord]
-decord = [
-    "decord2; sys_platform != 'win32'",
-    "eva_decord; sys_platform == 'win32'",
-]
 ## Notebook / interactive widget stack.
 gui = [
     "jupyter",
@@ -119,9 +116,8 @@ multisession = [
 ]
 ## Meta-extra: full install used by README ("pip install -e .[all]").
 ## Explicit union (not self-referential) to keep pip error messages readable.
+## Note: decord2/eva_decord and torchcodec are required deps now, not extras.
 all = [
-    "decord2; sys_platform != 'win32'",
-    "eva_decord; sys_platform == 'win32'",
     "jupyter",
     "notebook<7",
     "ipywidgets",
