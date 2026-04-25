@@ -11,7 +11,7 @@ dynamic = ["version"]
 description = "A Python package for extracting and decomposing rhythmic facial movements from video."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     { name = "Rich Hakim" },
 ]
@@ -28,7 +28,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -40,16 +39,16 @@ classifiers = [
 ## GUI/notebook-only packages (jupyter, notebook, ipywidgets, ipympl) live in [gui].
 ## Test tooling (pytest) lives in [dev].
 dependencies = [
-    "numpy<2",
-    "tensorly==0.8.1",
-    "opencv_contrib_python==4.10.0.84",
-    "matplotlib",
+    "numpy>=2,<3",
+    "tensorly>=0.8.1,<1.0",
+    "opencv_contrib_python>=4.10.0.84,<5",
+    "matplotlib>=3.8",
     "scikit_learn>=1.5,<2",
-    "scikit_image",
+    "scikit_image>=0.24",
     "pyyaml",
     "tqdm",
-    "h5py",
-    "Pillow",
+    "h5py>=3.11",
+    "Pillow>=10.3",
     ## torchcodec is the primary video decoding backend. Ships wheels for
     ## Linux x86_64 + macOS arm64/x86_64 (CPU and CUDA). Includes a
     ## built-in workaround for issue #905 (H.264 AVI sequential-access
@@ -66,10 +65,10 @@ dependencies = [
     "decord2; sys_platform != 'win32'",
     "eva_decord; sys_platform == 'win32'",
     "natsort",
-    "pandas",
-    "tables",
-    "einops",
-    "torch",
+    "pandas>=2.2.2",
+    "tables>=3.10.1",
+    "einops>=0.8",
+    "torch>=2.3",
     "torchvision",
     "torchaudio",
     "nvidia_ml_py3",
