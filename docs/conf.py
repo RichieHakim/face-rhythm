@@ -148,7 +148,6 @@ autodoc_mock_imports = [
     "matplotlib",
     "h5py",
     "tables",
-    "sklearn",
     "scikit_learn",
     "scikit_image",
     "skimage",
@@ -207,7 +206,6 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "torch": ("https://pytorch.org/docs/stable/", None),
-    "sklearn": ("https://scikit-learn.org/stable/", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
 }
 
