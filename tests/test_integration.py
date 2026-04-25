@@ -57,6 +57,7 @@ def test_pipeline_tracking_simple(dir_data_test):
                 "prefetch": 1,
                 "posthold": 1,
                 "method_getitem": "by_video",
+                "backend": "decord",
                 "verbose": 1,
             },
             "Dataset_videos": {

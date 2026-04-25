@@ -102,6 +102,7 @@ def get_default_parameters(
                 "prefetch": 1,
                 "posthold": 1,
                 "method_getitem": "by_video",
+                "backend": "torchcodec",
                 "verbose": 1,
             },
             "Dataset_videos": {

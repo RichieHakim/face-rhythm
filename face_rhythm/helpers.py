@@ -1317,6 +1317,33 @@ else:
     VideoReaderWrapper = None
 
 
+def _is_torchcodec_load_error(exc: BaseException) -> bool:
+    """Return True when torchcodec failed during shared-library loading."""
+    msg = str(exc)
+    markers = (
+        "Could not load libtorchcodec",
+        "Could not load this library",
+        "FFmpeg is not properly installed",
+        "libtorchcodec",
+        "libavutil",
+        "libavcodec",
+        "libavformat",
+        "Library not loaded: @rpath/libav",
+    )
+    return any(marker in msg for marker in markers)
+
+
+def _torchcodec_unavailable_message() -> str:
+    return (
+        "torchcodec could not be imported or could not load its FFmpeg-linked "
+        "shared libraries. Install FFmpeg shared libraries visible to the "
+        "dynamic loader, or install torchcodec and ffmpeg from conda-forge "
+        "before installing face-rhythm. To use the bundled decord backend "
+        "instead, construct your video reader with backend='decord':\n"
+        "    BufferedVideoReader(paths_videos=..., backend='decord')"
+    )
+
+
 class TorchCodecVideoReader:
     """
     Video reader backed by ``torchcodec.decoders.VideoDecoder`` with a
@@ -1375,13 +1402,11 @@ class TorchCodecVideoReader:
         try:
             self._decoder = self._make_fresh_decoder()
         except (ImportError, ModuleNotFoundError) as e:
-            raise ImportError(
-                "torchcodec is not available on this platform (torchcodec has no "
-                "Windows wheels). Use the decord backend instead — decord is "
-                "installed with face-rhythm by default. Construct your video "
-                "reader with backend='decord':\n"
-                "    BufferedVideoReader(paths_videos=..., backend='decord')"
-            ) from e
+            raise ImportError(_torchcodec_unavailable_message()) from e
+        except (OSError, RuntimeError) as e:
+            if _is_torchcodec_load_error(e):
+                raise ImportError(_torchcodec_unavailable_message()) from e
+            raise
         self._num_frames = len(self._decoder)
 
         ## SAFETY = max(has_b_frames, 2). torchcodec VideoStreamMetadata does
@@ -1633,12 +1658,11 @@ class BufferedVideoReader:
                 try:
                     video_readers = [TorchCodecVideoReader(path_video, device=self._device) for path_video in tqdm(paths_videos, disable=(self._verbose < 2))]
                 except (ImportError, ModuleNotFoundError) as e:
-                    raise ImportError(
-                        "torchcodec is not available on this platform (torchcodec "
-                        "has no Windows wheels). Use the decord backend instead — "
-                        "decord is installed with face-rhythm by default. "
-                        "Construct BufferedVideoReader with backend='decord'."
-                    ) from e
+                    raise ImportError(_torchcodec_unavailable_message()) from e
+                except (OSError, RuntimeError) as e:
+                    if _is_torchcodec_load_error(e):
+                        raise ImportError(_torchcodec_unavailable_message()) from e
+                    raise
             elif self._backend == 'decord':
                 assert decord is not None, (
                     "FR ERROR: decord is not installed (this is unexpected — "
@@ -3318,7 +3342,7 @@ class Colorwheel:
         colors = np.clip(colors, 0, 255)
 
         im = np.zeros((l, l, 3), dtype=self.dtype)
-        im[*np.meshgrid(range(l), range(l), indexing='ij')] = colors.reshape(im.shape[:2] + (3,))
+        im[tuple(np.meshgrid(range(l), range(l), indexing='ij'))] = colors.reshape(im.shape[:2] + (3,))
 
         fig, axs = plt.subplots(2, 1, figsize=(5, 10))
         axs[0].imshow(im)
