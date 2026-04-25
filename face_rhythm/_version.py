@@ -6,4 +6,4 @@ Kept in its own module with NO other imports so build-time tooling
 triggering heavy imports (``torch``, ``cv2``) from ``face_rhythm/__init__.py``.
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
