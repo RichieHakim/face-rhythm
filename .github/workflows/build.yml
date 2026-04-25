@@ -27,6 +27,7 @@ jobs:
         platform:
           - ubuntu-latest
           - macos-latest
+          - windows-latest
         python-version:
           - "3.10"
           - "3.11"
@@ -83,6 +84,16 @@ jobs:
       run: |
         pip list
         python -c "import torch; print(f'torch=={torch.__version__}'); print('cuda:', torch.cuda.is_available())"
+
+    - name: Install FFmpeg (Linux)
+      if: startsWith(matrix.platform, 'ubuntu')
+      run: |
+        sudo apt-get update && sudo apt-get install -y ffmpeg
+
+    - name: Install FFmpeg (macOS)
+      if: startsWith(matrix.platform, 'macos')
+      run: |
+        brew install ffmpeg
 
     - name: Run pytest
       run: |

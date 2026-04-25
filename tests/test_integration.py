@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import sys
 import warnings
 import pytest
 import tempfile
@@ -7,7 +8,17 @@ import tempfile
 from face_rhythm import helpers, util, h5_handling, pipelines
 
 
-def test_pipeline_tracking_simple(dir_data_test):
+@pytest.mark.parametrize("backend", [
+    pytest.param(
+        "torchcodec",
+        marks=pytest.mark.skipif(
+            sys.platform.startswith('win'),
+            reason='torchcodec has no Windows wheels',
+        ),
+    ),
+    "decord",
+])
+def test_pipeline_tracking_simple(dir_data_test, backend):
     dir_temp = str(tempfile.TemporaryDirectory().name)
     dir_project = str(Path(dir_temp).resolve() / 'project')
     dir_inputs       = str(Path(dir_data_test).resolve() / 'inputs')
@@ -57,7 +68,7 @@ def test_pipeline_tracking_simple(dir_data_test):
                 "prefetch": 1,
                 "posthold": 1,
                 "method_getitem": "by_video",
-                "backend": "decord",
+                "backend": backend,
                 "verbose": 1,
             },
             "Dataset_videos": {
