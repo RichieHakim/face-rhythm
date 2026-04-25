@@ -7,7 +7,7 @@ so build-tooling and CI can read it without triggering the heavy imports here
 (``torch``, ``cv2``).
 """
 
-## On macOS, multiple deps (pytorch, scikit-learn, opencv) ship their own
+## On macOS, multiple deps (pytorch, opencv, etc.) ship their own
 ## libomp.dylib; importing them in the same process triggers OMP Error #15
 ## and aborts. All copies are LLVM libomp (same ABI), so allowing duplicates
 ## is safe in practice. Set before any heavy imports. Users can override by

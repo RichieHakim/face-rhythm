@@ -95,6 +95,7 @@ notebooks = []
 dev = [
     "pytest",
     "pytest-cov",
+    "xxhash",
 ]
 ## Sphinx docs stack — mirrors docs/conf.py extensions.
 docs = [
