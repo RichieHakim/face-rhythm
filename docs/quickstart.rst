@@ -1,43 +1,34 @@
 Quick Start
 ===========
 
-face-rhythm has three entry points, ordered from lowest friction to most
-flexible:
+face-rhythm has three entry points:
 
-1. Interactive notebook (recommended for new users)
----------------------------------------------------
+Interactive notebooks
+---------------------
 
-The end-to-end demo runs a complete face-rhythm pipeline on a sample
-recording in roughly 5 minutes:
+- `demo_pipeline.ipynb <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_pipeline.ipynb>`_
+  — end-to-end demo on a single session. Start here.
+- `demo_set_rois_multisession.ipynb <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_set_rois_multisession.ipynb>`_
+  — draw and align ROIs across multiple sessions of the same subject.
+- `demo_event_alignment.ipynb <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_event_alignment.ipynb>`_
+  — align extracted factors to event timestamps and view trial-averaged
+  traces.
 
-* `demo_pipeline.ipynb <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_pipeline.ipynb>`_
-  on GitHub
+See :doc:`notebooks` for the full list.
 
-  .. image:: https://colab.research.google.com/assets/colab-badge.svg
-     :target: https://colab.research.google.com/github/RichieHakim/face-rhythm/blob/release/notebooks/demo_pipeline.ipynb
-     :alt: Open In Colab
-
-Other notebooks:
-`demo_set_rois_multisession <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_set_rois_multisession.ipynb>`_
-for cross-session ROI alignment, and
-`demo_event_alignment <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_event_alignment.ipynb>`_
-for event-aligned trace analysis. See :doc:`notebooks` for the full list.
-
-2. Command-line script
-----------------------
+Command line
+------------
 
 For batch runs across many sessions:
 
-.. code-block:: bash
+.. code-block:: shell
 
-   python scripts/run_pipeline_basic.py \
-       --path_params params.json \
-       --directory_save /path/to/project/
+   python scripts/run_pipeline_basic.py --path_params params.json --directory_save /path/to/project/
 
-A ready-to-edit template lives at ``scripts/params_pipeline_basic.json``.
+``scripts/params_pipeline_basic.json`` is a ready-to-edit template.
 
-3. Python API
--------------
+Python API
+----------
 
 .. code-block:: python
 
