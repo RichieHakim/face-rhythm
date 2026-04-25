@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import importlib.util
 import sys
 import warnings
 import pytest
@@ -8,12 +9,19 @@ import tempfile
 from face_rhythm import helpers, util, h5_handling, pipelines
 
 
+_torchcodec_skip_reason = None
+if sys.platform.startswith('win'):
+    _torchcodec_skip_reason = 'torchcodec has no Windows wheels'
+elif importlib.util.find_spec('torchcodec') is None:
+    _torchcodec_skip_reason = 'torchcodec is not installed in this environment'
+
+
 @pytest.mark.parametrize("backend", [
     pytest.param(
         "torchcodec",
         marks=pytest.mark.skipif(
-            sys.platform.startswith('win'),
-            reason='torchcodec has no Windows wheels',
+            _torchcodec_skip_reason is not None,
+            reason=_torchcodec_skip_reason or '',
         ),
     ),
     "decord",

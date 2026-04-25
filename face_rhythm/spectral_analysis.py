@@ -444,8 +444,8 @@ class VQT_Analyzer(FR_Module):
         return iter(self.spectrograms.items())
     def __call__(self, points_tracked: dict, point_positions: np.ndarray, name_points: str='0'):
         """
-        Computes spectrograms for ``points_tracked``. Thin wrapper around
-        :meth:`transform`; see that method for details.
+        Computes spectrograms for one entry of ``points_tracked``. Thin wrapper
+        around :meth:`transform`; see that method for details.
 
         Args:
             points_tracked (dict):
@@ -458,4 +458,4 @@ class VQT_Analyzer(FR_Module):
                 Key into ``points_tracked`` selecting which array to transform.
                 (Default is ``'0'``)
         """
-        return self.transform(points_tracked, point_positions, name_points)
+        return self.transform(points_tracked[name_points], point_positions)
