@@ -1,54 +1,48 @@
 Quick Start
 ===========
 
-This page shows the minimum code needed to run the face-rhythm basic
-pipeline end-to-end. The canonical, fully-worked walkthrough (including
-the interactive ROI-drawing step) lives in
-``notebooks/demo_pipeline.ipynb`` — see :doc:`notebooks`.
+face-rhythm has three entry points, ordered from lowest friction to most
+flexible:
 
-Run the basic pipeline from Python
-----------------------------------
+1. Interactive notebook (recommended for new users)
+---------------------------------------------------
 
-Build a parameters dictionary from the defaults, point it at your data,
-then hand it to :func:`face_rhythm.pipelines.pipeline_basic`:
+The end-to-end demo runs a complete face-rhythm pipeline on a sample
+recording in roughly 5 minutes:
 
-.. code-block:: python
+* `demo_pipeline.ipynb <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_pipeline.ipynb>`_
+  on GitHub
 
-   import face_rhythm as fr
+  .. image:: https://colab.research.google.com/assets/colab-badge.svg
+     :target: https://colab.research.google.com/github/RichieHakim/face-rhythm/blob/release/notebooks/demo_pipeline.ipynb
+     :alt: Open In Colab
 
-   params = fr.util.get_default_parameters(
-       directory_project="/path/to/output/project_dir",
-       directory_videos="/path/to/videos",
-       filename_videos_strMatch=r"\.mp4$",   # regex that videos must match
-       path_ROIs=None,                       # set to a .h5 to skip the GUI step
-   )
+Other notebooks:
+`demo_set_rois_multisession <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_set_rois_multisession.ipynb>`_
+for cross-session ROI alignment, and
+`demo_event_alignment <https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_event_alignment.ipynb>`_
+for event-aligned trace analysis. See :doc:`notebooks` for the full list.
 
-   fr.pipelines.pipeline_basic(params)
+2. Command-line script
+----------------------
 
-The pipeline writes every intermediate artefact (point trajectories,
-spectral decompositions, TCA factors) and a ``params_used.json`` snapshot
-into the project directory.
+For batch runs across many sessions:
 
-Run from the command line
--------------------------
-
-A thin CLI wrapper lives in ``scripts/run_pipeline_basic.py`` (available
-when you install from source — see :ref:`install-source`). Point it at a
-JSON parameters file derived from ``scripts/params_pipeline_basic.json``:
-
-.. code-block:: console
+.. code-block:: bash
 
    python scripts/run_pipeline_basic.py \
-       --path_params scripts/params_pipeline_basic.json \
-       --directory_save /path/to/output/project_dir
+       --path_params params.json \
+       --directory_save /path/to/project/
 
-The ``--directory_save`` flag is optional; if omitted, the pipeline uses
-``directory_project`` from the JSON file.
+A ready-to-edit template lives at ``scripts/params_pipeline_basic.json``.
 
-Next steps
-----------
+3. Python API
+-------------
 
-- Read :doc:`standards` for recommended video acquisition settings.
-- Read :doc:`organization` for how multi-session datasets should be laid
-  out.
-- Browse the :doc:`api` to see every module and function.
+.. include:: ../README.md
+   :start-after: <!-- start-quickstart -->
+   :end-before: <!-- end-quickstart -->
+   :parser: myst_parser.sphinx_
+
+For the full parameter contract, see
+:func:`face_rhythm.util.get_default_parameters`.

@@ -1,25 +1,106 @@
-API Reference
-=============
+face\_rhythm package
+====================
 
-The following tables summarise every public module in ``face_rhythm``.
-Click through to a module for the full list of classes, functions, and
-their docstrings.
+face\_rhythm.alignment module
+------------------------------
 
-.. autosummary::
-   :toctree: _autosummary
-   :recursive:
-   :caption: Modules
+.. automodule:: face_rhythm.alignment
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-   face_rhythm.alignment
-   face_rhythm.alignment_multisession
-   face_rhythm.data_importing
-   face_rhythm.decomposition
-   face_rhythm.h5_handling
-   face_rhythm.helpers
-   face_rhythm.pipelines
-   face_rhythm.point_tracking
-   face_rhythm.project
-   face_rhythm.rois
-   face_rhythm.spectral_analysis
-   face_rhythm.util
-   face_rhythm.visualization
+face\_rhythm.alignment\_multisession module
+-------------------------------------------
+
+.. automodule:: face_rhythm.alignment_multisession
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.data\_importing module
+------------------------------------
+
+.. automodule:: face_rhythm.data_importing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.decomposition module
+----------------------------------
+
+.. automodule:: face_rhythm.decomposition
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.h5\_handling module
+---------------------------------
+
+.. automodule:: face_rhythm.h5_handling
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.helpers module
+----------------------------
+
+.. automodule:: face_rhythm.helpers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.pipelines module
+------------------------------
+
+.. automodule:: face_rhythm.pipelines
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.point\_tracking module
+------------------------------------
+
+.. automodule:: face_rhythm.point_tracking
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.project module
+----------------------------
+
+.. automodule:: face_rhythm.project
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.rois module
+-------------------------
+
+.. automodule:: face_rhythm.rois
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.spectral\_analysis module
+---------------------------------------
+
+.. automodule:: face_rhythm.spectral_analysis
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.util module
+-------------------------
+
+.. automodule:: face_rhythm.util
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+face\_rhythm.visualization module
+----------------------------------
+
+.. automodule:: face_rhythm.visualization
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -9,8 +9,36 @@ from __future__ import annotations
 
 import os
 import re
+import sys
+import types
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock
+
+
+# ---------------------------------------------------------------------------
+# cv2 mock shim
+# ---------------------------------------------------------------------------
+# autodoc's default mock (MagicMock) does not support bitwise operators, so
+# class-body expressions like
+#     cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT
+# (used in face_rhythm.point_tracking.PointTracker) raise TypeError at import
+# time and break autodoc for that module and anything it transitively touches.
+# We pre-install a real module in sys.modules with int constants for the
+# TermCriteria flags; everything else falls back to MagicMock.
+
+class _CV2Module(types.ModuleType):
+    TERM_CRITERIA_EPS = 2
+    TERM_CRITERIA_COUNT = 1
+    TERM_CRITERIA_MAX_ITER = 1
+
+    def __getattr__(self, name):  # noqa: D401 — sphinx-only shim
+        attr = MagicMock()
+        setattr(self, name, attr)
+        return attr
+
+
+sys.modules["cv2"] = _CV2Module("cv2")
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +108,7 @@ extensions = [
     "sphinx.ext.mathjax",      # Math rendering.
     "sphinx.ext.githubpages",  # GitHub Pages support (harmless elsewhere).
     "myst_parser",             # Parse Markdown alongside reST.
+    "sphinx_copybutton",       # Copy-to-clipboard button on code blocks.
 ]
 
 templates_path = ["_templates"]
@@ -107,7 +136,10 @@ autodoc_mock_imports = [
     "torch",
     "torchvision",
     "torchaudio",
-    "cv2",
+    # NOTE: 'cv2' is intentionally NOT in this list — it is pre-installed
+    # above as a real module with int TermCriteria constants, because
+    # MagicMock does not support bitwise OR which PointTracker uses at
+    # class-definition time.
     "decord",
     "eva_decord",
     "tensorly",
@@ -144,6 +176,7 @@ autodoc_mock_imports = [
     "jupyter",
     "notebook",
     "librosa",
+    "torchcodec",
 ]
 
 autodoc_default_options = {
@@ -203,6 +236,7 @@ myst_heading_anchors = 3
 # still render a warning rather than crashing on config load.
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_css_files = ["css/custom.css"]
 htmlhelp_basename = "face-rhythmdoc"
 
 

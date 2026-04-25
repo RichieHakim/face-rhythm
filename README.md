@@ -25,11 +25,11 @@ A Python package that turns videos of facial or other behavior into a small set 
 
 **Interactive notebooks**:
 
-- [`demo_pipeline.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/dev/notebooks/demo_pipeline.ipynb)
+- [`demo_pipeline.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_pipeline.ipynb)
   — end-to-end demo on a single session. Start here.
-- [`demo_set_rois_multisession.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/dev/notebooks/demo_set_rois_multisession.ipynb)
+- [`demo_set_rois_multisession.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_set_rois_multisession.ipynb)
   — draw and align ROIs across multiple sessions of the same subject.
-- [`demo_event_alignment.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/dev/notebooks/demo_event_alignment.ipynb)
+- [`demo_event_alignment.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_event_alignment.ipynb)
   — line the extracted factors up with event timestamps and look at
   trial-averaged traces.
 
@@ -44,53 +44,59 @@ python scripts/run_pipeline_basic.py --path_params params.json --directory_save 
 
 ## Installation
 
+<!-- start-install -->
 If you have any issues during installation, please open a
 [GitHub issue](https://github.com/RichieHakim/face-rhythm/issues).
 
 ### 0. Requirements
 - [Anaconda](https://www.anaconda.com/distribution/) or
-  [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
-- **ffmpeg** (system library, required by torchcodec):
-  - Linux: `apt install ffmpeg`
-  - macOS: `brew install ffmpeg`
-  - conda (any OS): `conda install -c conda-forge ffmpeg`
+  [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (any modern
+  install).
 
-### 1. Create a new conda environment
+### 1. Install face-rhythm
+
+**Linux / macOS** (recommended — torchcodec backend, all distros):
 ```shell
-conda create -n face_rhythm python=3.12 -y
+conda create -n face_rhythm -c conda-forge python=3.12 'torchcodec=*=cpu*' ffmpeg libstdcxx-ng
 conda activate face_rhythm
+pip install face-rhythm
 ```
+On macOS, drop `libstdcxx-ng` from the command (it is Linux-only).
+
+For NVDEC GPU video decoding, swap `cpu*` for `cuda126*`, `cuda129*`, or
+`cuda130*` to match your driver (Linux x86_64 only).
+
+**Windows** (decord backend):
+```shell
+conda create -n face_rhythm python=3.12
+conda activate face_rhythm
+pip install face-rhythm
+```
+torchcodec has no PyPI Windows wheels, so on Windows construct readers
+with `BufferedVideoReader(..., backend='decord')` explicitly. (The
+torchcodec wrapper raises a helpful error pointing to this if you forget.)
+
 You will need to activate the environment with `conda activate face_rhythm`
 each time you want to use face-rhythm.
 
-### 2. Install face-rhythm
+**Why conda-forge for torchcodec?** The conda-forge torchcodec package bakes
+RPATH so FFmpeg is found automatically. The PyPI wheel does not, which
+causes load errors in many conda envs. Conda-forge avoids this entirely.
 
-```shell
-pip install "face-rhythm[all]"
-```
+- **Headless servers** (no display, e.g. compute clusters): after the
+  install above, run `pip uninstall opencv_contrib_python` and
+  `pip install opencv_contrib_python_headless`.
 
-This installs both video backends (`torchcodec` and `decord`) where available:
-
-- **Linux / macOS:** torchcodec is the default. `BufferedVideoReader()` uses
-  it transparently and includes a built-in workaround for torchcodec issue
-  [#905](https://github.com/meta-pytorch/torchcodec/issues/905).
-- **Windows:** torchcodec has no Windows wheels, so only the decord backend
-  is available. Construct `BufferedVideoReader(..., backend='decord')`
-  explicitly. (The torchcodec wrapper raises a helpful error pointing to
-  this if you forget.)
-
-For headless installs on servers (where you can't visually view videos),
-you'll need to `pip uninstall opencv_contrib_python` and
-`pip install opencv_contrib_python_headless`.
-
-### 3. Clone the repo to get the notebooks
+### 2. Clone the repo to get the notebooks
 ```shell
 git clone https://github.com/RichieHakim/face-rhythm.git
 ```
 Then open the notebooks in `face-rhythm/notebooks/`.
+<!-- end-install -->
 
 ## Quick start
 
+<!-- start-quickstart -->
 ```python
 import json
 import face_rhythm as fr
@@ -108,6 +114,7 @@ results = fr.pipelines.pipeline_basic(params)
 Copy [`scripts/params_pipeline_basic.json`](scripts/params_pipeline_basic.json)
 as a template, edit the three paths, and run. Results land in the project
 directory as HDF5 files plus summary plots.
+<!-- end-quickstart -->
 
 ## Upgrading
 

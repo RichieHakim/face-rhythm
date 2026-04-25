@@ -103,8 +103,9 @@ dev = [
 ## Sphinx docs stack — mirrors docs/conf.py extensions.
 docs = [
     "sphinx",
-    "sphinx_rtd_theme",
+    "sphinx_rtd_theme>=2.0,<3.0",
     "myst-parser",
+    "sphinx_copybutton",
 ]
 ## Multi-session (cross-session) alignment stack.
 ## Enables the RoMa backend in face_rhythm.alignment_multisession.Aligner.
@@ -125,8 +126,9 @@ all = [
     "pytest",
     "pytest-cov",
     "sphinx",
-    "sphinx_rtd_theme",
+    "sphinx_rtd_theme>=2.0,<3.0",
     "myst-parser",
+    "sphinx_copybutton",
     "romatch-roicat>=0.1.2.post1",
     "openpyxl",
     "plotly>=6",
