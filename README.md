@@ -13,25 +13,26 @@
 
 ## Rhythmic facial movements from video ᗢ
 
-A Python package that turns videos of facial or other behavior into a small set of interpretable behavioral components.
+A Python package that turns videos of facial or other behavior into a small
+set of interpretable behavioral components.
 
 **Why use face-rhythm?**
-- **Unsupervised.** No labels, no model zoo — you give it a video, it gives
-  you a handful of components.
+- **Unsupervised.** No labels, no model zoo — give it a video, get back a
+  handful of components.
 - **Interpretable.** Each component is a (space × frequency × time) factor
   you can plot and read off directly.
 
 ## How to use face-rhythm
 
-**Interactive notebooks**:
+**Interactive notebooks:**
 
 - [`demo_pipeline.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_pipeline.ipynb)
   — end-to-end demo on a single session. Start here.
 - [`demo_set_rois_multisession.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_set_rois_multisession.ipynb)
   — draw and align ROIs across multiple sessions of the same subject.
 - [`demo_event_alignment.ipynb`](https://github.com/RichieHakim/face-rhythm/blob/release/notebooks/demo_event_alignment.ipynb)
-  — line the extracted factors up with event timestamps and look at
-  trial-averaged traces.
+  — align extracted factors to event timestamps and view trial-averaged
+  traces.
 
 **Command line** for batch runs across many sessions:
 ```shell
@@ -45,53 +46,54 @@ python scripts/run_pipeline_basic.py --path_params params.json --directory_save 
 ## Installation
 
 <!-- start-install -->
-If you have any issues during installation, please open a
-[GitHub issue](https://github.com/RichieHakim/face-rhythm/issues).
+Requires [conda](https://docs.conda.io/en/latest/miniconda.html) or mamba.
+Run these commands in Terminal (Linux/macOS) or Anaconda Prompt (Windows).
 
 ### 0. Requirements
+
 - [Anaconda](https://www.anaconda.com/distribution/) or
-  [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (any modern
-  install).
+  [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
+- Windows users should use the `decord` video backend.
 
-### 1. Install face-rhythm
+### 1. Create a conda environment
 
-**Linux / macOS** (recommended — torchcodec backend, all distros):
-```shell
-conda create -n face_rhythm -c conda-forge python=3.12 'torchcodec=*=cpu*' ffmpeg libstdcxx-ng
-conda activate face_rhythm
-pip install face-rhythm
-```
-On macOS, drop `libstdcxx-ng` from the command (it is Linux-only).
-
-For NVDEC GPU video decoding, swap `cpu*` for `cuda126*`, `cuda129*`, or
-`cuda130*` to match your driver (Linux x86_64 only).
-
-**Windows** (decord backend):
 ```shell
 conda create -n face_rhythm python=3.12
 conda activate face_rhythm
+python -m pip install --upgrade pip
+```
+
+Activate the env (`conda activate face_rhythm`) each time you use
+face-rhythm.
+
+### 2. Install video packages
+
+**Linux:**
+```shell
+conda install -c conda-forge 'torchcodec=*=cpu*' ffmpeg libstdcxx-ng
+```
+
+**macOS:**
+```shell
+conda install -c conda-forge 'torchcodec=*=cpu*' ffmpeg
+```
+
+**Windows:** skip this step.
+
+### 3. Install face-rhythm
+
+```shell
 pip install face-rhythm
 ```
-torchcodec has no PyPI Windows wheels, so on Windows construct readers
-with `BufferedVideoReader(..., backend='decord')` explicitly. (The
-torchcodec wrapper raises a helpful error pointing to this if you forget.)
 
-You will need to activate the environment with `conda activate face_rhythm`
-each time you want to use face-rhythm.
+For headless servers, GPU acceleration, and installation troubleshooting,
+see the [installation docs](https://face-rhythm.readthedocs.io/en/latest/installation.html).
 
-**Why conda-forge for torchcodec?** The conda-forge torchcodec package bakes
-RPATH so FFmpeg is found automatically. The PyPI wheel does not, which
-causes load errors in many conda envs. Conda-forge avoids this entirely.
+### 4. Clone the repo to get the notebooks
 
-- **Headless servers** (no display, e.g. compute clusters): after the
-  install above, run `pip uninstall opencv_contrib_python` and
-  `pip install opencv_contrib_python_headless`.
-
-### 2. Clone the repo to get the notebooks
 ```shell
 git clone https://github.com/RichieHakim/face-rhythm.git
 ```
-Then open the notebooks in `face-rhythm/notebooks/`.
 <!-- end-install -->
 
 ## Quick start
@@ -119,13 +121,10 @@ directory as HDF5 files plus summary plots.
 ## Upgrading
 
 ```shell
-pip install --upgrade "face-rhythm[all]"
+pip install --upgrade face-rhythm
 ```
 
-To update the notebooks/scripts from a clone:
-```shell
-cd face-rhythm && git pull
-```
+To update the cloned notebooks/scripts: `cd face-rhythm && git pull`.
 
 ## Pipeline at a glance
 
@@ -138,6 +137,31 @@ cd face-rhythm && git pull
    ([`face_rhythm.spectral_analysis`](https://face-rhythm.readthedocs.io/en/latest/api.html)).
 5. Factorize the (points × frequency × time) tensor with non-negative TCA
    ([`face_rhythm.decomposition`](https://face-rhythm.readthedocs.io/en/latest/api.html)).
+
+## GPU acceleration (optional)
+
+face-rhythm runs on CPU by default. Install the CPU setup above first.
+
+**PyTorch compute:** set `project.use_GPU: true` in your params. Check CUDA
+with:
+```shell
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+**OpenCV CUDA:** build OpenCV plus `opencv_contrib` with CUDA enabled, then
+make sure that build is the `cv2` imported in this env. Useful links:
+[OpenCV CUDA build options](https://docs.opencv.org/4.x/db/d05/tutorial_config_reference.html#cuda-support)
+and [opencv_contrib](https://github.com/opencv/opencv_contrib).
+
+**NVDEC video decoding:** experimental. On Linux/NVIDIA systems, try a CUDA
+torchcodec package, then pass `device='cuda'` when constructing video
+readers:
+```shell
+conda install -c conda-forge 'torchcodec=*=cuda130*' ffmpeg libstdcxx-ng
+```
+Use `cuda126*`, `cuda129*`, or `cuda130*` to match your driver. Useful
+links: [TorchCodec CUDA decoding](https://meta-pytorch.org/torchcodec/stable/generated_examples/decoding/basic_cuda_example.html)
+and [NVIDIA Video Codec SDK](https://developer.nvidia.com/video-codec-sdk).
 
 ## Citation
 
@@ -158,38 +182,3 @@ submitting substantial changes.
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
----
-
-## Optional: GPU-accelerated video decoding and tracking
-
-Neither of the following is required — face-rhythm runs on CPU with the
-stock `pip`-installed OpenCV. These notes are for users who want extra
-throughput on a CUDA GPU.
-
-### OpenCV built with CUDA (optical-flow speedup)
-
-face-rhythm automatically uses OpenCV's CUDA optical-flow and CLAHE if
-available. The stock `opencv-python` wheel on PyPI does **not** include
-CUDA support — you need to build OpenCV from source.
-
-Relevant CMake flags: `-DWITH_CUDA=ON`, `-DWITH_CUDNN=ON`,
-`-DOPENCV_DNN_CUDA=ON`, and `-DCUDA_ARCH_BIN=<your compute capability>`.
-See the upstream guide:
-<https://docs.opencv.org/4.x/d2/de6/tutorial_py_setup_in_ubuntu.html>.
-
-### NVDEC hardware video decoding
-
-[`torchcodec`](https://github.com/pytorch/torchcodec) is the default video
-decoding backend on Linux and macOS. It supports both CPU software decoding
-and NVIDIA NVDEC GPU decoding. Pass `device='cuda'` (or `device='cuda:0'`)
-to `BufferedVideoReader` to activate NVDEC. GPU decoding requires
-torchcodec built with CUDA support and an FFmpeg build with `--enable-cuda`.
-
-For CUDA-enabled torchcodec wheels and GPU setup instructions, see:
-- torchcodec CUDA install guide: <https://pytorch.org/torchcodec/stable/>
-- NVIDIA Video Codec SDK: <https://developer.nvidia.com/video-codec-sdk>
-
-**Windows users:** torchcodec has no Windows wheels. Install with
-`pip install "face-rhythm[decord]"` and use `backend='decord'` instead.
-GPU decoding via decord is not currently supported.
