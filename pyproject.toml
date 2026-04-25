@@ -35,9 +35,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
-## Runtime dependencies actually imported by face_rhythm/*.py.
-## GUI/notebook-only packages (jupyter, notebook, ipywidgets, ipympl) live in [gui].
-## Test tooling (pytest) lives in [dev].
+## Runtime dependencies actually imported by face_rhythm/*.py, plus the
+## notebook/widget stack required by the demo pipeline.
+## Test tooling (pytest) lives in [dev]; docs tooling in [docs];
+## multi-session alignment (romatch) in [multisession].
 dependencies = [
     "numpy>=2,<3",
     "tensorly>=0.8.1,<1.0",
@@ -77,15 +78,11 @@ dependencies = [
     "vqt",
     "plotly>=6",
     "anywidget",
-]
-
-[project.optional-dependencies]
-## Notebook / interactive widget stack.
-## ipywidgets>=8 + jupyterlab_widgets>=3 are required for anywidget
-## (pulled transitively by plotly's FigureWidget) to render in VSCode
-## and JupyterLab. ipykernel is the kernel itself; needed when the env
-## is used as a notebook kernel.
-gui = [
+    ## Notebook / interactive widget stack (used by the demo pipeline and
+    ## ``face_rhythm.visualization``). ipywidgets>=8 + jupyterlab_widgets>=3
+    ## are required for anywidget (pulled transitively by plotly's
+    ## FigureWidget) to render in VSCode and JupyterLab. ipykernel is the
+    ## kernel itself; needed when the env is used as a notebook kernel.
     "jupyter",
     "notebook<7",
     "ipykernel",
@@ -93,6 +90,12 @@ gui = [
     "jupyterlab_widgets>=3",
     "ipympl",
 ]
+
+[project.optional-dependencies]
+## Previously housed the notebook/widget stack; that stack is now part of
+## the default install. Kept as a stable extra name so users who pin
+## ``pip install face-rhythm[gui]`` in their environments still resolve.
+gui = []
 ## Extra packages used by the demo notebooks (not by the core package).
 ## Currently empty — kept as a stable extra name for users who pin
 ## ``pip install face-rhythm[notebooks]`` in their environments.
@@ -118,25 +121,19 @@ docs = [
 multisession = [
     "romatch-roicat>=0.1.2.post1",
 ]
-## Meta-extra: full install used by README ("pip install -e .[all]").
+## Meta-extra: dev + docs + multisession on top of the default install.
 ## Explicit union (not self-referential) to keep pip error messages readable.
-## Note: decord2/eva_decord and torchcodec are required deps now, not extras.
+## Note: the gui/notebook stack, decord2/eva_decord, and torchcodec are
+## required deps now, not extras.
 all = [
-    "jupyter",
-    "notebook<7",
-    "ipykernel",
-    "ipywidgets>=8",
-    "jupyterlab_widgets>=3",
-    "ipympl",
     "pytest",
     "pytest-cov",
+    "xxhash",
     "sphinx",
     "sphinx_rtd_theme>=2.0,<3.0",
     "myst-parser",
     "sphinx_copybutton",
     "romatch-roicat>=0.1.2.post1",
-    "plotly>=6",
-    "anywidget",
 ]
 
 [project.urls]
