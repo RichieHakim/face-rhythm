@@ -11,14 +11,13 @@
 - **Preprint:** [Hakim et al. (2025), *bioRxiv*](https://doi.org/10.1101/2025.09.10.675423)
 - **Issues / support:** [GitHub Issues](https://github.com/RichieHakim/face-rhythm/issues)
 
-## Rhythmic facial movements from video ᗢ
+## Rhythmic facial movements from video
 
 A Python package that turns videos of facial or other behavior into a small
 set of interpretable behavioral components.
 
 **Why use face-rhythm?**
-- **Unsupervised.** No labels, no model zoo — give it a video, get back a
-  handful of components.
+- **Unsupervised.** No labels, no model zoo.
 - **Interpretable.** Each component is a (space × frequency × time) factor
   you can plot and read off directly.
 
@@ -96,7 +95,7 @@ git clone https://github.com/RichieHakim/face-rhythm.git
 ```
 <!-- end-install -->
 
-## Quick start
+## CLI Quick start
 
 <!-- start-quickstart -->
 ```python
@@ -153,9 +152,7 @@ make sure that build is the `cv2` imported in this env. Useful links:
 [OpenCV CUDA build options](https://docs.opencv.org/4.x/db/d05/tutorial_config_reference.html#cuda-support)
 and [opencv_contrib](https://github.com/opencv/opencv_contrib).
 
-**NVDEC video decoding:** experimental. On Linux/NVIDIA systems, try a CUDA
-torchcodec package, then pass `device='cuda'` when constructing video
-readers:
+**NVDEC video decoding:** (uses experimental libraries). On Linux/NVIDIA systems, try a CUDA torchcodec package, then pass `device='cuda'` when constructing video readers:
 ```shell
 conda install -c conda-forge 'torchcodec=*=cuda130*' ffmpeg libstdcxx-ng
 ```
