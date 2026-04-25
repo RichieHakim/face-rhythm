@@ -1,37 +1,44 @@
-face-rhythm documentation!
-==============================================
+face-rhythm
+===========
 
-While many tools exist to transform behavioral videos into useful low-dimensional representations,
-very few both stay stable to small alterations in the recording conditions and require no pre-training of large models.
-Furthermore, few techniques capitalize on rich spectral data in creating factors. To tackle these existing restraints,
-we propose Face Rhythm, a novel behavioral quantification pipeline combining optic flow, spectral analysis, and
-tensor component analysis to robustly generate meaningful, low-dimensional factors capturing both spectral and
-spatial patterns in behavioral videos.
+Rhythmic facial movements from video
+------------------------------------
 
-User Guide
--------------------
+face-rhythm is a Python package that turns videos of facial or other behavior
+into a small set of interpretable behavioral components.
+
+`GitHub repository <https://github.com/RichieHakim/face-rhythm>`_
+
+The pipeline is designed to be:
+
+- *stable*, needing no pre-trained models and few sensitive hyperparameters;
+- *spectrally aware*, exposing rhythmic content that frame-difference or
+  keypoint methods typically ignore;
+- *session-scalable*, with alignment utilities for comparing across sessions.
+
+|
+
+--------
+
+Contents
+========
 
 .. toctree::
+   :maxdepth: 1
 
    installation
+   quickstart
+   notebooks
+   pipeline_outputs
    standards
-   organization
+   api
+   citation
    support
 
-Programmer Reference
---------------------
-
-.. toctree::
-
-   face_rhythm.util
-   face_rhythm.optic_flow
-   face_rhythm.analysis
-   face_rhythm.visualize
-
+--------
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
 * :ref:`modindex`
-* :ref:`search`

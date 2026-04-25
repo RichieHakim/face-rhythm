@@ -1,3 +1,12 @@
+"""Tensor Component Analysis (TCA) wrapper around :mod:`tensorly`.
+
+Provides the ``TCA`` class for decomposing multi-way arrays (time x points x
+frequency x ...) produced upstream by the spectral pipeline. Handles dict-of-
+arrays ingestion, axis concatenation, complex-to-real unfolding, normalization,
+and the actual decomposition via tensorly's CP / NN-HALS / Randomized CP
+solvers on either numpy or pytorch backends.
+"""
+
 from typing import Union
 import time
 from functools import partial
@@ -17,22 +26,33 @@ from . import helpers
 ## Define TCA class as a subclass of util.FR_Module
 class TCA(util.FR_Module):
     """
-    Class for performing Tensor Component Analysis (TCA).
-    RH 2022
+    Performs Tensor Component Analysis (TCA) on multi-way arrays produced by
+    the spectral pipeline using ``tensorly`` solvers. RH 2022
+
+    Args:
+        verbose (Union[bool, int]):
+            Verbosity level. One of \n
+            * ``0``: No messages.
+            * ``1``: Warnings only.
+            * ``2``: Info messages. \n
+            (Default is ``1``)
+
+    Attributes:
+        config (dict):
+            Configuration dictionary populated by ``__init__`` and updated by
+            subsequent method calls.
+        run_info (dict):
+            Run-time information populated after fitting and rearranging.
+        run_data (dict):
+            Run-time data (factors and dimension names) populated after
+            fitting and rearranging.
     """
     def __init__(
         self,
         verbose: Union[bool, int]=1,
     ):
         """
-        Initialize the TCA object.
-
-        Args:
-            verbose (bool or int):
-                Whether to print progress messages.
-                0: No messages
-                1: Warnings
-                2: Info
+        Initializes the ``TCA`` object and prepares empty config/run state.
         """
         ## Imports
         super().__init__()
@@ -67,77 +87,57 @@ class TCA(util.FR_Module):
         # DEVICE: str='cpu',
     ):
         """
-        Rearrange the data dictionary into a format that can be used 
-         for TCA.
-        This function allows for the data to be rearranged in the
-         following ways:
-            - Concatenate dimensions of the data arrays
-            - Concatenate elements of the data dictionary along an
-               array dimension
-            - Stack elements of the data dictionary into a new
-               array dimension
-            - Treat dictionary elements independently
-            - Select a window of data to use from each array
+        Rearranges the input data dictionary into a single tensor (or set of
+        tensors) suitable for TCA. Supports concatenating array dimensions,
+        unfolding the complex dimension, combining or stacking dictionary
+        elements, and windowing each array along a chosen dimension.
 
         Args:
-            data (dict of np.ndarray):
-                Dictionary of data arrays.
-
-            names_dims_array (list of str):
-                Names of the dimensions of the data arrays.
-                Typically these are ['xy', 'points', 'frequency', 'time'].
-
-            names_dims_concat_array (list of 2-element lists of str):
-                List of 2-element lists of dimension names to concatenate.
-                Example tuple: ('dim1', 'dim2'). Here 'dim1' will be
-                 concatenated along 'dim2'. The resulting array will have
-                 one less dimension than the original arrays, and 'dim2'
-                 will be longer (len(dim2_new) = len(dim2_old) * len(dim1)).
-                The dimensions will be concatenated in the order they are
-                 specified.
-                New dimension names will be joined with underscore:
-                    example: ('dim1', 'dim2') -> 'dim1_dim2'
-
-            concat_complexDim (str):
-                Whether to concatenate the complex dimension.
+            data (dict):
+                Dictionary mapping element name to a ``numpy.ndarray`` of
+                consistent rank. Arrays may be complex valued.
+            names_dims_array (list):
+                Names of the dimensions of the data arrays, in axis order.
+                (Default is ``['xy', 'points', 'frequency', 'time']``)
+            names_dims_concat_array (list):
+                List of 2-element lists ``[dim_a, dim_b]`` describing pairs
+                of array dimensions to concatenate. ``dim_a`` is folded into
+                ``dim_b``, producing a single dimension named
+                ``'(dim_a dim_b)'`` with length
+                ``len(dim_a) * len(dim_b)``. Pairs are applied in the order
+                given. (Default is ``[['xy', 'points']]``)
+            concat_complexDim (bool):
+                If ``True``, real and imaginary parts are stacked and folded
+                into ``name_dim_concat_complexDim``. Requires complex valued
+                input. (Default is ``True``)
             name_dim_concat_complexDim (str):
-                Name of the array dimension to concatenate the complex
-                 dimension along. Typically this should be 'time'.
-
+                Name of the array dimension into which the complex dimension
+                is folded. Typically ``'time'``. (Default is ``'time'``)
             name_dim_dictElements (str):
-                What the different elements of the dictionary correspond
-                 to. Typically this is 'trials', but it could be 'videos'.
-
+                Semantic name for the dictionary elements (e.g. ``'trials'``
+                or ``'videos'``). (Default is ``'trials'``)
             method_handling_dictElements (str):
-                How to handle the different elements of the dictionary.
-                'concatenate': Concatenate the different elements of the
-                    dictionary along a specified dimension. Specify the
-                    dimension to concatenate along using the 
-                    name_dim_concat_dictElements argument.
-                    This will result in data being a single array with
-                    the same number of dimensions as the original data.
-                'stack': Stack the different elements of the dictionary
-                    along a new dimension. Will be new first dimension.
-                    This will result in data being a single array with
-                    one more dimension than the original data.
-                'separate': Keep the different elements of the dictionary
-                    separate. This will result in each array being a
-                    separate tensor. And getting decomposed separately.
+                How to combine dictionary elements. One of \n
+                * ``'concatenate'``: Concatenate elements along
+                  ``name_dim_concat_dictElements``; output is a single
+                  array of the same rank as inputs.
+                * ``'stack'``: Stack elements along a new leading axis;
+                  output is a single array with one extra dimension.
+                * ``'separate'``: Keep each element as its own tensor;
+                  decompositions run independently. \n
+                (Default is ``'concatenate'``)
             name_dim_concat_dictElements (str):
-                Name of the dimension to concatenate the dictElements
-                 along. Only used if method_handling_dictElements is 'concatenate'.
-
-            idx_windows (list of 2-tuples of int):
-                Indices of the start and end of the window to use for
-                 each dictEntry. Indices are inclusive.
-                If None then the entire array in dictionary entry will
-                 be used.
+                Array dimension along which to concatenate dictionary
+                elements. Only used when ``method_handling_dictElements`` is
+                ``'concatenate'``. (Default is ``'time'``)
+            idx_windows (list):
+                Per-element ``(start, end)`` index pairs (inclusive) defining
+                a window along ``name_dim_array_window``. If ``None``, the
+                full array is used. (Default is ``None``)
             name_dim_array_window (str):
-                Name of the dimension to use for the window.
-                Only used if idx_windows is not None.
-            
-            # DEVICE (str):
-            #     Device to use for the tensor. Typically 'cpu' or 'cuda'.
+                Array dimension along which ``idx_windows`` is applied. Only
+                used when ``idx_windows`` is not ``None``.
+                (Default is ``'time'``)
         """
         ## Assertions
         ### Check that the names_dims_array is a list of strings
@@ -183,7 +183,19 @@ class TCA(util.FR_Module):
         ## Make a function for concatenating the array dimensions
         def concatenate_array_dimensions(data):
             """
-            Concatenate dimensions of the data arrays.
+            Folds the array dimensions listed in
+            ``self._names_dims_concat_array`` (and optionally the complex
+            dimension) using ``einops.rearrange``.
+
+            Args:
+                data (np.ndarray):
+                    Input array with axes ordered according to
+                    ``self._names_dims_array``.
+
+            Returns:
+                (np.ndarray):
+                    data_out (np.ndarray):
+                        Rearranged array with concatenated dimensions.
             """
             names_dims_array_new = self._names_dims_array.copy()
             ## Use einops to concatenate dimensions
@@ -228,7 +240,21 @@ class TCA(util.FR_Module):
         ## Make a function for windowing the data
         def window_data(data, win_idx):
             """
-            Window the data. Assume numpy input.
+            Selects a window from a single dictionary entry along the
+            dimension named ``self._name_dim_array_window``.
+
+            Args:
+                data (np.ndarray):
+                    Input array for one dictionary element.
+                win_idx (int):
+                    Index into ``self._idx_windows`` identifying which
+                    window to apply.
+
+            Returns:
+                (np.ndarray):
+                    data_out (np.ndarray):
+                        Windowed array, or the original array if no window
+                        is specified for this entry.
             """
             if self._idx_windows is None:
                 return data
@@ -288,17 +314,21 @@ class TCA(util.FR_Module):
         dim_name: str='time',
     ):
         """
-        Normalize the data.
-        self.rearrange_data() must be run before this function.
+        Normalizes ``self.data`` along a named dimension by optional mean
+        subtraction and/or standard-deviation scaling. Requires that
+        ``self.rearrange_data`` has already populated ``self.data``.
 
         Args:
             mean_subtract (bool):
-                Whether to subtract the mean from the data.
+                If ``True``, subtracts the mean along ``dim_name``.
+                (Default is ``False``)
             std_divide (bool):
-                Whether to divide the data by the standard deviation.
+                If ``True``, divides by the standard deviation along
+                ``dim_name``. (Default is ``False``)
             dim_name (str):
-                Name of the dimension to normalize over.
-                Should be the name after rearranging the data.
+                Name of the array dimension to normalize over. Must match a
+                name in ``self.names_dims_array_preDecomp`` (i.e. the names
+                that exist after ``rearrange_data``). (Default is ``'time'``)
         """
         ## Place params into config
         self.config['mean_subtract'] = mean_subtract
@@ -351,41 +381,40 @@ class TCA(util.FR_Module):
         verbose: Union[bool, int]=1,
     ):
         """
-        Fit the TCA model to the data.
+        Fits a TCA model to the rearranged data using a ``tensorly``
+        decomposition. Populates ``self.factors``, ``self.factors_raw``, and
+        ``self.factor_weights``.
 
         Args:
-            data (dict of np.ndarray):
-                Dictionary of data arrays.
-                Each array should have the same shape.
-                The arrays should be numpy arrays.
+            data (dict):
+                Dictionary of ``numpy.ndarray`` data arrays of identical
+                shape. If ``None``, ``self.data`` (set by
+                ``rearrange_data``) is used. (Default is ``None``)
             method (str):
-                Method for fitting the TCA model.
-                See Tensorly's documentation for the params_method
-                 argument inputs.
-                Good options are from Tensorly's decomposition methods:
-                    - 'CP_NN_HALS': non-negative CP decomposition
-                        using the efficient HALS algorithm.
-                    - 'CP': Standard CP decomposition.
-                    - 'Randomized_CP': Randomized CP decomposition.
-                        Allows for large input tensors.
+                ``tensorly`` decomposition class to instantiate. One of \n
+                * ``'CP_NN_HALS'``: Non-negative CP decomposition via the
+                  HALS algorithm.
+                * ``'CP'``: Standard CP decomposition.
+                * ``'RandomizedCP'``: Randomized CP decomposition for large
+                  tensors.
+                * ``'ConstrainedCP'``: Constrained CP decomposition. \n
+                (Default is ``'CP_NN_HALS'``)
             params_method (dict):
-                Parameters for the method. See Tensorly's documentation
-                 for the params_method argument inputs for the method.
+                Keyword arguments forwarded to the ``tensorly`` decomposition
+                class. See ``tensorly`` documentation for valid keys.
+                (Default is the ``CP_NN_HALS`` parameter set defined in the
+                signature)
             backend (str):
-                Backend for the tensorly package. Use 'pytorch' for
-                 most applications.
+                ``tensorly`` backend. One of \n
+                * ``'pytorch'``: Recommended for most use cases.
+                * ``'numpy'``: NumPy backend. \n
+                (Default is ``'pytorch'``)
             DEVICE (str):
-                Device for the tensorly package. Set to 'cuda' if you
-                 have a GPU and want to use it. Otherwise, set to 'cpu'.
-            verbose (bool or int):
-                Verbosity level. Set to 0 for no output. Set to 1 for
-                 warnings. Set to 2 for info.
-
-        Set Attributes:
-            self._model (tensorly.decomposition.candecomp_parafac.CP):
-                Fitted TCA model.
-            self.factors (list of np.ndarray):
-                List of the factors of the TCA model.
+                Torch device string (e.g. ``'cpu'`` or ``'cuda'``) used when
+                ``backend`` is ``'pytorch'``. (Default is ``'cpu'``)
+            verbose (Union[bool, int]):
+                Verbosity level. ``0`` is silent, ``1`` warnings, ``2`` info.
+                (Default is ``1``)
         """
         ## Assert that method is valid
         assert isinstance(method, str), f"Argument 'method' must be a string."
@@ -429,21 +458,35 @@ class TCA(util.FR_Module):
 
     def order_factors_by_EVR(self, data: dict=None, factors: dict=None, weights: dict=None, overwrite_factors: bool=True):
         """
-        Order the factors by how much variance each factor explains in the data.
+        Reorders TCA factors by descending explained variance ratio (EVR) on
+        each data tensor.
 
         Args:
-            data (dict of np.ndarray):
-                Dictionary of data arrays.
-                Each array should have the same shape.
-                The arrays should be numpy arrays.
-            factors (dict of np.ndarray):
-                Dictionary of factors of the TCA model.
-            weights (dict of np.ndarray):
-                Dictionary of weights of the TCA model.
+            data (dict):
+                Dictionary of ``numpy.ndarray`` data tensors. If ``None``,
+                ``self.data`` is used. (Default is ``None``)
+            factors (dict):
+                Dictionary of factor sets keyed to match ``data``. If
+                ``None``, ``self.factors`` is used. (Default is ``None``)
+            weights (dict):
+                Dictionary of CP weights keyed to match ``data``. If
+                ``None``, ``self.factor_weights`` is used.
+                (Default is ``None``)
+            overwrite_factors (bool):
+                If ``True``, writes the reordered results back to
+                ``self.factors``, ``self.factor_weights``, and
+                ``self.evrs_ordered``. (Default is ``True``)
 
         Returns:
-            factors_ordered (dict of np.ndarray):
-                Dictionary of factors ordered by how much variance they explain.
+            (tuple): tuple containing:
+                orders (dict):
+                    Per-key sort indices used to reorder factors.
+                factors_ordered (dict):
+                    Per-key dictionaries of factors reordered by EVR.
+                weights_ordered (dict):
+                    Per-key CP weight vectors reordered by EVR.
+                evrs_ordered (dict):
+                    Per-key explained variance ratios in descending order.
         """
         factors = factors if factors is not None else self.factors
         weights = weights if weights is not None else self.factor_weights
@@ -479,20 +522,26 @@ class TCA(util.FR_Module):
         undo_concat_complexDim: bool=True,
     ):
         """
-        Rearrange the factors of the TCA model.
-        Undo the concatenation of the dictElements dimension.
+        Reverses the dimension folding applied in ``rearrange_data`` so the
+        fitted factors can be interpreted in the original data space.
+        Populates ``self.factors_rearranged``,
+        ``self.names_dims_array_postDecomp``, and
+        ``self.name_dim_dictElements_postDecomp``.
 
         Args:
-            factors (dict of np.ndarray):
-                Dictionary of factors of the TCA model.
+            factors (dict):
+                Dictionary of factors to rearrange. If ``None``,
+                ``self.factors`` is used. (Default is ``None``)
             undo_concat_dictElements (bool):
-                Whether to undo the concatenation of the dictElements
-                 dimension. Result will be a list of factors along the
-                 dictElements concatenated dimension.
+                If ``True``, splits the concatenated dictionary-elements
+                dimension back into per-element factors. Requires that
+                ``method_handling_dictElements`` was ``'concatenate'``.
+                (Default is ``True``)
             undo_concat_complexDim (bool):
-                Whether to undo the concatenation of the complexDim
-                 dimension. Result will be complex valued arrays of
-                 the same shape.
+                If ``True``, recombines real and imaginary halves of the
+                folded complex dimension into complex-valued arrays.
+                Requires that ``concat_complexDim`` was ``True``.
+                (Default is ``True``)
         """
 
         ## Set attributes
@@ -537,7 +586,19 @@ class TCA(util.FR_Module):
             ## Undo the concatenation of the complexDim dimension
             def undo_concat_complexDim(factor: np.ndarray):
                 """
-                Undo the concatenation of the complexDim dimension.
+                Recombines an interleaved real/imaginary factor back into a
+                complex-valued factor by treating even rows as the real part
+                and odd rows as the imaginary part.
+
+                Args:
+                    factor (np.ndarray):
+                        Interleaved real/imaginary factor along axis 0.
+
+                Returns:
+                    (np.ndarray):
+                        factor_complex (np.ndarray):
+                            Complex-valued factor with half the original
+                            length along axis 0.
                 """
                 len_factor = factor.shape[0]
                 return factor[0:len_factor:2] + 1j*factor[1:len_factor:2]
@@ -566,23 +627,27 @@ class TCA(util.FR_Module):
         self.run_info['num_dictElements'] = self.num_dictElements
 
     def plot_factors(
-        self, 
+        self,
         factors: dict=None,
         figure_saver: util.Figure_Saver=None,
         show_figures: bool=True,
     ):
         """
-        Plot the factors.
+        Plots each leaf factor as a normalized line plot, one figure per
+        factor. Optionally writes figures to disk via a
+        ``util.Figure_Saver``.
 
         Args:
-            factors (dict): 
-                The factors to plot. If None, then uses self.factors_rearranged
-                 if not None, and self.factors as last resort.
+            factors (dict):
+                Nested dictionary of factors to plot. If ``None``,
+                ``self.factors_rearranged`` is used if available, otherwise
+                ``self.factors``. (Default is ``None``)
             figure_saver (util.Figure_Saver):
-                If None, then figures are not saved.
-                Should be an instance of util.Figure_Saver.
+                Saver used to persist figures. If ``None``, figures are not
+                saved. (Default is ``None``)
             show_figures (bool):
-                If True, then figures are shown.
+                If ``True``, enables interactive mode so figures are shown.
+                (Default is ``True``)
         """
         import matplotlib.pyplot as plt
         ## Set attributes
@@ -627,7 +692,8 @@ class TCA(util.FR_Module):
 
     def _cleanup(self):
         """
-        Clear the CUDA cache and garbage collect.
+        Clears the CUDA cache (when a CUDA device is configured) and runs
+        Python garbage collection to release lingering tensors between fits.
         """
         if hasattr(self, '_DEVICE'):
             if 'cuda' in self._DEVICE.type:

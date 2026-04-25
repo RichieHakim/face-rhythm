@@ -1,0 +1,57 @@
+cff-version: 1.2.0
+message: "If you use face-rhythm in your research, please cite our preprint (see preferred-citation)."
+title: "face-rhythm: Extracting rhythmic facial movements from video"
+abstract: >
+  A Python package for extracting rhythmic facial movements from video via
+  non-negative tensor-component decomposition of optical-flow point-trajectory
+  spectrograms.
+type: software
+authors:
+  - family-names: Hakim
+    given-names: Richard
+    orcid: "https://orcid.org/0000-0002-6991-1801"
+version: 0.2.8
+repository-code: "https://github.com/RichieHakim/face-rhythm"
+url: "https://github.com/RichieHakim/face-rhythm"
+keywords:
+  - neuroscience
+  - facial behavior
+  - optical flow
+  - tensor decomposition
+  - rhythmic movement
+preferred-citation:
+  type: article
+  title: "Spectral envelopes of facial movements predict intention, cortical representations, and neural prosthetic control"
+  authors:
+    - family-names: Hakim
+      given-names: Richard
+      orcid: "https://orcid.org/0000-0002-6991-1801"
+    - family-names: Jaggi
+      given-names: Akshay
+      orcid: "https://orcid.org/0000-0002-7493-6958"
+    - family-names: Heo
+      given-names: Gyuryang
+      orcid: "https://orcid.org/0000-0002-9674-632X"
+    - family-names: Matsumoto
+      given-names: Hideyuki
+      orcid: "https://orcid.org/0000-0002-4444-2295"
+    - family-names: Uchida
+      given-names: Naoshige
+      orcid: "https://orcid.org/0000-0002-5755-9409"
+    - family-names: Watabe-Uchida
+      given-names: Mitsuko
+      orcid: "https://orcid.org/0000-0001-7864-754X"
+    - family-names: Datta
+      given-names: Sandeep Robert
+      orcid: "https://orcid.org/0000-0002-8068-3862"
+    - family-names: Musall
+      given-names: Simon
+      orcid: "https://orcid.org/0000-0002-9461-1042"
+    - family-names: Sabatini
+      given-names: Bernardo L
+      orcid: "https://orcid.org/0000-0003-0095-9177"
+  journal: "bioRxiv"
+  year: 2025
+  month: 9
+  doi: "10.1101/2025.09.10.675423"
+  url: "https://www.biorxiv.org/content/10.1101/2025.09.10.675423"

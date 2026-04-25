@@ -1,0 +1,169 @@
+## pyproject.toml for face-rhythm
+## PEP 517/518 build configuration.
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "face-rhythm"
+dynamic = ["version"]
+description = "A Python package for extracting and decomposing rhythmic facial movements from video."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [
+    { name = "Rich Hakim" },
+]
+keywords = [
+    "neuroscience",
+    "neuroimaging",
+    "machine learning",
+    "facial behavior",
+    "optical flow",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+## Runtime dependencies actually imported by face_rhythm/*.py.
+## GUI/notebook-only packages (jupyter, notebook, ipywidgets, ipympl) live in [gui].
+## Test tooling (pytest) lives in [dev].
+dependencies = [
+    "numpy>=2,<3",
+    "tensorly>=0.8.1,<1.0",
+    "opencv_contrib_python>=4.10.0.84,<5",
+    "matplotlib>=3.8",
+    "scikit_learn>=1.5,<2",
+    "scikit_image>=0.24",
+    "pyyaml",
+    "tqdm",
+    "h5py>=3.11",
+    "Pillow>=10.3",
+    ## torchcodec is the primary video decoding backend. Ships wheels for
+    ## Linux x86_64 + macOS arm64/x86_64 (CPU and CUDA). Includes a
+    ## built-in workaround for issue #905 (H.264 AVI sequential-access
+    ## drain bug). See TorchCodecVideoReader in face_rhythm/helpers.py.
+    ## NOTE: torchcodec has no Windows wheels. The decord backend below
+    ## is installed everywhere as a guaranteed fallback; Windows users
+    ## must construct BufferedVideoReader with backend='decord'.
+    "torchcodec; sys_platform != 'win32'",
+    ## decord backend (always installed). decord2 is an actively maintained
+    ## fork of decord (same C++ codebase, identical API; the installed module
+    ## is named ``decord``). Ships vendored FFmpeg 8.0 + cibuildwheel CI for
+    ## Linux x86_64/aarch64 and macOS arm64, Python 3.10-3.14. eva_decord is
+    ## the Windows fallback (decord2 has no Windows wheels yet).
+    "decord2; sys_platform != 'win32'",
+    "eva_decord; sys_platform == 'win32'",
+    "natsort",
+    "pandas>=2.2.2",
+    "tables>=3.10.1",
+    "einops>=0.8",
+    "torch>=2.3",
+    "torchvision",
+    "torchaudio",
+    "nvidia_ml_py3",
+    "py_cpuinfo",
+    "GPUtil",
+    "psutil",
+    "requests",
+    "ffmpeg-python",
+    "vqt",
+    "plotly>=6",
+    "anywidget",
+]
+
+[project.optional-dependencies]
+## Notebook / interactive widget stack.
+gui = [
+    "jupyter",
+    "notebook<7",
+    "ipywidgets",
+    "ipympl",
+]
+## Extra packages used by the demo notebooks (not by the core package).
+notebooks = [
+    "openpyxl",
+]
+## Test and lint tooling.
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+## Sphinx docs stack — mirrors docs/conf.py extensions.
+docs = [
+    "sphinx",
+    "sphinx_rtd_theme>=2.0,<3.0",
+    "myst-parser",
+    "sphinx_copybutton",
+]
+## Multi-session (cross-session) alignment stack.
+## Enables the RoMa backend in face_rhythm.alignment_multisession.Aligner.
+## The PyPI distribution name is "romatch-roicat" (a pinning-hardened fork of
+## the upstream "romatch" by the same author); the package still imports as
+## "romatch" regardless of which distribution is installed.
+multisession = [
+    "romatch-roicat>=0.1.2.post1",
+]
+## Meta-extra: full install used by README ("pip install -e .[all]").
+## Explicit union (not self-referential) to keep pip error messages readable.
+## Note: decord2/eva_decord and torchcodec are required deps now, not extras.
+all = [
+    "jupyter",
+    "notebook<7",
+    "ipywidgets",
+    "ipympl",
+    "pytest",
+    "pytest-cov",
+    "sphinx",
+    "sphinx_rtd_theme>=2.0,<3.0",
+    "myst-parser",
+    "sphinx_copybutton",
+    "romatch-roicat>=0.1.2.post1",
+    "openpyxl",
+    "plotly>=6",
+    "anywidget",
+]
+
+[project.urls]
+Homepage = "https://github.com/RichieHakim/face-rhythm"
+Documentation = "https://face-rhythm.readthedocs.io"
+Repository = "https://github.com/RichieHakim/face-rhythm"
+Issues = "https://github.com/RichieHakim/face-rhythm/issues"
+Changelog = "https://github.com/RichieHakim/face-rhythm/releases"
+
+## ---------------------------------------------------------------------------
+## setuptools configuration
+## ---------------------------------------------------------------------------
+
+## Dynamic version: resolved at build time from ``face_rhythm/_version.py``.
+## That module is kept import-light (no ``torch``/``cv2``) so that
+## ``setuptools`` can read ``__version__`` as an attribute without triggering
+## the side-effect imports in ``face_rhythm/__init__.py``.
+[tool.setuptools.dynamic]
+version = {attr = "face_rhythm._version.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["face_rhythm*"]
+exclude = ["tests*", "notebooks*", "docs*", "scripts*", "batch_run*", "other*"]
+
+[tool.setuptools.package-data]
+## No non-Python data files ship with the package currently.
+face_rhythm = []
+
+## ---------------------------------------------------------------------------
+## pytest
+## ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

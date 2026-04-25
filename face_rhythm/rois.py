@@ -1,3 +1,10 @@
+"""ROI selection, point-grid generation, and image warping / registration.
+
+Provides the ``ROIs`` class (choose face regions via GUI, file, or explicit
+dict), the ``ImageAlignmentChecker`` and registration helpers used by the
+alignment module, and the interactive ``_Select_ROI`` Plotly/ipywidgets GUI.
+"""
+
 from pathlib import Path
 import warnings
 import functools
@@ -13,6 +20,62 @@ from . import h5_handling, helpers
 
 
 class ROIs(FR_Module):
+    """
+    Container for one or more face ROIs and the tracking points sampled within
+    them. Supports three construction modes: interactive GUI, loading a saved
+    ``ROIs.h5`` file, or building from explicit polygon coordinates. RH 2022
+
+    Args:
+        select_mode (str):
+            How to populate the ROIs. One of \n
+            * ``'gui'``: Launch the interactive Plotly/ipywidgets selector.
+              ``exampleImage`` must be provided.
+            * ``'file'``: Load ``mask_images``, ``roi_points``, and
+              ``exampleImage`` from a previously saved ``ROIs.h5`` file.
+              ``path_file`` must be provided.
+            * ``'custom'``: Build masks from explicit polygon coordinates.
+              ``coords_rois`` and ``exampleImage`` must be provided. \n
+            (Default is ``'gui'``)
+        exampleImage (np.ndarray):
+            Image to display in the GUI or to define the canvas size for
+            ``'custom'`` mode. Only used when ``select_mode`` is ``'gui'`` or
+            ``'custom'``. (Default is ``None``)
+        path_file (str):
+            Path to a saved ``ROIs.h5`` file. Only used when ``select_mode``
+            is ``'file'``. (Default is ``None``)
+        coords_rois (dict):
+            Dictionary mapping ROI names (e.g. ``'ROI_0'``, ``'ROI_1'``) to
+            polygon vertices, given as either an ``np.ndarray`` of shape
+            *(N, 2)* or a list of ``[x, y]`` pairs. Only used when
+            ``select_mode`` is ``'custom'``. (Default is ``None``)
+        point_positions (np.ndarray):
+            Optional pre-computed array of tracking point positions, shape
+            *(n_points, 2)*. (Default is ``None``)
+        mask_images (dict):
+            Dictionary mapping mask names to 2D boolean ``np.ndarray`` masks
+            with the same height and width as the videos. (Default is
+            ``None``)
+        verbose (int):
+            Verbosity level. One of \n
+            * ``0``: No output.
+            * ``1``: Warnings only.
+            * ``2``: All output. \n
+            (Default is ``1``)
+
+    Attributes:
+        exampleImage (np.ndarray):
+            The reference image associated with the ROIs.
+        roi_points (dict):
+            Polygon vertices for each ROI keyed by name.
+        mask_images (dict):
+            Boolean masks for each ROI keyed by name.
+        point_positions (np.ndarray):
+            Tracking point positions, shape *(n_points, 2)*.
+        num_points (int):
+            Total number of tracking points.
+        img_hw (tuple):
+            Height and width of ``exampleImage``.
+    """
     def __init__(
         self,
         select_mode="gui",
@@ -24,53 +87,7 @@ class ROIs(FR_Module):
         mask_images=None,
         verbose=1,
     ):
-        """
-        Initialize the class.
-        Four ways to initialize depending on the select_mode.
-        Look carefully at options for each mode.
-        RH 2022
-
-            Args:
-                select_mode (str):
-                    'gui' (default):
-                        Make a GUI using matplotlib and ipywidgets.
-                        'exampleImage' must be provided.
-                    'file':
-                        Load a file with the ROI points.
-                        This should be an existing 'ROIs.h5' file from
-                         a previous run.
-                        'path_file' must be provided, and either 
-                    'custom':
-                        Must provide:
-                            - points
-                            - exampleImage
-                        Will compute the masks from the points.
-                exampleImage (np.ndarray):
-                    Image to show in the GUI to select the ROIs.
-                    Only used if select_mode is 'gui'.
-                path_file (str):
-                    Path to the file to load.
-                    Only used if select_mode is 'file'.
-                coords_rois (list of dictionaries containing either np.ndarray or 2-element lists of float):
-                    Dictionary of point coords of the boundaries of the ROIs.
-                    Should be in format:
-                        {'ROI_0': np.ndarray, 'ROI_1': np.ndarray, ...}
-                        OR
-                        {'ROI_0': [[x1, y1], [x2, y2], ...], 'ROI_1': [[x1, y1], [x2, y2], ...], ...}
-                    Only used if select_mode is 'custom'.
-                mask_images (list of np.ndarray):
-                    List of mask images of the ROIs.
-                    Must have same height and width as the videos.
-                    Should be in format:
-                        [mask1, mask2, ...]
-                        where each mask is a 2D boolean np.ndarray.
-                    Only used if select_mode is 'mask'.
-                verbose (int):
-                    Verbosity level.
-                    0: No output
-                    1: Warnings
-                    2: All output
-        """
+        """Initializes the ROIs container according to ``select_mode``."""
         super().__init__()
         self._select_mode = select_mode
         self.exampleImage = exampleImage
@@ -107,7 +124,6 @@ class ROIs(FR_Module):
         if select_mode == "gui":
             print(f"FR: Initializing GUI...") if self._verbose > 1 else None
             self._gui = _Select_ROI(exampleImage)
-            self._gui._ax.set_title('Select ROIs by clicking the image.')
             self.roi_points = self._gui.selected_points
             self.mask_images = self._gui.mask_frames
         
@@ -180,20 +196,17 @@ class ROIs(FR_Module):
 
     def make_points(self, rois, point_spacing=10):
         """
-        Make points from a list of ROIs.
+        Generates a regular grid of tracking points inside the intersection of
+        the supplied ROI masks and stores them on ``self.point_positions``.
 
         Args:
-            rois (list of np.ndarray): 
-                List of ROIs.
-                Each ROI should be a 2D boolean numpy array.
+            rois (Union[List[np.ndarray], np.ndarray]):
+                Either a list of 2D boolean masks, a single 2D boolean mask,
+                or a 3D boolean array stacked along axis 0. All masks must
+                share the same shape.
             point_spacing (int):
-                Spacing between points in pixels.
-
-        Returns:
-            self.point_positions (np.ndarray):
-                Array of point positions.
-                Shape is (n_points, 2).
-                (x, y) coordinates.
+                Spacing between adjacent grid points, in pixels. (Default is
+                ``10``)
         """
         ## Assertions
         ## rois should either be a list of 2D arrays or 3D array or a single 2D array
@@ -228,19 +241,22 @@ class ROIs(FR_Module):
 
     def _helper_make_points(self, roi, point_spacing):
         """
-        Make points within a roi with spacing of point_spacing.
-        
+        Builds an evenly spaced grid of points lying inside a single boolean
+        ROI mask.
+
         Args:
-            roi (np.ndarray, boolean):
-                A 2D array of booleans, where True indicates a pixel
-                 that is within the region of interest.
+            roi (np.ndarray):
+                2D boolean array where ``True`` marks pixels inside the ROI.
+                shape: *(H, W)*, dtype: *bool*.
             point_spacing (int):
-                The spacing between points, in pixels.
+                Spacing between adjacent grid points, in pixels. Rounded to
+                the nearest integer if a non-integer value is supplied.
 
         Returns:
-            points (np.ndarray, np.float32):
-                A 2D array of integers, where each row is a point
-                 to track.
+            (np.ndarray):
+                points (np.ndarray):
+                    Point coordinates as ``(x, y)`` pairs. shape:
+                    *(n_points, 2)*, dtype: *float32*.
         """
         ## Assert that roi is a 2D array of booleans
         assert isinstance(roi, np.ndarray), "FR ERROR: roi must be a numpy array"
@@ -270,7 +286,12 @@ class ROIs(FR_Module):
     
     def set_point_positions(self, point_positions):
         """
-        Manually set the point positions.
+        Manually overrides ``self.point_positions`` with an explicit array.
+
+        Args:
+            point_positions (np.ndarray):
+                Tracking point coordinates as ``(x, y)`` pairs. shape:
+                *(n_points, 2)*.
         """
         assert isinstance(point_positions, np.ndarray), "FR ERROR: 'point_positions' must be a numpy array."
         assert point_positions.ndim == 2, "FR ERROR: 'point_positions' must be a 2D array."
@@ -293,25 +314,24 @@ class ROIs(FR_Module):
 
     def plot_rois(self, image=None, **kwargs_imshow):
         """
-        Plot the rois.
-        If an image exists, it makes polygons of the rois on top of 
-         the image in different colors.
-        If no image exists, it plots the rois on the existing
-         self.exampleImage.
+        Plots ROI polygon outlines (and tracking points if available) on top
+        of an image.
 
         Args:
             image (np.ndarray):
-                Image to plot the rois on top of.
-                If None, the rois are plotted on the existing
-                 self.exampleImage.
+                Background image to draw the ROIs on. If ``None``, falls back
+                to ``self.exampleImage``; if that is also missing, a blank
+                image is used. (Default is ``None``)
             **kwargs_imshow:
-                Keyword arguments for plt.imshow().
+                Additional keyword arguments forwarded to
+                ``matplotlib.pyplot.imshow``.
 
         Returns:
-            fig (plt.figure):
-                Figure object.
-            ax (plt.axis):
-                Axis object.
+            (tuple): tuple containing:
+                fig (matplotlib.figure.Figure):
+                    The Matplotlib figure containing the plot.
+                ax (matplotlib.axes.Axes):
+                    The Matplotlib axes containing the plot.
         """
         import matplotlib.pyplot as plt
         if image is None:
@@ -343,7 +363,8 @@ class ROIs(FR_Module):
     
     def fliplr(self):
         """
-        Flip the ROIs left-right. In place
+        Flips the example image, masks, ROI polygon points, and tracking
+        points horizontally **in place**.
         """
         if hasattr(self, 'exampleImage'):
             if self.exampleImage is not None:
@@ -371,145 +392,351 @@ class ROIs(FR_Module):
 
 class _Select_ROI:
     """
-    A simple GUI to select ROIs from an image.
-    Uses matplotlib and ipywidgets.
-    Only works in a Jupyter notebook.
-    Select regions of interest in an image using matplotlib.
-    Use %matplotlib notebook or qt backend to use this.
-    It currently uses cv2.polylines to draw the ROIs.
-    Output is self.mask_frames
-    RH 2021
+    Interactive polygon ROI selector built on Plotly ``FigureWidget`` and
+    ipywidgets. Replaces the original matplotlib/nbagg GUI and works in
+    JupyterLab 3+, Notebook 7+, VSCode Jupyter, and any frontend that supports
+    ``FigureWidget`` (anywidget backend, requires ``plotly >= 6.0``).
 
-    outputs:
-        self.selected_points (list):
-            List of points selected by the user.
-            Shape: (n_points, 2)
-            (x, y) coordinates of the points.
-        self.mask_frames (list):
-            List of mask images.
-            Shape: (n_roi, img_height, img_width)
-            Each mask image is a 2D array of booleans.
+    Draw closed polygons on the displayed image via the ``drawclosedpath``
+    modebar tool, then click "Confirm ROIs" to freeze the selection and
+    populate the output attributes. Colab note: ``plotly >= 6.0`` is broken
+    on Colab (anywidget JS issue #5027); workaround is ``plotly==5.24.1`` plus
+    ``from google.colab import output; output.enable_custom_widget_manager()``.
+
+    Args:
+        image (np.ndarray):
+            Image to display in the selector. shape: *(H, W)* or *(H, W, 3)*.
+        n_rois (int):
+            Hint for the title text indicating how many polygons to draw.
+            (Default is ``1``)
+        height (Optional[int]):
+            Optional figure height in pixels. (Default is ``None``)
+        width (Optional[int]):
+            Optional figure width in pixels. (Default is ``None``)
+        line_color (str):
+            Stroke color used while drawing new polygons. (Default is
+            ``'red'``)
+
+    Attributes:
+        selected_points (dict):
+            Populated after "Confirm ROIs" is clicked. Maps ``"ROI_0"``,
+            ``"ROI_1"``, ... to ``np.ndarray`` of shape *(N, 2)*, dtype
+            *float64*, columns ``(x, y)`` in image-pixel coords (top-left
+            origin; ``x`` is column, ``y`` is row).
+        mask_frames (dict):
+            Populated after "Confirm ROIs" is clicked. Maps ``"mask_0"``,
+            ``"mask_1"``, ... to a boolean ``np.ndarray`` of shape *(H, W)*.
+            ``True`` inside the polygon.
+        _completed_status (bool):
+            ``True`` after "Confirm ROIs" has been clicked successfully.
     """
 
-    def __init__(self, image, kwargs_subplots={}, kwargs_imshow={}):
+    _ROI_COLORS: list = [
+        "red", "blue", "lime", "orange", "purple",
+        "cyan", "magenta", "yellow",
+    ]
+
+    def __init__(
+        self,
+        image: np.ndarray,
+        n_rois: int = 1,
+        height=None,
+        width=None,
+        line_color: str = "red",
+    ) -> None:
+        """Builds the FigureWidget, wires up button callbacks, and renders the GUI."""
+        import re as _re
+        import plotly.express as px
+        import plotly.graph_objects as go
+        import ipywidgets as widgets
+        from IPython.display import display
+        import skimage.draw
+
+        self._re = _re
+        self._skimage_draw = skimage.draw
+
+        assert isinstance(image, np.ndarray), (
+            "FR ERROR: '_Select_ROI' 'image' must be a numpy ndarray, "
+            f"got {type(image)}."
+        )
+        assert image.ndim in (2, 3), (
+            "FR ERROR: '_Select_ROI' 'image' must be 2D (H,W) or 3D (H,W,3), "
+            f"got shape {image.shape}."
+        )
+
+        self._image = image
+
+        ## Public attributes — initialised as empty dicts so that ROIs.__init__
+        ## can grab references before the user clicks Confirm.  _on_confirm
+        ## mutates them in place so the reference-sharers stay in sync.
+        self.selected_points: dict = {}
+        self.mask_frames: dict = {}
+        self._completed_status: bool = False
+
+        ## Build the base figure using px.imshow.
+        ## binary_string=True PNG-encodes the array for fast rendering and
+        ## sets up a top-left origin (y=0 at top), matching NumPy indexing.
+        if image.ndim == 2:
+            fig_base = px.imshow(
+                image,
+                color_continuous_scale="gray",
+                binary_string=True,
+            )
+        else:
+            fig_base = px.imshow(image, binary_string=True)
+
+        layout_kwargs = dict(
+            dragmode="drawclosedpath",
+            newshape=dict(
+                line_color=line_color,
+                fillcolor="rgba(255,0,0,0.2)",
+                ## opacity > 0.5 required to click inside shape to select it
+                opacity=0.6,
+            ),
+            xaxis=dict(showticklabels=False, showgrid=False),
+            yaxis=dict(showticklabels=False, showgrid=False),
+            margin=dict(l=0, r=0, t=30, b=0),
+            title_text=f"Draw {n_rois} ROI polygon(s) → click Confirm ROIs",
+            coloraxis_showscale=False,
+        )
+        if height is not None:
+            layout_kwargs["height"] = height
+        if width is not None:
+            layout_kwargs["width"] = width
+
+        fig_base.update_layout(**layout_kwargs)
+
+        ## FigureWidget (anywidget-backed in plotly >= 6) enables Python-side
+        ## shape retrieval. Must display via IPython.display, NOT .show().
+        self._widget = go.FigureWidget(fig_base)
+
+        self._btn_confirm = widgets.Button(
+            description="Confirm ROIs",
+            button_style="success",
+            tooltip="Freeze current polygon selections and compute masks",
+        )
+        self._btn_clear = widgets.Button(
+            description="Clear",
+            button_style="warning",
+            tooltip="Remove all drawn shapes from the figure",
+        )
+        self._label = widgets.Label("Draw polygons using the toolbar, then click Confirm ROIs.")
+
+        self._btn_confirm.on_click(self._on_confirm)
+        self._btn_clear.on_click(self._on_clear)
+
+        self._label.layout = widgets.Layout(width='100%')
+        display(
+            widgets.VBox([
+                self._widget,
+                widgets.HBox([self._btn_confirm, self._btn_clear]),
+                self._label,
+            ])
+        )
+
+    def _on_confirm(self, _button_event) -> None:
         """
-        Initialize the class
+        Reads shapes from the FigureWidget, parses each SVG path into polygon
+        vertices, computes the corresponding boolean masks, and updates
+        ``self.selected_points`` and ``self.mask_frames`` in place.
 
         Args:
-            im:
-                Image to select the ROI from
+            _button_event (object):
+                Unused ipywidgets button event passed by the click callback.
         """
-        from ipywidgets import widgets
-        import IPython.display as Disp
-        import matplotlib.pyplot as plt
-        import matplotlib as mpl
+        ## Use _props workaround: widget.layout["shapes"] returns empty tuple
+        ## due to plotly >= 6.x bug (plotly/plotly.py #5309, open Aug 2025).
+        shapes_raw = self._widget.layout._props.get("shapes", [])
 
-        import torch
+        path_shapes = [s for s in shapes_raw if s.get("type") == "path"]
 
-        ## Make sure that the image is a numpy array or torch.Tensor
-        assert isinstance(image, (np.ndarray, torch.Tensor)), "FR ERROR: 'image' must be a numpy array or torch.Tensor."
-        if isinstance(image, torch.Tensor):
-            image = image.numpy()
+        if not path_shapes:
+            self._label.value = "No polygon shapes found. Draw at least one polygon."
+            return
 
-        ## set jupyter notebook to use interactive matplotlib.
-        ## equivalent to %matplotlib notebook
-        mpl.use("nbagg")        
-        plt.ion()
+        selected_points: dict = {}
+        mask_frames: dict = {}
 
-        ## Set variables                
-        self._img_input = image.copy()
-        self.selected_points = {}
-        self._selected_points_last_ROI = []
-        self.mask_frames = {}
-        self._completed_status = False
+        for idx, shape in enumerate(path_shapes):
+            path_str = shape["path"]
+            verts = self._parse_svg_path(path_str)
+            mask = self._compute_mask(
+                vertices_xy=verts,
+                image_shape=self._image.shape,
+            )
+            selected_points[f"ROI_{idx}"] = verts
+            mask_frames[f"mask_{idx}"] = mask
 
-        ## Prepare figure
-        self._fig, self._ax = plt.subplots(**kwargs_subplots)
-        self._img_current = self._ax.imshow(self._img_input.copy(), **kwargs_imshow)
-        self._fig.canvas.draw()
-
-        ## Connect the click event
-        self._buttonRelease = self._fig.canvas.mpl_connect('button_release_event', self._onclick)
-        ## Make and connect the buttons
-        disconnect_button = widgets.Button(description="Confirm ROI")
-        new_ROI_button = widgets.Button(description="New ROI")
-        Disp.display(disconnect_button)
-        Disp.display(new_ROI_button)
-        disconnect_button.on_click(self._disconnect_mpl)
-        new_ROI_button.on_click(self._new_ROI)
-
-    def _poly_img(self, img, pts):
-        """
-        Draw a polygon on an image.
-        """
-        pts = np.array(pts, np.int32)
-        pts = pts.reshape((-1, 1, 2))
-        cv2.polylines(
-            img=img, 
-            pts=[pts],
-            isClosed=True,
-            color=(255,255,255,),
-            thickness=2
-        )
-        return img
-
-    def _onclick(self, event):
-        """
-        When the mouse is clicked, add the point to the list.
-        """
-        ## If the click is outside the image, ignore it
-        if (event.xdata is None) or (event.ydata is None):
-            return None
-        self._selected_points_last_ROI.append([float(event.xdata), float(event.ydata)])
-        if len(self._selected_points_last_ROI) > 1:
-            self._fig
-            im = self._img_input.copy()
-            for p in self.selected_points.values():
-                im = self._poly_img(im, p)
-            im = self._poly_img(im, self._selected_points_last_ROI)
-            self._img_current.set_data(im)
-        self._fig.canvas.draw()
-
-
-    def _disconnect_mpl(self, _):
-        """
-        Disconnect the click event and collect the points.
-        """
-        self.selected_points.update({f"ROI_{len(self.selected_points)}": np.array(self._selected_points_last_ROI)})
-
-        self._fig.canvas.mpl_disconnect(self._buttonRelease)
+        ## Mutate in place so that reference-sharers (ROIs.roi_points,
+        ## ROIs.mask_images) stay in sync after the user clicks Confirm.
+        self.selected_points.clear()
+        self.selected_points.update(selected_points)
+        self.mask_frames.clear()
+        self.mask_frames.update(mask_frames)
         self._completed_status = True
 
-        self.mask_frames.update(self._compute_mask_frames(
-            selected_points=self.selected_points, 
-            exampleImage=self._img_input,
-            verbose=True,
-        ))
+        n = len(selected_points)
+        vertex_counts = [v.shape[0] for v in selected_points.values()]
+        self._label.value = (
+            f"Captured {n} ROI(s) with {vertex_counts} vertices. "
+            "Access via .selected_points and .mask_frames."
+        )
+        print(
+            f"Select_ROI_Plotly: Captured {n} ROI(s) with "
+            f"{vertex_counts} vertices."
+        )
+
+    def _on_clear(self, _button_event) -> None:
+        """
+        Removes all drawn shapes from the figure and resets the internal
+        ``_props['shapes']`` cache so the next confirm sees an empty list.
+
+        Args:
+            _button_event (object):
+                Unused ipywidgets button event passed by the click callback.
+        """
+        ## Bug workaround (plotly #5309): writing widget.layout.shapes = []
+        ## inside batch_update() doesn't push the clear to the JS frontend.
+        ## Use plotly_relayout to send the update directly; also reset _props
+        ## so that the next Confirm read sees an empty list.
+        self._widget.plotly_relayout({'shapes': []})
+        self._widget.layout._props['shapes'] = []
+        self._label.value = "Shapes cleared. Draw new polygons."
+
+    @staticmethod
+    def _parse_svg_path(path_str: str) -> np.ndarray:
+        """
+        Parses a Plotly ``drawclosedpath`` SVG path string into polygon
+        vertices.
+
+        Handles the format Plotly actually emits (``Mx,yLx,yLx,yZ`` with
+        absolute ``M`` and ``L`` commands, comma-separated ``x,y`` pairs, and
+        a trailing ``Z`` close), and also accepts space-separated variants.
+
+        Args:
+            path_str (str):
+                SVG path string from
+                ``widget.layout._props['shapes'][i]['path']``.
+
+        Returns:
+            (np.ndarray):
+                vertices (np.ndarray):
+                    Polygon vertices as ``(x, y)`` pairs. shape: *(N, 2)*,
+                    dtype: *float64*.
+
+        Raises:
+            ValueError:
+                If ``path_str`` is empty or yields no vertices.
+        """
+        import re
+        if not path_str or not path_str.strip():
+            raise ValueError("Empty SVG path string.")
+
+        tokens = re.split(r"([MLZmlz])", path_str.strip())
+        tokens = [t.strip() for t in tokens if t.strip()]
+
+        coords: list = []
+        current_pos = np.array([0.0, 0.0])
+
+        i = 0
+        while i < len(tokens):
+            cmd = tokens[i]
+            i += 1
+
+            if cmd in ("M", "L"):
+                if i < len(tokens) and tokens[i] not in "MLZmlz":
+                    raw = tokens[i].replace(",", " ").split()
+                    i += 1
+                    for j in range(0, len(raw) - 1, 2):
+                        x, y = float(raw[j]), float(raw[j + 1])
+                        current_pos = np.array([x, y])
+                        coords.append(current_pos.copy())
+
+            elif cmd in ("m", "l"):
+                if i < len(tokens) and tokens[i] not in "MLZmlz":
+                    raw = tokens[i].replace(",", " ").split()
+                    i += 1
+                    for j in range(0, len(raw) - 1, 2):
+                        dx, dy = float(raw[j]), float(raw[j + 1])
+                        current_pos = current_pos + np.array([dx, dy])
+                        coords.append(current_pos.copy())
+
+            elif cmd in ("Z", "z"):
+                pass
+
+        if not coords:
+            raise ValueError(f"No vertices parsed from path: {path_str!r}")
+
+        return np.array(coords, dtype=np.float64)
 
     @staticmethod
     def _compute_mask_frames(
-        selected_points,
-        exampleImage,
-        verbose=False,
-    ):
-        import skimage
-        mask_frames = {}
+        selected_points: dict,
+        exampleImage: np.ndarray,
+        verbose: bool = False,
+    ) -> dict:
+        """
+        Batch-computes boolean masks from a dictionary of polygon vertex
+        arrays.
+
+        Args:
+            selected_points (dict):
+                Maps ``"ROI_0"``, ... to an ``np.ndarray`` of shape *(N, 2)*
+                with columns ``(x, y)``.
+            exampleImage (np.ndarray):
+                Image whose ``(H, W)`` determines the mask dimensions.
+            verbose (bool):
+                If ``True``, print a confirmation line when done. (Default is
+                ``False``)
+
+        Returns:
+            (dict):
+                mask_frames (dict):
+                    Maps ``"mask_0"``, ... to a boolean ``np.ndarray`` of
+                    shape *(H, W)*.
+        """
+        import skimage.draw
+        mask_frames: dict = {}
         for ii, pts in enumerate(selected_points.values()):
             pts = np.array(pts)
             mask_frame = np.zeros((exampleImage.shape[0], exampleImage.shape[1]))
-            pts_y, pts_x = skimage.draw.polygon(pts[:, 1], pts[:, 0])
-            mask_frame[pts_y, pts_x] = 1
+            rr, cc = skimage.draw.polygon(pts[:, 1], pts[:, 0])
+            mask_frame[rr, cc] = 1
             mask_frame = mask_frame.astype(np.bool_)
-            mask_frames.update({f"mask_{ii}": mask_frame})
-        print(f'mask_frames computed') if verbose else None
+            mask_frames[f"mask_{ii}"] = mask_frame
+        if verbose:
+            print("mask_frames computed")
         return mask_frames
-        
-    def _new_ROI(self, _):
+
+    @staticmethod
+    def _compute_mask(
+        vertices_xy: np.ndarray,
+        image_shape: tuple,
+    ) -> np.ndarray:
         """
-        Start a new ROI.
+        Converts a single set of polygon vertices to a boolean image mask.
+
+        Args:
+            vertices_xy (np.ndarray):
+                Polygon vertices as ``(x, y)`` pairs in pixel coordinates.
+                shape: *(N, 2)*.
+            image_shape (tuple):
+                Either ``(height, width)`` or ``(height, width, channels)``.
+
+        Returns:
+            (np.ndarray):
+                mask (np.ndarray):
+                    Boolean polygon mask. shape: *(height, width)*, dtype:
+                    *bool*.
         """
-        self.selected_points.update({f"ROI_{len(self.selected_points)}": np.array(self._selected_points_last_ROI)})
-        self._selected_points_last_ROI = []
+        import skimage.draw
+        h, w = image_shape[:2]
+        rows = vertices_xy[:, 1]
+        cols = vertices_xy[:, 0]
+        rr, cc = skimage.draw.polygon(rows, cols, shape=(h, w))
+        mask = np.zeros((h, w), dtype=np.bool_)
+        mask[rr, cc] = True
+        return mask
         
         
 
@@ -520,12 +747,25 @@ class _Select_ROI:
 
 class ROI_Alinger:
     """
-    A class for registering a template image to a 
-     set of images, and warping points from the
-     template image to the set of images.
-    Currently relies on available OpenCV methods for 
-     non-rigid registration.
-    RH 2022
+    Registers a template image to a set of new images using OpenCV optical
+    flow, then warps the template's ROI polygons and tracking points onto
+    each new image. RH 2022
+
+    Args:
+        method (str):
+            Optical-flow method to use for non-rigid registration. One of \n
+            * ``'calcOpticalFlowFarneback'``
+            * ``'createOptFlow_DeepFlow'`` \n
+            (Default is ``'createOptFlow_DeepFlow'``)
+        kwargs_method (dict):
+            Keyword arguments forwarded to the chosen optical-flow method.
+            If ``None``, hard-coded defaults are used. (Default is ``None``)
+        verbose (int):
+            Verbosity level. One of \n
+            * ``0``: No updates.
+            * ``1``: Warnings only.
+            * ``2``: All updates. \n
+            (Default is ``1``)
     """
     def __init__(
         self,
@@ -533,26 +773,7 @@ class ROI_Alinger:
         kwargs_method=None,
         verbose=1,
     ):
-        """
-        Initialize the class.
-
-        Args:
-            method (str):
-                The method to use for optical flow calculation.
-                The following are currently supported:
-                    'calcOpticalFlowFarneback',
-                    'createOptFlow_DeepFlow',
-            kwargs_method (dict):
-                The keyword arguments to pass to the method.
-                See the documentation for the method for the
-                 required arguments.
-                If None, hard-coded defaults will be used.
-            verbose (bool):
-                Whether to print progress updates.
-                0: No updates
-                1: Warnings
-                2: All updates
-        """
+        """Stores the chosen optical-flow method and its keyword arguments."""
         self._verbose = verbose
         self._method = method
         self._kwargs_method = kwargs_method
@@ -567,46 +788,43 @@ class ROI_Alinger:
         normalize=True,
     ):
         """
-        Perform non-rigid registration of a template image
-         to a set of images.
-        Currently relies on available OpenCV methods for
-         non-rigid registration.
-        RH 2022
+        Performs non-rigid registration of a template image onto each new
+        image and warps the template's tracking points, ROI polygons, masks,
+        and the new images themselves into the template's frame. RH 2022
+
+        Results are stored on the instance as ``self.flows``,
+        ``self.pointPositions_new``, ``self.roiPoints_new``,
+        ``self.maskImages_new``, ``self.ROIs_objects_new``, and
+        ``self.images_warped``.
 
         Args:
-            ROIs_object_template (face_rhythm.rois.ROIs):
-                A single ROIs object made using the template image.
-                The ROIs and points from this object will be aligned
-                 (warped) onto the new images.
-            images_new (list of numpy.ndarray):
-                The images to project the points onto.
-                Template image will be warped onto each image.
-                Each image should be of shape (height, width, n_channels)
-                 and have dtype uint8.
-            image_template (numpy.ndarray):
-                The template image to warp onto the new images.
-                Optional. If None, then the template image will be
-                 taken from the ROIs object: ROIs.exampleImage
-                shape: (height, width, n_channels)
-                dtype: uint8
+            ROIs_object_template (ROIs):
+                A single ``ROIs`` object built from the template image. Its
+                ROIs and tracking points are warped onto each new image.
+            images_new (List[np.ndarray]):
+                Images to align the template to. Each image must have shape
+                *(H, W, n_channels)* and dtype *uint8*.
+            image_template (np.ndarray):
+                Template image to warp onto the new images. shape:
+                *(H, W, n_channels)*, dtype: *uint8*. If ``None``,
+                ``ROIs_object_template.exampleImage`` is used. (Default is
+                ``None``)
             template_method (str):
-                The method used to register the images.
-                Either 'image' or 'sequential'.
-                If 'image':      image_template must be a single image.
-                If 'sequential': image_template must be an integer corresponding 
-                 to the index of the image to set as 'zero' offset.
-            shifts (numpy.ndarray):
-                The shifts to apply to the points.
-                If None, no shifts will be applied.
-                The shifts describe the relative shift between the 
-                 original image and the provided image in images_new.
-                This will be non-zero if the 
-                 input iamges have been shifted using the phase-
-                 correlation shifter. 
+                Strategy for choosing the template per registration. One of \n
+                * ``'image'``: ``image_template`` is treated as a single
+                  image.
+                * ``'sequential'``: ``image_template`` is treated as the
+                  integer index of the image to use as the zero-offset
+                  reference. \n
+                (Default is ``'image'``)
+            shifts (np.ndarray):
+                Per-image ``(dx, dy)`` shifts to add to each computed flow
+                field, e.g. from a phase-correlation pre-registration step.
+                If ``None``, zero shifts are applied. (Default is ``None``)
             normalize (bool):
-                If True, the images will be normalized to be in the
-                 range [0, 255] before registration. Min and max values
-                 will be used to set range.
+                If ``True``, normalize images to ``[0, 255]`` (using each
+                image's own min and max) before registration. (Default is
+                ``True``)
         """
         ### Assert images_new is a list of 2D or 3D numpy.ndarray
         if isinstance(images_new, list):
@@ -688,32 +906,29 @@ class ROI_Alinger:
         normalize=True,
     ):
         """
-        Perform non-rigid registration of a template image
-         to a set of images.
-        Currently relies on available OpenCV methods for
-         non-rigid registration.
-        RH 2022
+        Computes the dense optical-flow field that registers ``image_moving``
+        onto ``image_template`` using the configured OpenCV method. RH 2022
 
         Args:
-            image_moving (list of numpy.ndarray):
-                The image to warp onto image_template.
-                Image should be of shape (height, width, n_channels)
-                 and have dtype uint8.
-            image_template (numpy.ndarray):
-                The template image to align (warp) onto.
-                shape: (height, width, n_channels)
-                dtype: uint8
+            image_moving (np.ndarray):
+                Image to align onto ``image_template``. shape: *(H, W)* or
+                *(H, W, n_channels)*, dtype: *uint8*.
+            image_template (np.ndarray):
+                Reference image to align onto. shape: *(H, W)* or
+                *(H, W, n_channels)*, dtype: *uint8*.
+            shifts (Union[np.ndarray, tuple]):
+                Optional ``(dx, dy)`` shift (or array of shifts) added to the
+                returned flow field. (Default is ``None``)
             normalize (bool):
-                If True, the images will be normalized to be in the
-                 range [0, 255] before registration. Min and max values
-                 will be used to set range.
+                If ``True``, normalize both inputs to ``[0, 255]`` before
+                registration. (Default is ``True``)
 
         Returns:
-            image_moving_aligned (numpy.ndarray):
-                The moving image warped onto the template image.
-            flow (list of numpy.ndarray):
-                The optical flow to warp the moving image onto the 
-                 template image.
+            (np.ndarray):
+                flow (np.ndarray):
+                    Dense optical-flow field mapping ``image_moving`` to
+                    ``image_template``. shape: *(H, W, 2)*, last dim is
+                    ``(dx, dy)``.
         """
 
         # Check inputs
@@ -779,20 +994,21 @@ class ROI_Alinger:
         flow,
     ):
         """
-        Warp points using provided flow field.
-        RH 2022
+        Warps a set of ``(x, y)`` points using a dense flow field. RH 2022
 
         Args:
-            points (numpy.ndarray):
-                The points to warp.
-                shape: (n_points, 2)
-                dtype: float
-                (x, y) coordinates
-            flow (numpy.ndarray):
-                The flow field to warp the points.
-                shape: (height, width, 2)
-                dtype: float
-                last dim is (x, y) coordinates
+            points (np.ndarray):
+                Points to warp as ``(x, y)`` pairs. shape: *(n_points, 2)*,
+                dtype: *float*.
+            flow (np.ndarray):
+                Dense flow field. shape: *(H, W, 2)*, dtype: *float*. Last
+                dim is ``(dx, dy)``.
+
+        Returns:
+            (np.ndarray):
+                points_remap (np.ndarray):
+                    Warped points clipped to the image bounds. shape:
+                    *(n_points, 2)*.
         """
         from functools import partial
         ### Assert points is a 2D numpy.ndarray of shape (n_points, 2) and that all points are within the image and that points are float
@@ -842,20 +1058,21 @@ class ROI_Alinger:
         flow,
     ):
         """
-        Warp image using provided flow field.
-        RH 2022
+        Warps an image using a dense flow field via ``cv2.remap``. RH 2022
 
         Args:
-            image (numpy.ndarray):
-                The image to warp.
-                shape: (height, width)
-                 or (height, width, 3)
-                dtype: float
-            flow (numpy.ndarray):
-                The flow field to warp the image.
-                shape: (height, width, 2)
-                dtype: float
-                last dim is (x, y) coordinates
+            image (np.ndarray):
+                Image to warp. shape: *(H, W)* or *(H, W, 3)*, dtype:
+                *float*. 3-channel inputs are averaged to grayscale before
+                remapping.
+            flow (np.ndarray):
+                Dense flow field. shape: *(H, W, 2)*, dtype: *float*. Last
+                dim is ``(dx, dy)``.
+
+        Returns:
+            (np.ndarray):
+                image_remap (np.ndarray):
+                    Warped image. shape: *(H, W)*, dtype: *float32*.
         """
         def safe_remap(image, x_remap, y_remap):
             image_remap = cv2.remap(
@@ -904,8 +1121,9 @@ class Image_Aligner(FR_Module):
         self,
         verbose=True,
     ):
+        """Initializes empty registration state (warp matrices and remap indices)."""
         self._verbose = verbose
-        
+
         self.remappingIdx_geo = None
         self.warp_matrices = None
 
@@ -1421,20 +1639,22 @@ class Image_Aligner(FR_Module):
         remappingIdx: np.ndarray,
     ):
         """
-        Warp points using provided flow field.
-        RH 2022
+        Warps points through the supplied remapping index field. RH 2022
 
         Args:
-            points (numpy.ndarray):
-                The points to warp.
-                shape: (n_points, 2)
-                dtype: float
-                (x, y) coordinates
-            flow (numpy.ndarray):
-                The flow field to warp the points.
-                shape: (height, width, 2)
-                dtype: float
-                last dim is (x, y) coordinates
+            points (np.ndarray):
+                Points to warp as ``(x, y)`` pairs. shape: *(n_points, 2)*,
+                dtype: *float*.
+            remappingIdx (np.ndarray):
+                Remapping index field that maps output ``(x, y)`` coordinates
+                to source ``(x, y)`` coordinates. shape: *(H, W, 2)*, dtype:
+                *float*. Last dim is ``(x, y)``.
+
+        Returns:
+            (np.ndarray):
+                points_remap (np.ndarray):
+                    Warped points clipped to image bounds. shape:
+                    *(n_points, 2)*.
         """
         points_remap = helpers.remap_points(
             points=points,

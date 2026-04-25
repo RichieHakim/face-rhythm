@@ -132,6 +132,11 @@ dmypy.json
 .DS_Store
 data_test/
 .vscode/
+.idea/
+.ruff_cache/
 .fuse_hidden*
 __pycache__/
 .fr-*
+agent_assets/
+AGENTS.md
+.claude/
