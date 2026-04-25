@@ -48,10 +48,11 @@ import tensorly as tl
 
 def prepare_cv2_imshow():
     """
-    This function is necessary because cv2.imshow() 
-     can crash the kernel if called after importing 
-     av and decord.
-    RH 2022
+    Pre-initializes ``cv2.imshow`` to avoid kernel crashes. RH 2022
+
+    Calling ``cv2.imshow`` after ``av`` or ``decord`` have been imported can
+    crash the Python kernel. Showing a small dummy frame here primes the
+    OpenCV display loop so subsequent ``cv2.imshow`` calls work safely.
     """
     import numpy as np
     import cv2
@@ -199,40 +200,31 @@ def prepare_path(
     exist_ok: bool = True,
 ) -> str:
     """
-    Checks if a directory or file path is valid for different purposes: 
-    saving, loading, etc.
-    RH 2023
+    Validates a directory or file path for saving or loading. RH 2023
 
-    * If exists:
-        * If exist_ok=True: all good
-        * If exist_ok=False: raises error
-    * If doesn't exist:
-        * If file:
-            * If parent directory exists:
-                * All good
-            * If parent directory doesn't exist:
-                * If mkdir=True: creates parent directory
-                * If mkdir=False: raises error
-        * If directory:
-            * If mkdir=True: creates directory
-            * If mkdir=False: raises error
-            
-    RH 2023
+    Resolution rules: \n
+    * If the path exists and ``exist_ok`` is ``True``, it is accepted.
+    * If the path exists and ``exist_ok`` is ``False``, an error is raised.
+    * If the path does not exist and refers to a file: the parent directory
+      is created when ``mkdir`` is ``True``, otherwise an error is raised
+      when the parent does not exist.
+    * If the path does not exist and refers to a directory: the directory is
+      created when ``mkdir`` is ``True``, otherwise an error is raised. \n
 
     Args:
-        path (str): 
+        path (str):
             Path to be checked.
-        mkdir (bool): 
-            If ``True``, creates parent directory if it does not exist. 
-            (Default is ``False``)
-        exist_ok (bool): 
-            If ``True``, allows overwriting of existing file. 
-            (Default is ``True``)
+        mkdir (bool):
+            If ``True``, creates the parent directory (or directory) if it
+            does not exist. (Default is ``False``)
+        exist_ok (bool):
+            If ``True``, allows the path to already exist. (Default is
+            ``True``)
 
     Returns:
-        (str): 
+        (str):
             path (str):
-                Resolved path.
+                Resolved absolute path.
     """
     ## check if path is valid
     try:
@@ -915,39 +907,41 @@ def extract_zip(
 #####################################################################################################################################
 
 def make_batches(
-    iterable, 
-    batch_size=None, 
-    num_batches=None, 
-    min_batch_size=0, 
-    return_idx=False, 
+    iterable,
+    batch_size=None,
+    num_batches=None,
+    min_batch_size=0,
+    return_idx=False,
     length=None
 ):
     """
-    Make batches of data or any other iterable.
-    RH 2021
+    Generates batches of data from an iterable. RH 2021
 
     Args:
-        iterable (iterable):
-            iterable to be batched
-        batch_size (int):
-            size of each batch
-            if None, then batch_size based on num_batches
-        num_batches (int):
-            number of batches to make
+        iterable (Iterable):
+            Iterable to be batched.
+        batch_size (Optional[int]):
+            Size of each batch. If ``None``, ``batch_size`` is computed from
+            ``num_batches``. (Default is ``None``)
+        num_batches (Optional[int]):
+            Number of batches to make. Used only when ``batch_size`` is
+            ``None``. (Default is ``None``)
         min_batch_size (int):
-            minimum size of each batch
+            Minimum size of each batch. Batches smaller than this are
+            skipped. (Default is ``0``)
         return_idx (bool):
-            whether to return the indices of the batches.
-            output will be [start, end] idx
-        length (int):
-            length of the iterable.
-            if None, then length is len(iterable)
-            This is useful if you want to make batches of 
-             something that doesn't have a __len__ method.
-    
+            If ``True``, yields ``(batch, [start, end])`` tuples instead of
+            just the batch. (Default is ``False``)
+        length (Optional[int]):
+            Length of the iterable. If ``None``, uses ``len(iterable)``. Useful
+            when the iterable does not implement ``__len__``. (Default is
+            ``None``)
+
     Returns:
-        output (iterable):
-            batches of iterable
+        (Generator):
+            output (Generator):
+                Yields successive batches from ``iterable``. If ``return_idx``
+                is ``True``, yields ``(batch, [start, end])`` tuples.
     """
 
     if length is None:
@@ -971,18 +965,22 @@ def make_batches(
 
 def cp_to_dense(cp, weights=None):
     """
-    Converts a list (of length n_modes) of 2D arrays (of shape (len_dim, rank))
-     [CP format] to a dense tensor (of shape (len_dim, len_dim, ...))
-    RH 2022
+    Reconstructs a dense tensor from a CP-format list of factor matrices. RH 2022
 
     Args:
-        cp (list of np.ndarray):
-            List of 2D arrays in CP format.
-            Tensorly uses this format for their 'cp' format.
+        cp (List[np.ndarray]):
+            List of length ``n_modes`` of 2D factor matrices, each with
+            shape *(len_dim, rank)*. This is the format Tensorly uses for
+            its ``'cp'`` representation. Elements may be NumPy arrays or
+            ``torch.Tensor`` (matching dtype).
+        weights (Optional[np.ndarray]):
+            Per-rank weights of length ``rank``. If ``None``, uses a vector
+            of ones. (Default is ``None``)
 
     Returns:
-        dense (np.ndarray):
-            Dense tensor
+        (np.ndarray):
+            dense (np.ndarray):
+                Reconstructed dense tensor. shape: *(len_dim_0, len_dim_1, ...)*.
     """
     rank = cp[0].shape[1]
     n_modes = len(cp)
@@ -1009,27 +1007,41 @@ def cp_to_dense(cp, weights=None):
 
 class Lazy_repeat_item():
     """
-    Makes a lazy iterator that repeats an item.
-     RH 2021
+    Lazy iterator-like container that always returns the same item. RH 2021
+
+    Args:
+        item (Any):
+            Item to repeat on every access.
+        pseudo_length (Optional[int]):
+            Reported length of the container. If ``None``, the container has
+            no enforced length and ``__getitem__`` always returns ``item``.
+            (Default is ``None``)
+
+    Attributes:
+        item (Any):
+            The repeated item.
+        pseudo_length (Optional[int]):
+            Stored pseudo length.
     """
     def __init__(self, item, pseudo_length=None):
-        """
-        Args:
-            item (any object):
-                item to repeat
-            pseudo_length (int):
-                length of the iterator.
-        """
+        """Initializes the repeater with the item and an optional pseudo length."""
         super().__init__()
         self.item = item
         self.pseudo_length = pseudo_length
 
     def __getitem__(self, i):
         """
+        Returns ``self.item``.
+
         Args:
             i (int):
-                index of item to return.
-                Ignored if pseudo_length is None.
+                Index requested. Ignored when ``pseudo_length`` is ``None``.
+                Otherwise an ``IndexError`` is raised when ``i >= pseudo_length``.
+
+        Returns:
+            (Any):
+                item (Any):
+                    The repeated item.
         """
         if self.pseudo_length is None:
             return self.item
@@ -1048,34 +1060,37 @@ class Lazy_repeat_item():
 
 def deep_update_dict(dictionary, key, new_val=None, new_key=None, in_place=False):
     """
-    Updates a dictionary with a new value.
-    RH 2022
+    Updates a value or renames a key inside a nested dictionary. RH 2022
 
     Args:
         dictionary (Dict):
-            dictionary to update
-        key (list of str):
-            Key to update
-            List elements should be strings.
-            Each element should be a hierarchical
-             level of the dictionary.
-            DEMO:
-                deep_update_dict(params, ['dataloader_kwargs', 'prefetch_factor'], val)
-        new_val (any):
-            If not None, the value to update with this
-            If None, then new_key must be specified and will only
-             be used to update the key.
-        new_key (str):
-            If not None, the key will be updated with this key.
-             [key[-1]] will be deleted and replaced with new_key.
-            If None, then [key[-1]] will be updated with new_val.
-             
+            Dictionary to update.
+        key (List[str]):
+            Hierarchical path of string keys leading to the entry to update.
+            Each element corresponds to a nesting level.
+        new_val (Optional[Any]):
+            New value to assign. If ``None``, ``new_key`` must be provided and
+            only the key is renamed. (Default is ``None``)
+        new_key (Optional[str]):
+            If provided, ``key[-1]`` is removed and replaced with ``new_key``
+            (mapping to ``new_val`` if given, otherwise to the existing value).
+            (Default is ``None``)
         in_place (bool):
-            whether to update in place
+            If ``True``, updates ``dictionary`` in place and returns ``None``.
+            If ``False``, returns a deep-copied updated dictionary. (Default
+            is ``False``)
 
     Returns:
-        output (Dict):
-            updated dictionary
+        (Optional[Dict]):
+            output (Optional[Dict]):
+                Updated dictionary when ``in_place`` is ``False``; otherwise
+                ``None``.
+
+    Example:
+        .. highlight:: python
+        .. code-block:: python
+
+            deep_update_dict(params, ['dataloader_kwargs', 'prefetch_factor'], val)
     """
     def helper_deep_update_dict(d, key):
         if type(key) is str:
@@ -1104,24 +1119,25 @@ def deep_update_dict(dictionary, key, new_val=None, new_key=None, in_place=False
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str ='.') -> MutableMapping:
     """
-    Flattens a dictionary of dictionaries into a single dictionary. NOTE: Turns
-    all keys into strings. Stolen from https://stackoverflow.com/a/6027615.
-    RH 2022
+    Flattens a nested dictionary into a single dictionary. RH 2022
+
+    All keys are coerced to strings and joined by ``sep``. Adapted from
+    https://stackoverflow.com/a/6027615.
 
     Args:
-        d (Dict):
-            Dictionary to flatten
+        d (MutableMapping):
+            Dictionary to flatten.
         parent_key (str):
-            Key to prepend to flattened keys IGNORE: USED INTERNALLY FOR
-            RECURSION
+            Key prefix prepended to flattened keys. Used internally for
+            recursion. (Default is ``''``)
         sep (str):
-            Separator to use between keys IGNORE: USED INTERNALLY FOR RECURSION
+            Separator between key components. Used internally for recursion.
+            (Default is ``'.'``)
 
     Returns:
         (Dict):
-            flattened dictionary (dict):
-                Flat dictionary with the keys to deeper dictionaries joined by
-                the separator.
+            flattened (Dict):
+                Flat dictionary with paths joined by ``sep``.
     """
 
     items = []
@@ -1136,24 +1152,24 @@ def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str ='.') -> Muta
 
 def find_subDict_key(d: dict, s: str, max_depth: int=9999999):
     """
-    Recursively search for a sub-dictionary that contains the given string.
-    Yield the result.
+    Recursively searches a nested dictionary for keys matching a regex.
 
     Args:
         d (dict):
-            dictionary to search
+            Dictionary to search.
         s (str):
-            string of the key to search for using regex
+            Regex pattern that keys are matched against.
         max_depth (int):
-            maximum depth to search.
-            1 means only search the keys in the top level of
-             the dictionary. 2 means the first and second level.
+            Maximum depth to descend. ``1`` searches only the top level, ``2``
+            searches the first and second levels, etc. (Default is
+            ``9999999``)
 
     Returns:
-        k_all (list of tuples):
-            List of 2-tuples: (list of tuples containing:
-             list of strings of keys to sub-dictionary, value
-             of sub-dictionary)
+        (List[Tuple[List[str], Any]]):
+            k_all (List[Tuple[List[str], Any]]):
+                List of 2-tuples ``(path, value)`` where ``path`` is the list
+                of string keys leading to the matched entry and ``value`` is
+                the matched sub-dictionary value.
     """
     def helper_find_subDict_key(d, s, depth=999, _k_all=[]):
         """
@@ -1176,27 +1192,26 @@ def find_subDict_key(d: dict, s: str, max_depth: int=9999999):
 ## parameter dictionary helpers ##
 
 def fill_in_dict(
-    d: Dict, 
+    d: Dict,
     defaults: Dict,
     verbose: bool = True,
-    hierarchy: List[str] = ['dict'], 
+    hierarchy: List[str] = ['dict'],
 ):
     """
-    In-place. Fills in dictionary ``d`` with values from ``defaults`` if they
-    are missing. Works hierachically.
-    RH 2023
+    Fills in a dictionary in place with values from ``defaults`` for missing
+    keys, recursing into nested dictionaries. RH 2023
 
     Args:
         d (Dict):
-            Dictionary to fill in.
-            In-place.
+            Dictionary to fill in (modified in place).
         defaults (Dict):
-            Dictionary of defaults.
+            Dictionary of default values.
         verbose (bool):
-            Whether to print messages.
+            If ``True``, prints a message each time a default value is
+            inserted. (Default is ``True``)
         hierarchy (List[str]):
-            Used internally for recursion.
-            Hierarchy of keys to d.
+            Path of keys leading to ``d``. Used internally for recursion.
+            (Default is ``['dict']``)
     """
     from copy import deepcopy
     for key in defaults:
@@ -1209,26 +1224,27 @@ def fill_in_dict(
             
 
 def check_keys_subset(
-    d, 
-    default_dict, 
+    d,
+    default_dict,
     error_on_missing_keys=True,
     hierarchy=['defaults'],
 ):
     """
-    Checks that the keys in d are all in default_dict. Raises an error if not.
-    RH 2023
+    Verifies recursively that every key in ``d`` also appears in
+    ``default_dict``. RH 2023
 
     Args:
         d (Dict):
             Dictionary to check.
         default_dict (Dict):
-            Dictionary containing the keys to check against.
+            Dictionary containing the allowed keys.
         error_on_missing_keys (bool):
-            Whether to raise an error if any keys in ``params`` are not in
-             ``defaults``.
+            If ``True``, raises ``AssertionError`` when a key in ``d`` is
+            not in ``default_dict``. If ``False``, emits a warning instead.
+            (Default is ``True``)
         hierarchy (List[str]):
-            Used internally for recursion.
-            Hierarchy of keys to d.
+            Path of keys leading to ``d``. Used internally for recursion.
+            (Default is ``['defaults']``)
     """
     default_keys = list(default_dict.keys())
     for key in d.keys():
@@ -1248,16 +1264,18 @@ def check_keys_subset(
 
 
 def prepare_params(
-    params, 
-    defaults, 
+    params,
+    defaults,
     error_on_missing_keys=True,
     verbose=True,
 ):
     """
-    Does the following:
-        * Checks that all keys in ``params`` are in ``defaults``.
-        * Fills in any missing keys in ``params`` with values from ``defaults``.
-        * Returns a deepcopy of the filled-in ``params``.
+    Validates ``params`` against ``defaults`` and fills in missing keys.
+
+    Performs the following: \n
+    * Checks that all keys in ``params`` are also in ``defaults``.
+    * Fills in any missing keys in ``params`` with values from ``defaults``.
+    * Returns a deepcopy of the filled-in ``params``. \n
 
     Args:
         params (Dict):
@@ -1265,10 +1283,17 @@ def prepare_params(
         defaults (Dict):
             Dictionary of defaults.
         error_on_missing_keys (bool):
-            Whether to raise an error if any keys in ``params`` are not in
-             ``defaults``.
+            If ``True``, raises an error when a key in ``params`` is not in
+            ``defaults``. If ``False``, emits a warning instead. (Default is
+            ``True``)
         verbose (bool):
-            Whether to print messages.
+            If ``True``, prints messages while filling in defaults. (Default
+            is ``True``)
+
+    Returns:
+        (Dict):
+            params_out (Dict):
+                Validated and default-filled deepcopy of ``params``.
     """
     from copy import deepcopy
     ## Check inputs
@@ -1299,17 +1324,25 @@ def prepare_params(
 if decord is not None:
     class VideoReaderWrapper(decord.VideoReader):
         """
-        Used to fix a memory leak bug in decord.VideoReader
-        Taken from here.
-        https://github.com/dmlc/decord/issues/208#issuecomment-1157632702
+        Subclass of ``decord.VideoReader`` that works around a memory leak.
+
+        Calls ``self.seek(0)`` after initialization and after every
+        ``__getitem__`` so that decord releases buffered frames. Adapted from
+        https://github.com/dmlc/decord/issues/208#issuecomment-1157632702.
+
+        Attributes:
+            path (str):
+                Path to the video file (the first positional argument).
         """
         def __init__(self, *args, **kwargs):
+            """Forwards all arguments to ``decord.VideoReader`` and resets the seek position."""
             super().__init__(*args, **kwargs)
             self.seek(0)
 
             self.path = args[0]
 
         def __getitem__(self, key):
+            """Returns frames at ``key`` and resets the underlying decord seek position."""
             frames = super().__getitem__(key)
             self.seek(0)
             return frames
@@ -1318,7 +1351,7 @@ else:
 
 
 def _is_torchcodec_load_error(exc: BaseException) -> bool:
-    """Return True when torchcodec failed during shared-library loading."""
+    """Returns ``True`` when ``exc`` indicates a torchcodec shared-library load failure."""
     msg = str(exc)
     markers = (
         "Could not load libtorchcodec",
@@ -1334,6 +1367,7 @@ def _is_torchcodec_load_error(exc: BaseException) -> bool:
 
 
 def _torchcodec_unavailable_message() -> str:
+    """Returns the user-facing error message shown when torchcodec cannot be loaded."""
     return (
         "torchcodec could not be imported or could not load its FFmpeg-linked "
         "shared libraries. Install FFmpeg shared libraries visible to the "
@@ -1392,6 +1426,7 @@ class TorchCodecVideoReader:
             ``0`` lets FFmpeg choose automatically (recommended).
     """
     def __init__(self, path_video: str, device: str = 'cpu', num_ffmpeg_threads: int = 0):
+        """Opens ``path_video`` with torchcodec and prepares the issue-#905 tail-decoder cache."""
         import threading
 
         self.path = str(path_video)
@@ -1502,29 +1537,113 @@ class TorchCodecVideoReader:
 
 class BufferedVideoReader:
     """
-    A video reader that loads chunks of frames into a memory buffer
-     in background processes so that sequential batches of frames
-     can be accessed quickly.
-    In many cases, allows for reading videos in batches without
-     waiting for loading of the next batch to finish.
-    Uses threading to read frames in the background.
+    Reads frames from one or more videos with a chunked memory buffer and
+    optional background prefetching. RH 2022
 
-    Optimal use case:
-    1. Create a _BufferedVideoReader object
-    EITHER 2A. Set method_getitem to 'continuous' and iterate over the
-        object. This will read frames continuously in the
-        background. This is the fastest way to read frames.
-    OR 2B. Call batches of frames sequentially. Going backwards is
-        slow. Buffers move forward.
-    3. Each batch should be within a buffer. There should be no
-        batch slices that overlap multiple buffers. Eg. if the
-        buffer size is 1000 frames, then the following is fast:
-        [0:1000], [1000:2000], [2000:3000], etc.
-        But the following are slow:
-        [0:1700],  [1700:3200],   [0:990],         [990:1010], etc.
-        ^too big,  ^2x overlaps,  ^went backward,  ^1x overlap
+    Sequential batches of frames can be read quickly because buffers are
+    filled by background threads. In many cases, batches can be consumed
+    without waiting for the next chunk to finish loading.
 
-    RH 2022
+    Optimal use:
+
+    1. Create a ``BufferedVideoReader`` object.
+    2. EITHER set ``method_getitem='continuous'`` and iterate over the object
+       (fastest path), OR request batches of frames sequentially (going
+       backwards is slow because buffers move forward).
+    3. Each batch should fit inside a single buffer slot. Slices that span
+       multiple buffer slots require concatenation and are slow. With a
+       buffer size of 1000 frames, ``[0:1000], [1000:2000], ...`` is fast,
+       while ``[0:1700]``, ``[1700:3200]``, ``[0:990]``, ``[990:1010]`` are
+       slow (too big, overlapping, backwards, or crossing slot boundaries).
+
+    Args:
+        video_readers (Optional[list]):
+            List of video reader objects (``decord.VideoReader`` or
+            ``TorchCodecVideoReader``). A single reader is also accepted.
+            If ``None``, ``paths_videos`` must be provided. (Default is
+            ``None``)
+        paths_videos (Optional[list]):
+            List of paths to videos. A single ``str`` is also accepted. If
+            ``None``, ``video_readers`` must be provided. If both are
+            supplied, ``video_readers`` wins. (Default is ``None``)
+        buffer_size (int):
+            Number of frames per buffer slot. Avoid indexing more than
+            ``buffer_size`` frames at a time or across slot boundaries (e.g.
+            across ``idx % buffer_size == 0``); these require concatenating
+            buffers and are slow. (Default is ``1000``)
+        prefetch (int):
+            Number of buffers to prefetch ahead. ``0`` disables prefetching.
+            A single buffer slot only contains frames from one video, so
+            ``buffer_size <= video length`` is recommended. (Default is ``2``)
+        posthold (int):
+            Number of buffers to keep loaded behind the current position.
+            ``0`` disables posthold. Useful when iterating backwards.
+            (Default is ``1``)
+        method_getitem (str):
+            Indexing mode for ``__getitem__``. One of \n
+            * ``'continuous'``: index across all videos as a single
+              concatenated sequence; ``reader[idx_frames_slice]``.
+            * ``'by_video'``: index requires a ``(idx_video, idx_frames)``
+              tuple; ``reader[(idx_video, slice)]``. \n
+            (Default is ``'continuous'``)
+        starting_seek_position (int):
+            Starting frame index for the iterator. Used only when
+            ``method_getitem == 'continuous'`` and iterating. (Default is
+            ``0``)
+        backend (str):
+            Video decoding backend. One of \n
+            * ``'torchcodec'``: uses ``torchcodec.decoders.VideoDecoder``.
+              Frame-accurate seeking, actively maintained, supports CPU and
+              GPU (NVDEC) decode. Includes a workaround for torchcodec
+              issue #905 (sequential-access drain bug near EOF in H.264
+              AVIs): frames in ``[0, n - SAFETY)`` come from a persistent
+              decoder; the trailing ``SAFETY = max(has_b_frames, 2)`` frames
+              go through a fresh decoder cached as the tail decoder.
+            * ``'decord'``: uses ``decord.VideoReader``. Well-tested
+              fallback and the only backend available on Windows. Provided
+              by the ``decord2`` PyPI package on Linux/macOS (with vendored
+              FFmpeg 8 wheels for py3.10-3.14) and by ``eva_decord`` on
+              Windows. Both are installed by face-rhythm's default
+              dependencies. \n
+            Only used when ``paths_videos`` is provided. (Default is
+            ``'torchcodec'``)
+        device (str):
+            Device for video decoding when using torchcodec. ``'cpu'``
+            decodes on CPU. ``'cuda'`` or ``'cuda:0'`` decodes on GPU using
+            NVDEC; frames are returned as CUDA tensors. GPU decode requires
+            an NVIDIA GPU, torchcodec installed with CUDA support, and
+            FFmpeg built with ``--enable-cuda``. (Default is ``'cpu'``)
+        decord_backend (str):
+            Backend used by decord when loading frames (``'torch'``,
+            ``'numpy'``, ``'mxnet'``, ...). Only used when
+            ``backend='decord'``. (Default is ``'torch'``)
+        decord_ctx (object):
+            Context used by decord when loading frames (e.g. ``decord.cpu()``,
+            ``decord.gpu()``). Only used when ``backend='decord'``. (Default
+            is ``None``)
+        verbose (int):
+            Verbosity level. ``0`` silences output, ``1`` prints warnings,
+            ``2`` prints warnings and info. (Default is ``1``)
+
+    Attributes:
+        num_frames_total (int):
+            Total number of frames across all videos.
+        num_videos (int):
+            Number of videos being read.
+        metadata (pandas.DataFrame):
+            Per-video metadata (path, length, fps, frame size, channels).
+        frame_rate (List[float]):
+            Frame rate of each video.
+        frame_height_width (List[Tuple[int, int]]):
+            ``(H, W)`` of each video.
+        num_channels (List[int]):
+            Number of channels of each video.
+        slots (List[List[Optional[torch.Tensor]]]):
+            Buffer slots holding chunks of decoded frames.
+        boundaries (List[List[Tuple[int, int]]]):
+            Inclusive ``(start, end)`` frame index for each slot.
+        lookup (pandas.DataFrame):
+            Lookup table mapping continuous frame index to ``(video, slot)``.
     """
     def __init__(
         self,
@@ -1541,88 +1660,7 @@ class BufferedVideoReader:
         decord_ctx=None,
         verbose: int=1,
     ):
-        """
-        video_readers (list):
-            list of video reader objects (decord.VideoReader or
-            TorchCodecVideoReader). Can also be a single reader.
-            If None, then paths_videos must be provided.
-        paths_videos (list of str):
-            list of paths to videos.
-            Can also be single str.
-            If None, then video_readers must be provided.
-            If both paths_videos and video_readers are provided,
-             then video_readers will be used.
-        buffer_size (int):
-            Number of frames per buffer slot.
-            When indexing this object, try to not index more than
-             buffer_size frames at a time, and try to not index
-             across buffer slots (eg. across idx%buffer_size==0).
-             These require concatenating buffers, which is slow.
-        prefetch (int):
-            Number of buffers to prefetch.
-            If 0, then no prefetching.
-            Note that a single buffer slot can only contain frames
-             from a single video. Best to keep
-             buffer_size <= video length.
-        posthold (int):
-            Number of buffers to hold after a new buffer is loaded.
-            If 0, then no posthold.
-            This is useful if you want to go backwards in the video.
-        method_getitem (str):
-            Method to use for __getitem__.
-            'continuous' - read frames continuously across videos.
-                Index behaves like videos are concatenated:
-                - reader[idx] where idx: slice=idx_frames
-            'by_video' - index must specify video index and frame
-                index:
-                - reader[idx] where idx: tuple=(int: idx_video, slice: idx_frames)
-        starting_seek_position (int):
-            Starting frame index to start iterator from.
-            Only used when method_getitem=='continuous' and
-             using the iterator method.
-        backend (str):
-            Video decoding backend. Options:
-            'torchcodec' - (default) Uses torchcodec.decoders.VideoDecoder.
-                Frame-accurate seeking, actively maintained, supports CPU
-                and GPU (NVDEC) decode. Includes a workaround for
-                torchcodec issue #905 (sequential-access drain bug near EOF
-                in H.264 AVIs): frames in ``[0, n − SAFETY)`` are read from
-                a persistent decoder; the trailing ``SAFETY = max(has_b_frames, 2)``
-                frames are routed through a fresh decoder, opening it once
-                per video pass and caching it as the tail decoder.
-            'decord' - Uses decord.VideoReader. Well-tested fallback,
-                and the only video backend available on Windows.
-                Provided by the ``decord2`` PyPI package (a maintained fork
-                of decord with vendored FFmpeg 8 wheels for Linux + macOS
-                arm64, py3.10-3.14); ``eva_decord`` on Windows. Both are
-                installed by face-rhythm's default dependencies.
-            Only used when paths_videos is provided (ignored if video_readers given).
-        device (str):
-            Device for video decoding. Options:
-            ``'cpu'`` (default) decodes on CPU. Works everywhere.
-            ``'cuda'`` or ``'cuda:0'`` decodes on GPU using NVDEC hardware
-            decoder. Frames are returned as CUDA tensors. Requires: (1)
-            NVIDIA GPU, (2) torchcodec installed with CUDA support
-            (``pip install torchcodec --index-url=...cu126``), and (3) FFmpeg
-            built with ``--enable-cuda``. Will raise an error if GPU decode
-            is not available.
-            Only used with ``backend='torchcodec'``.
-        decord_backend (str):
-            Backend to use for decord when loading frames.
-            Only used when backend='decord'.
-            See decord documentation for options.
-            ('torch', 'numpy', 'mxnet', ...)
-        decord_ctx (decord.Context):
-            Context to use for decord when loading frames.
-            Only used when backend='decord'.
-            See decord documentation for options.
-            (decord.cpu(), decord.gpu(), ...)
-        verbose (int):
-            Verbosity level.
-            0: no output
-            1: output warnings
-            2: output warnings and info
-        """
+        """Initializes the reader, opens the videos, and prepares buffer slots."""
         import pandas as pd
 
         self._verbose = verbose
@@ -1722,26 +1760,27 @@ class BufferedVideoReader:
 
     def _get_metadata(self, video_readers):
         """
-        Get metadata about videos: lengths, fps, frame size, 
-         num_channels, etc.
+        Collects per-video metadata: length, fps, frame size, channels.
 
         Args:
-            video_readers (list of decord.VideoReader):
-                List of decord.VideoReader objects
+            video_readers (List[object]):
+                List of decoder objects (``decord.VideoReader`` or
+                ``TorchCodecVideoReader``).
 
         Returns:
-            metadata (list of dict):
-                Dictionary containing metadata for each video.
-                Contains: 'num_frames', 'frame_rate',
-                 'frame_height_width', 'num_channels'
-            num_frames_total (int):
-                Total number of frames across all videos.
-            frame_rate (float):
-                Frame rate of videos.
-            frame_height_width (tuple of int):
-                Height and width of frames.
-            num_channels (int):
-                Number of channels.
+            (tuple): tuple containing:
+                metadata (Dict[str, list]):
+                    Per-video metadata with keys ``'paths_videos'``,
+                    ``'num_frames'``, ``'frame_rate'``,
+                    ``'frame_height_width'``, ``'num_channels'``.
+                num_frames_total (int):
+                    Total number of frames across all videos.
+                frame_rate (float):
+                    Median frame rate across videos.
+                frame_height_width (List[int]):
+                    Common ``[height, width]`` of all videos.
+                num_channels (int):
+                    Common channel count across videos.
         """
 
         ## make video metadata dataframe
@@ -1783,18 +1822,17 @@ class BufferedVideoReader:
 
     def _load_slots(self, idx_slots: list, wait_for_load: Union[bool, list]=False):
         """
-        Load slots in the background using threading.
+        Loads buffer slots in the background using threading.
 
         Args:
-            idx_slots (list): 
-                List of tuples containing the indices of the slots to load.
-                Each tuple should be of the form (idx_video, idx_buffer).
-            wait_for_load (bool or list):
-                If True, wait for the slots to load before returning.
-                If False, return immediately.
-                If True wait for each slot to load before returning.
-                If a list of bools, each bool corresponds to a slot in
-                 idx_slots.
+            idx_slots (list):
+                List of ``(idx_video, idx_buffer)`` tuples identifying the
+                slots to load.
+            wait_for_load (Union[bool, List[bool]]):
+                If ``True``, blocks until each slot is loaded before
+                returning. If ``False``, returns immediately. If a list, each
+                entry corresponds to the slot at the same position in
+                ``idx_slots``. (Default is ``False``)
         """
         ## Check if idx_slots is a list
         if not isinstance(idx_slots, list):
@@ -1835,19 +1873,17 @@ class BufferedVideoReader:
 
     def _load_slot(self, idx_slot: tuple, blocking_thread: threading.Thread=None):
         """
-        Load a single slot.
-        self.slots[idx_slot[0]][idx_slot[1]] will be populated
-         with the loaded data.
-        Allows for a blocking_thread argument to be passed in,
-         which will force this new thread to wait until the
-         blocking_thread is finished (join()) before loading.
-        
+        Loads a single buffer slot, optionally after another thread finishes.
+
+        Populates ``self.slots[idx_slot[0]][idx_slot[1]]`` with decoded
+        frames. If ``blocking_thread`` is provided, this call ``join()`` s
+        that thread before reading, ensuring serial decode order.
+
         Args:
-            idx_slot (tuple):
-                Tuple containing the indices of the slot to load.
-                Should be of the form (idx_video, idx_buffer).
-            blocking_thread (threading.Thread):
-                Thread to wait for before loading.
+            idx_slot (Tuple[int, int]):
+                ``(idx_video, idx_buffer)`` identifying the slot to load.
+            blocking_thread (Optional[threading.Thread]):
+                Thread to wait on before loading. (Default is ``None``)
         """
         ## Set backend of decord to PyTorch (only needed for decord)
         if self._backend == 'decord':
@@ -1876,14 +1912,12 @@ class BufferedVideoReader:
                 
     def _delete_slots(self, idx_slots: list):
         """
-        Delete slots from memory.
-        Sets self.slots[idx_slot[0]][idx_slot[1]] to None.
+        Frees buffer slots by setting their contents to ``None``.
 
         Args:
-            idx_slots (list):
-                List of tuples containing the indices of the 
-                 slots to delete.
-                Each tuple should be of the form (idx_video, idx_buffer).
+            idx_slots (List[Tuple[int, int]]):
+                ``(idx_video, idx_buffer)`` tuples identifying the slots to
+                delete.
         """
         print(f"FR: Deleting slots {idx_slots}") if self._verbose > 1 else None
         ## Find all loaded slots
@@ -1898,17 +1932,12 @@ class BufferedVideoReader:
                 print(f"FR: Deleted slot {idx_slot}") if self._verbose > 1 else None
 
     def delete_all_slots(self):
-        """
-        Delete all slots from memory.
-        Uses the _delete_slots() method.
-        """
+        """Frees every currently loaded slot by delegating to ``_delete_slots``."""
         print(f"FR: Deleting all slots") if self._verbose > 1 else None
         self._delete_slots(self.loaded)
 
     def wait_for_loading(self):
-        """
-        Wait for all slots to finish loading.
-        """
+        """Blocks until every background slot-loading thread has finished."""
         print(f"FR: Waiting for all slots to load") if self._verbose > 1 else None
         while len(self.loading) > 0:
             time.sleep(0.01)
@@ -1917,19 +1946,24 @@ class BufferedVideoReader:
     
     def get_frames_from_single_video_index(self, idx: tuple):
         """
-        Get a slice of frames by specifying the video number and 
-         the frame number.
+        Returns frames from a single video by ``(video, frame)`` index.
+
+        If ``idx`` is an ``int`` or ``slice`` it is interpreted as a video
+        index and a new ``BufferedVideoReader`` is constructed over the
+        selected videos.
 
         Args:
-            idx (tuple or int):
-            A tuple containing the index of the video and a slice for the frames.
-            (idx_video: int, idx_frames: slice)
-            If idx is an int or slice, it is assumed to be the index of the video, and
-             a new BufferedVideoReader(s) will be created with just those videos.
+            idx (Union[int, slice, Tuple[int, Union[int, slice]]]):
+                Either ``(idx_video, idx_frames)`` to read frames from one
+                video, or an ``int`` / ``slice`` to spawn a reader over a
+                subset of videos.
 
         Returns:
-            frames (torch.Tensor):
-                A tensor of shape (num_frames, height, width, num_channels)
+            (Union[torch.Tensor, BufferedVideoReader]):
+                frames (Union[torch.Tensor, BufferedVideoReader]):
+                    Decoded frames with shape *(num_frames, H, W, C)* when
+                    ``idx`` is a tuple, or a new reader when ``idx`` selects
+                    videos.
         """
         ## if idx is an int or slice, use idx to make a new BufferedVideoReader of just those videos
         idx = slice(idx, idx+1) if isinstance(idx, int) else idx
@@ -2009,18 +2043,20 @@ class BufferedVideoReader:
 
     def get_frames_from_continuous_index(self, idx):
         """
-        Get a batch of frames from a continuous index.
-        Here the videos are treated as one long sequence of frames,
-         and the index is the index of the frames in this sequence.
+        Returns frames addressed by a continuous (concatenated) frame index.
+
+        The videos are treated as one long sequence of frames; ``idx`` is the
+        index of the frames within this sequence.
 
         Args:
-            idx (int or slice):
-                The index of the frames to get. If an int, a single frame is returned.
-                If a slice, a batch of frames is returned.
+            idx (Union[int, slice]):
+                Frame index. If an ``int``, a single frame is returned. If a
+                ``slice``, the corresponding batch of frames is returned.
 
         Returns:
-            frames (torch.Tensor):
-                A tensor of shape (num_frames, height, width, num_channels)
+            (torch.Tensor):
+                frames (torch.Tensor):
+                    Stacked frames. shape: *(num_frames, height, width, num_channels)*.
         """
         ## Assert that idx is an int or a slice
         assert isinstance(idx, (int, np.int_)) or isinstance(idx, slice), f"idx must be an int or a slice. Got {type(idx)}"
@@ -2052,19 +2088,18 @@ class BufferedVideoReader:
 
     def set_iterator_frame_idx(self, idx):
         """
-        Set the starting frame for the iterator.
-        Index should be in 'continuous' format.
+        Sets the starting frame for the iterator.
 
         Args:
             idx (int):
-                The index of the frame to start the iterator from.
-                Should be in 'continuous' format where the index
-                 is the index of the frame in the entire sequence 
-                 of frames.
+                Frame index from which the iterator should start. Must be in
+                ``'continuous'`` format, i.e. the index of the frame within
+                the concatenated sequence of all videos.
         """
         self._iterator_frame = idx
         
     def __getitem__(self, idx):
+        """Dispatches to ``get_frames_from_single_video_index`` or ``get_frames_from_continuous_index`` based on ``method_getitem``."""
         if self.method_getitem == 'by_video':
             return self.get_frames_from_single_video_index(idx)
         elif self.method_getitem == 'continuous':
@@ -2072,27 +2107,34 @@ class BufferedVideoReader:
         else:
             raise ValueError(f"Invalid method_getitem: {self.method_getitem}")
 
-    def __len__(self): 
+    def __len__(self):
+        """Returns the number of videos (``'by_video'``) or the total frame count (``'continuous'``)."""
         if self.method_getitem == 'by_video':
             return len(self.video_readers)
         elif self.method_getitem == 'continuous':
             return self.num_frames_total
-    def __repr__(self): 
+    def __repr__(self):
+        """Returns a debug string summarizing buffer size, video count, prefetch state, and verbosity."""
         if self.method_getitem == 'by_video':
-            return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={self.num_videos}, method_getitem='{self.method_getitem}', loaded={self.loaded}, prefetch={self.prefetch}, loading={self.loading}, verbose={self._verbose})"    
+            return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={self.num_videos}, method_getitem='{self.method_getitem}', loaded={self.loaded}, prefetch={self.prefetch}, loading={self.loading}, verbose={self._verbose})"
         elif self.method_getitem == 'continuous':
             return f"BufferedVideoReader(buffer_size={self.buffer_size}, num_videos={self.num_videos}, total_frames={self.num_frames_total}, method_getitem='{self.method_getitem}', iterator_frame={self._iterator_frame}, prefetch={self.prefetch}, loaded={self.loaded}, loading={self.loading}, verbose={self._verbose})"
-    def __iter__(self): 
+    def __iter__(self):
         """
-        If method_getitem is 'by_video':
-            Iterate over BufferedVideoReaders for each video.
-        If method_getitem is 'continuous':
-            Iterate over the frames in the video.
-            Makes a generator that yields single frames directly from
-            the buffer slots.
-            If it is the initial frame, or the first frame of a slot,
-            then self.get_frames_from_continuous_index is called to
-            load the next slots into the buffer.
+        Iterates over the contents according to ``method_getitem``.
+
+        When ``method_getitem == 'by_video'``, yields a fresh
+        ``BufferedVideoReader`` for each underlying video. When
+        ``method_getitem == 'continuous'``, yields single frames pulled
+        directly from buffer slots, calling
+        ``get_frames_from_continuous_index`` whenever a new slot must be
+        loaded.
+
+        Returns:
+            (Iterator):
+                iterator (Iterator):
+                    Iterator over readers (``'by_video'``) or frames
+                    (``'continuous'``).
         """
         if self.method_getitem == 'by_video':
             return iter([BufferedVideoReader(
@@ -2129,37 +2171,36 @@ class BufferedVideoReader:
 
 
 def save_gif(
-    array, 
-    path, 
-    frameRate=5.0, 
-    loop=0, 
-    backend='PIL', 
+    array,
+    path,
+    frameRate=5.0,
+    loop=0,
+    backend='PIL',
     kwargs_backend={},
 ):
     """
-    Save an array of images as a gif.
-    RH 2023
+    Saves an array of images as an animated GIF. RH 2023
 
     Args:
-        array (np.ndarray or list):
-            3D (grayscale) or 4D (color) array of images.
-            - if dtype is float type then scale from 0 to 1.
-            - if dtype is integer then scale from 0 to 255.
+        array (Union[np.ndarray, list]):
+            3D (grayscale) or 4D (color) array of images. If dtype is
+            floating, values are interpreted in *[0, 1]*; if integer, in
+            *[0, 255]*.
         path (str):
-            Path to save the gif.
+            Output path for the GIF.
         frameRate (float):
-            Frame rate of the gif.
+            Frame rate of the GIF in frames per second. (Default is ``5.0``)
         loop (int):
-            Number of times to loop the gif.
-            0 mean loop forever
-            1 mean play once
-            2 means play twice (loop once)
-            etc.
+            Number of loops. ``0`` loops forever, ``1`` plays once, ``2``
+            plays twice, etc. (Default is ``0``)
         backend (str):
-            Which backend to use.
-            Options: 'imageio' or 'PIL'
+            GIF writer backend. One of \n
+            * ``'imageio'``
+            * ``'PIL'`` \n
+            (Default is ``'PIL'``)
         kwargs_backend (dict):
-            Keyword arguments for the backend.
+            Extra keyword arguments forwarded to the chosen backend.
+            (Default is ``{}``)
     """
     array = np.stack(array, axis=0) if isinstance(array, list) else array
     array = grayscale_to_rgb(array) if array.ndim == 3 else array
@@ -2194,13 +2235,18 @@ def save_gif(
 
 def grayscale_to_rgb(array):
     """
-    Convert a grayscale image (2D array) or movie (3D array) to
-     RGB (3D or 4D array).
-    RH 2023
+    Converts a grayscale image or movie to RGB by repeating the channel. RH 2023
 
     Args:
-        array (np.ndarray or torch.Tensor or list):
-            2D or 3D array of grayscale images
+        array (Union[np.ndarray, torch.Tensor, list]):
+            2D image or 3D movie of grayscale frames. Lists of arrays or
+            tensors are stacked first.
+
+    Returns:
+        (Union[np.ndarray, torch.Tensor]):
+            rgb (Union[np.ndarray, torch.Tensor]):
+                Same backend as the input with an extra trailing channel
+                dimension of size 3.
     """
     import torch
     if isinstance(array, list):
@@ -2222,25 +2268,61 @@ def grayscale_to_rgb(array):
 
 class Toeplitz_convolution2d:
     """
-    Convolve a 2D array with a 2D kernel using the Toeplitz matrix 
-     multiplication method.
-    Allows for SPARSE 'x' inputs. 'k' should remain dense.
-    Ideal when 'x' is very sparse (density<0.01), 'x' is small
-     (shape <(1000,1000)), 'k' is small (shape <(100,100)), and
-     the batch size is large (e.g. 1000+).
-    Generally faster than scipy.signal.convolve2d when convolving mutliple
-     arrays with the same kernel. Maintains low memory footprint by
-     storing the toeplitz matrix as a sparse matrix.
-
-    See: https://stackoverflow.com/a/51865516 and https://github.com/alisaaalehi/convolution_as_multiplication
-     for a nice illustration.
-    See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.convolution_matrix.html 
-     for 1D version.
-    See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.matmul_toeplitz.html#scipy.linalg.matmul_toeplitz 
-     for potential ways to make this implementation faster.
-
-    Test with: tests.test_toeplitz_convolution2d()
+    Convolves a 2D array with a 2D kernel via Toeplitz matrix multiplication.
     RH 2022
+
+    Allows **sparse** ``x`` inputs (``k`` must remain dense). Ideal when
+    ``x`` is very sparse (density < 0.01), ``x`` is small (shape <
+    *(1000, 1000)*), ``k`` is small (shape < *(100, 100)*), and the batch
+    size is large (e.g. 1000+). Generally faster than
+    ``scipy.signal.convolve2d`` when convolving many arrays with the same
+    kernel. Memory footprint stays low because the Toeplitz matrix is held
+    as a sparse matrix.
+
+    See https://stackoverflow.com/a/51865516 and
+    https://github.com/alisaaalehi/convolution_as_multiplication for an
+    illustration. See
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.convolution_matrix.html
+    for the 1D version, and
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.matmul_toeplitz.html
+    for potential speedups.
+
+    Args:
+        x_shape (Tuple[int, int]):
+            Shape of the 2D array to be convolved.
+        k (np.ndarray):
+            2D kernel to convolve with.
+        mode (str):
+            Convolution mode. One of \n
+            * ``'full'``
+            * ``'same'``
+            * ``'valid'`` \n
+            See ``scipy.signal.convolve2d`` for details. (Default is ``'same'``)
+        dtype (Optional[np.dtype]):
+            Data type for the Toeplitz matrix. Ideally matches the dtype of
+            the input array. If ``None``, the dtype of ``k`` is used.
+            (Default is ``None``)
+
+    Attributes:
+        k (np.ndarray):
+            Flipped copy of the kernel used internally.
+        mode (str):
+            Convolution mode set in ``__init__``.
+        x_shape (Tuple[int, int]):
+            Stored input shape.
+        dtype (np.dtype):
+            Data type of the Toeplitz matrix.
+        so (Tuple[int, int]):
+            Output array size before cropping.
+        dt (scipy.sparse.csr_matrix):
+            The double-block Toeplitz matrix in sparse CSR form.
+
+    Example:
+        .. highlight:: python
+        .. code-block:: python
+
+            conv = Toeplitz_convolution2d(x_shape=x.shape, k=kernel, mode='same')
+            y = conv(x)
     """
     def __init__(
         self,
@@ -2249,23 +2331,7 @@ class Toeplitz_convolution2d:
         mode='same',
         dtype=None,
     ):
-        """
-        Initialize the convolution object.
-        Makes the Toeplitz matrix and stores it.
-
-        Args:
-            x_shape (tuple):
-                The shape of the 2D array to be convolved.
-            k (np.ndarray):
-                2D kernel to convolve with
-            mode (str):
-                'full', 'same' or 'valid'
-                see scipy.signal.convolve2d for details
-            dtype (np.dtype):
-                The data type to use for the Toeplitz matrix.
-                Ideally, this matches the data type of the input array.
-                If None, then the data type of the kernel is used.
-        """
+        """Builds and caches the double-block Toeplitz matrix for the given shape and kernel."""
         self.k = k = np.flipud(k.copy())
         self.mode = mode
         self.x_shape = x_shape
@@ -2298,33 +2364,35 @@ class Toeplitz_convolution2d:
         mode=None,
     ):
         """
-        Convolve the input array with the kernel.
+        Convolves an input array (or batch of arrays) with the stored kernel.
 
         Args:
-            x (np.ndarray or scipy.sparse.csc_matrix or scipy.sparse.csr_matrix):
-                Input array(s) (i.e. image(s)) to convolve with the kernel
-                If batching==False: Single 2D array to convolve with the kernel.
-                    shape: (self.x_shape[0], self.x_shape[1])
-                    type: np.ndarray or scipy.sparse.csc_matrix or scipy.sparse.csr_matrix
-                If batching==True: Multiple 2D arrays that have been flattened
-                 into row vectors (with order='C').
-                    shape: (n_arrays, self.x_shape[0]*self.x_shape[1])
-                    type: np.ndarray or scipy.sparse.csc_matrix or scipy.sparse.csr_matrix
+            x (Union[np.ndarray, scipy.sparse.csc_matrix, scipy.sparse.csr_matrix]):
+                Input array(s) to convolve. When ``batching`` is ``False``,
+                a single 2D array of shape *(self.x_shape[0],
+                self.x_shape[1])*. When ``batching`` is ``True``, multiple
+                2D arrays that have been flattened into row vectors with
+                shape *(n_arrays, self.x_shape[0] * self.x_shape[1])*.
             batching (bool):
-                If False, x is a single 2D array.
-                If True, x is a 2D array where each row is a flattened 2D array.
-            mode (str):
-                'full', 'same' or 'valid'
-                see scipy.signal.convolve2d for details
-                Overrides the mode set in __init__.
+                If ``False``, ``x`` is a single 2D array. If ``True``, ``x``
+                is a 2D array whose rows are flattened 2D inputs. (Default
+                is ``True``)
+            mode (Optional[str]):
+                Convolution mode. One of \n
+                * ``'full'``
+                * ``'same'``
+                * ``'valid'`` \n
+                Overrides the mode set in ``__init__`` when provided.
+                (Default is ``None``)
 
         Returns:
-            out (np.ndarray or scipy.sparse.csr_matrix):
-                If batching==True: Multiple convolved 2D arrays that have been flattened
-                 into row vectors (with order='C').
-                    shape: (n_arrays, height*width)
-                    type: np.ndarray or scipy.sparse.csc_matrix
-                If batching==False: Single convolved 2D array of shape (height, width)
+            (Union[np.ndarray, scipy.sparse.csr_matrix]):
+                out (Union[np.ndarray, scipy.sparse.csr_matrix]):
+                    When ``batching`` is ``True``, multiple convolved 2D
+                    arrays flattened into row vectors with shape
+                    *(n_arrays, height * width)*. When ``batching`` is
+                    ``False``, a single convolved 2D array with shape
+                    *(height, width)*.
         """
         if mode is None:
             mode = self.mode  ## use the mode that was set in the init if not specified
@@ -2381,7 +2449,18 @@ class Toeplitz_convolution2d:
         shift,
     ):
         """
-        Roll columns of a sparse matrix.
+        Shifts the row indices of a sparse matrix by ``shift`` (no wrap).
+
+        Args:
+            x (scipy.sparse.coo_matrix):
+                Sparse matrix to shift.
+            shift (int):
+                Row offset to add to ``x.row``.
+
+        Returns:
+            (scipy.sparse.coo_matrix):
+                out (scipy.sparse.coo_matrix):
+                    Copy of ``x`` with ``row`` shifted by ``shift``.
         """
         out = x.copy()
         out.row += shift
@@ -2389,20 +2468,22 @@ class Toeplitz_convolution2d:
 
 def cosine_kernel_2D(center=(5,5), image_size=(11,11), width=5):
     """
-    Generate a 2D cosine kernel
-    RH 2021
-    
+    Generates a 2D radial cosine kernel. RH 2021
+
     Args:
-        center (tuple):  
-            The mean position (X, Y) - where high value expected. 0-indexed. Make second value 0 to make 1D
-        image_size (tuple): 
-            The total image size (width, height). Make second value 0 to make 1D
-        width (scalar): 
-            The full width of one cycle of the cosine
-    
-    Return:
-        k_cos (np.ndarray): 
-            2D or 1D array of the cosine kernel
+        center (Tuple[int, int]):
+            ``(x, y)`` peak position, zero-indexed. Set the second element
+            to ``0`` to obtain a 1D kernel. (Default is ``(5, 5)``)
+        image_size (Tuple[int, int]):
+            ``(width, height)`` of the output kernel. Set the second
+            element to ``0`` for a 1D kernel. (Default is ``(11, 11)``)
+        width (float):
+            Full width of one cycle of the cosine. (Default is ``5``)
+
+    Returns:
+        (np.ndarray):
+            k_cos (np.ndarray):
+                Cosine kernel. shape: *(image_size[0], image_size[1])*.
     """
     x, y = np.meshgrid(range(image_size[1]), range(image_size[0]))  # note dim 1:X and dim 2:Y
     dist = np.sqrt((y - int(center[1])) ** 2 + (x - int(center[0])) ** 2)
@@ -2418,21 +2499,21 @@ def cosine_kernel_2D(center=(5,5), image_size=(11,11), width=5):
 
 def bounded_logspace(start, stop, num,):
     """
-    Like np.logspace, but with a defined start and
-     stop.
-    RH 2022
-    
+    Logarithmically spaced values between ``start`` and ``stop`` (inclusive). RH 2022
+
     Args:
         start (float):
-            First value in output array
+            First value in the output array.
         stop (float):
-            Last value in output array
+            Last value in the output array.
         num (int):
-            Number of values in output array
-            
+            Number of values in the output array.
+
     Returns:
-        output (np.ndarray):
-            Array of values
+        (np.ndarray):
+            output (np.ndarray):
+                Logarithmically spaced values bounded by ``start`` and
+                ``stop``. shape: *(num,)*.
     """
 
     exp = 2  ## doesn't matter what this is, just needs to be > 1
@@ -2440,20 +2521,26 @@ def bounded_logspace(start, stop, num,):
     return exp ** np.linspace(np.log(start)/np.log(exp), np.log(stop)/np.log(exp), num, endpoint=True)
 
 def gaussian(x=None, mu=0, sig=1, plot_pref=False):
-    '''
-    A gaussian function (normalized similarly to scipy's function)
-    RH 2021
-    
+    """
+    Evaluates a normalized 1D Gaussian function on a grid. RH 2021
+
     Args:
-        x (np.ndarray): 1-D array of the x-axis of the kernel
-        mu (float): center position on x-axis
-        sig (float): standard deviation (sigma) of gaussian
-        plot_pref (boolean): True/False or 1/0. Whether you'd like the kernel plotted
-        
+        x (Optional[np.ndarray]):
+            1D array of x positions. If ``None``, a default range covering
+            five sigma on each side is used. (Default is ``None``)
+        mu (float):
+            Mean of the Gaussian. (Default is ``0``)
+        sig (float):
+            Standard deviation of the Gaussian. (Default is ``1``)
+        plot_pref (bool):
+            If ``True``, plots the Gaussian using matplotlib. (Default is
+            ``False``)
+
     Returns:
-        gaus (np.ndarray): gaussian function (normalized) of x
-        params_gaus (dict): dictionary containing the input params
-    '''
+        (np.ndarray):
+            gaus (np.ndarray):
+                Gaussian evaluated at each value of ``x``.
+    """
     import matplotlib.pyplot as plt
 
     if x is None:
@@ -2476,22 +2563,23 @@ def gaussian(x=None, mu=0, sig=1, plot_pref=False):
 
 def torch_hilbert(x, N=None, dim=0):
     """
-    Computes the analytic signal using the Hilbert transform.
-    Based on scipy.signal.hilbert
-    RH 2022
-    
+    Computes the analytic signal of ``x`` via a Hilbert transform. RH 2022
+
+    Mirrors ``scipy.signal.hilbert`` but operates on ``torch.Tensor`` inputs.
+
     Args:
-        x (nd tensor):
-            Signal data. Must be real.
-        N (int):
-            Number of Fourier components to use.
-            If None, then N = x.shape[dim]
+        x (torch.Tensor):
+            Real-valued signal of arbitrary rank.
+        N (Optional[int]):
+            Number of Fourier components. If ``None``, uses ``x.shape[dim]``.
+            (Default is ``None``)
         dim (int):
-            Dimension along which to do the transformation.
-    
+            Dimension along which to transform. (Default is ``0``)
+
     Returns:
-        xa (nd tensor):
-            Analytic signal of input x along dim
+        (torch.Tensor):
+            xa (torch.Tensor):
+                Complex analytic signal with the same shape as ``x``.
     """
     assert x.is_complex() == False, "x should be real"
     n = x.shape[dim] if N is None else N
@@ -2527,54 +2615,49 @@ def make_VQT_filters(
     plot_pref=False
 ):
     """
-    Creates a set of filters for use in the VQT algorithm.
+    Builds a bank of complex sinusoid filters for the VQT algorithm. RH 2022
 
-    Set Q_lowF and Q_highF to be the same value for a 
-     Constant Q Transform (CQT) filter set.
-    Varying these values will varying the Q factor 
-     logarithmically across the frequency range.
-
-    RH 2022
+    Setting ``Q_lowF == Q_highF`` produces a Constant-Q Transform (CQT)
+    filter set. Differing values vary the Q factor logarithmically across
+    the frequency range.
 
     Args:
         Fs_sample (float):
-            Sampling frequency of the signal.
+            Sampling frequency of the signal. (Default is ``1000``)
         Q_lowF (float):
-            Q factor to use for the lowest frequency.
+            Q factor for the lowest frequency. (Default is ``3``)
         Q_highF (float):
-            Q factor to use for the highest frequency.
+            Q factor for the highest frequency. (Default is ``20``)
         F_min (float):
-            Lowest frequency to use.
+            Lowest frequency. (Default is ``10``)
         F_max (float):
-            Highest frequency to use (inclusive).
+            Highest frequency (inclusive). (Default is ``400``)
         n_freq_bins (int):
-            Number of frequency bins to use.
+            Number of frequency bins. (Default is ``55``)
         win_size (int):
-            Size of the window to use, in samples.
+            Window size in samples. Must be odd. (Default is ``501``)
         symmetry (str):
-            Whether to use a symmetric window or a single-sided window.
-            - 'center': Use a symmetric / centered / 'two-sided' window.
-            - 'left': Use a one-sided, left-half window. Only left half of the
-            filter will be nonzero.
-            - 'right': Use a one-sided, right-half window. Only right half of the
-            filter will be nonzero.
+            Window symmetry. One of \n
+            * ``'center'``: symmetric / two-sided window.
+            * ``'left'``: one-sided window, only the left half is nonzero.
+            * ``'right'``: one-sided window, only the right half is nonzero. \n
+            (Default is ``'center'``)
         taper_asymmetric (bool):
-            Only used if symmetry is not 'center'.
-            Whether to taper the center of the window by multiplying center
-            sample of window by 0.5.
+            If ``True`` and ``symmetry != 'center'``, the center sample of
+            the window is multiplied by 0.5 to taper the discontinuity.
+            (Default is ``True``)
         plot_pref (bool):
-            Whether to plot the filters.
+            If ``True``, plots the filters and windows. (Default is
+            ``False``)
 
     Returns:
-        filters (Torch ndarray):
-            Array of complex sinusoid filters.
-            shape: (n_freq_bins, win_size)
-        freqs (Torch array):
-            Array of frequencies corresponding to the filters.
-        wins (Torch ndarray):
-            Array of window functions (gaussians)
-             corresponding to each filter.
-            shape: (n_freq_bins, win_size)
+        (tuple): tuple containing:
+            filts_complex (torch.Tensor):
+                Complex sinusoid filters. shape: *(n_freq_bins, win_size)*.
+            freqs (np.ndarray):
+                Filter center frequencies. shape: *(n_freq_bins,)*.
+            wins (torch.Tensor):
+                Gaussian window for each filter. shape: *(n_freq_bins, win_size)*.
     """
 
     assert win_size%2==1, "RH Error: win_size should be an odd integer"
@@ -2671,6 +2754,80 @@ def make_VQT_filters(
     return filts_complex, freqs, wins
 
 class VQT():
+    """
+    Variable Q Transform implemented with PyTorch. RH 2022
+
+    Differs from librosa / nnAudio: this implementation does not iterate
+    lowpass filtering. Instead it convolves a fixed set of complex filters,
+    optionally returns the envelope via Hilbert transform, and downsamples.
+    Gradients propagate through the transform, and computation can run on
+    GPU. ``Q`` is the quality factor, roughly the number of cycles inside
+    four sigma (95%) of a Gaussian window.
+
+    Args:
+        Fs_sample (float):
+            Sampling frequency of the signal. (Default is ``1000``)
+        Q_lowF (float):
+            Q factor for the lowest frequency. (Default is ``3``)
+        Q_highF (float):
+            Q factor for the highest frequency. (Default is ``20``)
+        F_min (float):
+            Lowest frequency. (Default is ``10``)
+        F_max (float):
+            Highest frequency. (Default is ``400``)
+        n_freq_bins (int):
+            Number of frequency bins. (Default is ``55``)
+        win_size (int):
+            Window size in samples. Must be odd. (Default is ``501``)
+        symmetry (str):
+            Window symmetry passed through to ``make_VQT_filters``. One of \n
+            * ``'center'``
+            * ``'left'``
+            * ``'right'`` \n
+            (Default is ``'center'``)
+        taper_asymmetric (bool):
+            If ``True`` and ``symmetry != 'center'``, the center sample of
+            the window is multiplied by 0.5. (Default is ``True``)
+        downsample_factor (int):
+            Time-downsampling factor. The input is zero-padded to be a
+            multiple of this value. (Default is ``4``)
+        padding (str):
+            Convolution padding. ``'same'`` pads to keep output length
+            equal to input length; ``'valid'`` does not pad. (Default is
+            ``'valid'``)
+        DEVICE_compute (str):
+            Device used for computation. (Default is ``'cpu'``)
+        DEVICE_return (str):
+            Device on which results are returned. (Default is ``'cpu'``)
+        batch_size (int):
+            Number of signals processed per batch. Reduce when out of
+            memory. (Default is ``1000``)
+        return_complex (bool):
+            If ``True``, returns the complex-valued transform; otherwise
+            returns its absolute value (envelope). ``downsample_factor``
+            must be ``1`` when ``True``. (Default is ``False``)
+        filters (Optional[torch.Tensor]):
+            Pre-built complex sinusoid filters. shape: *(n_freq_bins,
+            win_size)*. If ``None``, ``make_VQT_filters`` is called.
+            (Default is ``None``)
+        plot_pref (bool):
+            If ``True``, plots the filters. (Default is ``False``)
+        progressBar (bool):
+            If ``True``, displays a tqdm progress bar during ``__call__``.
+            (Default is ``True``)
+
+    Attributes:
+        filters (torch.Tensor):
+            Complex sinusoid filters used for convolution.
+        freqs (np.ndarray):
+            Filter center frequencies (only when filters were generated
+            internally).
+        wins (torch.Tensor):
+            Gaussian windows for each filter (only when filters were
+            generated internally).
+        using_custom_filters (bool):
+            ``True`` if filters were supplied by the caller.
+    """
     def __init__(
         self,
         Fs_sample=1000,
@@ -2692,83 +2849,7 @@ class VQT():
         plot_pref=False,
         progressBar=True,
     ):
-        """
-        Variable Q Transform.
-        Class for applying the variable Q transform to signals.
-
-        This function works differently than the VQT from 
-         librosa or nnAudio. This one does not use iterative
-         lowpass filtering. Instead, it uses a fixed set of 
-         filters, and a Hilbert transform to compute the analytic
-         signal. It can then take the envelope and downsample.
-        
-        Uses Pytorch for GPU acceleration, and allows gradients
-         to pass through.
-
-        Q: quality factor; roughly corresponds to the number 
-         of cycles in a filter. Here, Q is the number of cycles
-         within 4 sigma (95%) of a gaussian window.
-
-        RH 2022
-
-        Args:
-            Fs_sample (float):
-                Sampling frequency of the signal.
-            Q_lowF (float):
-                Q factor to use for the lowest frequency.
-            Q_highF (float):
-                Q factor to use for the highest frequency.
-            F_min (float):
-                Lowest frequency to use.
-            F_max (float):
-                Highest frequency to use.
-            n_freq_bins (int):
-                Number of frequency bins to use.
-            win_size (int):
-                Size of the window to use, in samples.
-            symmetry (str):
-                Whether to use a symmetric window or a single-sided window.
-                - 'center': Use a symmetric / centered / 'two-sided' window.
-                - 'left': Use a one-sided, left-half window. Only left half of the
-                filter will be nonzero.
-                - 'right': Use a one-sided, right-half window. Only right half of the
-                filter will be nonzero.
-            taper_asymmetric (bool):
-                Only used if symmetry is not 'center'.
-                Whether to taper the center of the window by multiplying center
-                sample of window by 0.5.
-            downsample_factor (int):
-                Factor to downsample the signal by.
-                If the length of the input signal is not
-                 divisible by downsample_factor, the signal
-                 will be zero-padded at the end so that it is.
-            padding (str):
-                Padding to use for the signal.
-                'same' will pad the signal so that the output
-                 signal is the same length as the input signal.
-                'valid' will not pad the signal. So the output
-                 signal will be shorter than the input signal.
-            DEVICE_compute (str):
-                Device to use for computation.
-            DEVICE_return (str):
-                Device to use for returning the results.
-            batch_size (int):
-                Number of signals to process at once.
-                Use a smaller batch size if you run out of memory.
-            return_complex (bool):
-                Whether to return the complex version of 
-                 the transform. If False, then returns the
-                 absolute value (envelope) of the transform.
-                downsample_factor must be 1 if this is True.
-            filters (Torch tensor):
-                Filters to use. If None, will make new filters.
-                Should be complex sinusoids.
-                shape: (n_freq_bins, win_size)
-            plot_pref (bool):
-                Whether to plot the filters.
-            progressBar (bool):
-                Whether to show a progress bar.
-        """
+        """Builds filters (or accepts pre-built ones) and stores all transform parameters."""
         ## Prepare filters
         if filters is not None:
             ## Use provided filters
@@ -2795,6 +2876,24 @@ class VQT():
                 Fs_sample, Q_lowF, Q_highF, F_min, F_max, n_freq_bins, win_size, downsample_factor, padding, DEVICE_compute, DEVICE_return, batch_size, return_complex, plot_pref, progressBar
 
     def _helper_ds(self, X: torch.Tensor, ds_factor: int=4, return_complex: bool=False):
+        """
+        Downsamples ``X`` along the last dimension via average pooling.
+
+        Args:
+            X (torch.Tensor):
+                Input tensor (real or complex).
+            ds_factor (int):
+                Downsampling factor. ``1`` returns ``X`` unchanged.
+                (Default is ``4``)
+            return_complex (bool):
+                If ``True``, treats ``X`` as complex and pools the real and
+                imaginary parts separately. (Default is ``False``)
+
+        Returns:
+            (torch.Tensor):
+                X_ds (torch.Tensor):
+                    Downsampled tensor.
+        """
         if ds_factor == 1:
             return X
         elif return_complex == False:
@@ -2808,6 +2907,24 @@ class VQT():
             return Z
 
     def _helper_conv(self, arr, filters, take_abs, DEVICE):
+        """
+        Convolves a batch of signals with complex filters using two ``conv1d`` calls.
+
+        Args:
+            arr (torch.Tensor):
+                Real input signals. shape: *(batch, n_samples)*.
+            filters (torch.Tensor):
+                Complex filter bank. shape: *(n_freq_bins, win_size)*.
+            take_abs (bool):
+                If ``True``, returns the magnitude of the result.
+            DEVICE (str):
+                Device used for the convolution.
+
+        Returns:
+            (torch.Tensor):
+                out (torch.Tensor):
+                    Filtered output, complex if ``take_abs`` is ``False``.
+        """
         out = torch.complex(
             torch.nn.functional.conv1d(input=arr.to(DEVICE)[:,None,:], weight=torch.real(filters.T).to(DEVICE).T[:,None,:], padding=self.padding),
             torch.nn.functional.conv1d(input=arr.to(DEVICE)[:,None,:], weight=-torch.imag(filters.T).to(DEVICE).T[:,None,:], padding=self.padding)
@@ -2819,22 +2936,21 @@ class VQT():
 
     def __call__(self, X):
         """
-        Forward pass of VQT.
+        Computes the variable-Q spectrogram of ``X``.
 
         Args:
-            X (Torch tensor):
-                Input signal.
-                shape: (n_channels, n_samples)
+            X (torch.Tensor):
+                Input signal. shape: *(n_channels, n_samples)*.
 
         Returns:
-            Spectrogram (Torch tensor):
-                Spectrogram of the input signal.
-                shape: (n_channels, n_samples_ds, n_freq_bins)
-            x_axis (Torch tensor):
-                New x-axis for the spectrogram in units of samples.
-                Get units of time by dividing by self.Fs_sample.
-            self.freqs (Torch tensor):
-                Frequencies of the spectrogram.
+            (tuple): tuple containing:
+                specs (torch.Tensor):
+                    Spectrogram. shape: *(n_channels, n_freq_bins, n_samples_ds)*.
+                x_axis (torch.Tensor):
+                    New x-axis for the spectrogram in samples. Divide by
+                    ``self.Fs_sample`` to get time.
+                freqs (np.ndarray):
+                    Frequencies corresponding to the spectrogram bins.
         """
         if type(X) is not torch.Tensor:
             X = torch.as_tensor(X, dtype=torch.float32, device=self.DEVICE_compute)
@@ -2872,6 +2988,7 @@ class VQT():
         return specs, x_axis, self.freqs
 
     def __repr__(self):
+        """Returns a debug string summarizing the VQT configuration."""
         if self.using_custom_filters:
             return f"VQT with custom filters"
         else:
@@ -2886,28 +3003,30 @@ def generate_multiphasic_sinewave(
     return_phases: bool = False,
 ):
     """
-    Generates a multiphasic sine wave.
-    RH 2024
+    Generates ``n_waves`` cosine waves with evenly spaced phase offsets. RH 2024
 
     Args:
-        n_samples (int): 
-            Number of samples to generate.
-        n_periods (float): 
-            Number of periods in the sine wave.
-        n_waves (int): 
-            Number of sine waves to generate.
-        return_x (bool): 
-            If ``True``, returns the x-values along with the waves.
-        return_phases (bool): 
-            If ``True``, returns the phases along with the waves.
+        n_samples (int):
+            Number of samples per wave. (Default is ``10000``)
+        n_periods (float):
+            Number of full periods spanned by ``n_samples``. (Default is
+            ``1.0``)
+        n_waves (int):
+            Number of phase-shifted sine waves to return. (Default is ``3``)
+        return_x (bool):
+            If ``True``, also returns the x positions. (Default is ``False``)
+        return_phases (bool):
+            If ``True``, also returns the per-wave phase arrays. (Default is
+            ``False``)
 
     Returns:
-        (tuple): 
-            Depending on the `return_x` and `return_phases` parameters, the
-            function returns some combination of the following: \n
-                * waves (np.ndarray): The generated sine waves.
-                * x (np.ndarray): The x-values.
-                * phases (np.ndarray): The phases of the sine waves.
+        (Union[np.ndarray, tuple]):
+            output (Union[np.ndarray, tuple]):
+                Combination depending on ``return_x`` / ``return_phases``: \n
+                * ``waves`` (np.ndarray): generated cosine waves.
+                * ``x`` (np.ndarray): x positions, if ``return_x``.
+                * ``phases`` (np.ndarray): per-wave phases, if
+                  ``return_phases``.
     """
     x = np.linspace(0, n_periods * np.pi*2, n_samples)
 
@@ -2979,20 +3098,19 @@ def set_device(
 
 def tensorly_cp_to_device(cp, device='cpu'):
     """
-    Moves the factors and weights of a tensorly cp object to a particular
-    device.
-
-    RH 2024
+    Moves the factors and weights of a tensorly CP object to ``device``. RH 2024
 
     Args:
-        cp (tensorly.cp_tensor.CP):
-            The tensorly CP object to move to a device.
+        cp (object):
+            Tensorly ``CP`` tensor (``tensorly.cp_tensor.CP``).
         device (str):
-            The device to move the factors and weights to.
+            Target device for ``cp.factors`` and ``cp.weights``. (Default
+            is ``'cpu'``)
 
     Returns:
-        cp (tensorly.cp_tensor.CP):
-            The tensorly CP object with factors and weights moved to the device.
+        (object):
+            cp (object):
+                Same CP object with all factors and weights on ``device``.
     """
     for ii in range(len(cp.factors)):
         cp.factors[ii] = cp.factors[ii].to(device)
@@ -3023,23 +3141,40 @@ def simple_cmap(
     over=[0.5,0.5,0.5],
     bad=[0.9,0.9,0.9],
     name='none'):
-    """Create a colormap from a sequence of rgb values.
-    Stolen with love from Alex (https://gist.github.com/ahwillia/3e022cdd1fe82627cbf1f2e9e2ad80a7ex)
-    
+    """
+    Builds a ``LinearSegmentedColormap`` from a sequence of RGB values.
+
+    Adapted from
+    https://gist.github.com/ahwillia/3e022cdd1fe82627cbf1f2e9e2ad80a7e.
+
     Args:
         colors (list):
-            List of RGB values
+            Sequence of RGB triples (or matplotlib color strings) defining
+            the colormap stops.
+        under (list):
+            RGB color used for values below the colormap range. (Default is
+            ``[0, 0, 0]``)
+        over (list):
+            RGB color used for values above the colormap range. (Default is
+            ``[0.5, 0.5, 0.5]``)
+        bad (list):
+            RGB color used for masked / NaN values. (Default is
+            ``[0.9, 0.9, 0.9]``)
         name (str):
-            Name of the colormap
+            Colormap name. (Default is ``'none'``)
 
     Returns:
-        cmap:
-            Colormap
+        (matplotlib.colors.LinearSegmentedColormap):
+            cmap (matplotlib.colors.LinearSegmentedColormap):
+                Resulting linear-segmented colormap.
 
-    Demo:
-    cmap = simple_cmap([(1,1,1), (1,0,0)]) # white to red colormap
-    cmap = simple_cmap(['w', 'r'])         # white to red colormap
-    cmap = simple_cmap(['r', 'b', 'r'])    # red to blue to red
+    Example:
+        .. highlight:: python
+        .. code-block:: python
+
+            cmap = simple_cmap([(1, 1, 1), (1, 0, 0)])  # white to red
+            cmap = simple_cmap(['w', 'r'])               # white to red
+            cmap = simple_cmap(['r', 'b', 'r'])          # red to blue to red
     """
     from matplotlib.colors import LinearSegmentedColormap, colorConverter
 
@@ -3071,35 +3206,41 @@ def simple_cmap(
 
 class Cmap_conjunctive:
     """
-    Combines multiple colormaps into a single colormap by
-     multiplying their values together.
-    RH 2022
+    Combines multiple colormaps by multiplying their per-channel outputs. RH 2022
+
+    Args:
+        cmaps (list):
+            List of ``matplotlib.colors.LinearSegmentedColormap`` objects to
+            combine.
+        dtype_out (np.dtype):
+            Data type of the returned color array. (Default is ``int``)
+        normalize (bool):
+            If ``True``, normalizes each input column to ``[0, 1]`` before
+            applying the colormaps. (Default is ``False``)
+        normalization_range (list):
+            ``[lo, hi]`` to which the output is rescaled. (Default is
+            ``[0, 255]``)
+        name (str):
+            Name of the resulting colormap. (Default is ``'cmap_conjunctive'``)
+
+    Attributes:
+        cmaps (list):
+            Stored input colormaps.
+        n_cmaps (int):
+            Number of input colormaps.
+        fn_conj_cmap (Callable):
+            Function that maps an input array of shape *(n_samples, n_cmaps)*
+            to the elementwise product of each colormap's output.
     """
     def __init__(
-        self, 
-        cmaps, 
-        dtype_out=int, 
+        self,
+        cmaps,
+        dtype_out=int,
         normalize=False,
         normalization_range=[0,255],
         name='cmap_conjunctive',
     ):
-        """
-        Initialize the colormap transformer.
-
-        Args:
-            cmaps (list):
-                List of colormaps to combine.
-                Should be a list of matplotlib.colors.LinearSegmentedColormap objects.
-            dtype (np.dtype):
-                Data type of the output colormap.
-            normalize (bool):
-                Whether to normalize the inputs to (0,1) for the input to cmaps.
-            normalization_range (list):
-                Range to normalize the outputs to.
-                Should be a list of two numbers.
-            name (str):
-                Name of the colormap.
-        """
+        """Validates the colormaps and stores normalization parameters."""
         import matplotlib
 
         ## Check inputs
@@ -3118,19 +3259,19 @@ class Cmap_conjunctive:
 
     def __call__(self, x):
         """
-        Apply the colormap to the input data.
+        Applies the conjunctive colormap to the input array.
 
         Args:
             x (np.ndarray):
-                Input data.
-                Should be a numpy array of shape (n_samples, n_cmaps).
-                If normalize==True, then normalization is applied to
-                 each column of x separately.
+                Input values. shape: *(n_samples, n_cmaps)*. When
+                ``self.normalize`` is ``True``, each column is independently
+                rescaled to ``[0, 1]``.
 
         Returns:
             (np.ndarray):
-                Colormapped data.
-                Will be a numpy array of shape (n_samples, 4).
+                colors (np.ndarray):
+                    RGBA values rescaled to ``self.normalization_range``.
+                    shape: *(n_samples, 4)*, dtype: ``self.dtype_out``.
         """
         assert isinstance(x, np.ndarray), 'x must be a numpy array of shape (n_samples, n_cmaps).'
 
@@ -3153,31 +3294,42 @@ class Cmap_conjunctive:
 
 class Colorwheel:
     """
-    Generates a 2D colorwheel colormap (magnitude and angle). Useful for
-    visualizing complex/polar values, optical flow, and other cyclic data.
-    RH 2024
+    2D colorwheel colormap (angle + magnitude) for cyclic data. RH 2024
+
+    Useful for visualizing complex/polar values, optical flow, and other
+    cyclic data.
 
     Args:
         rotation (float):
-            Rotation of the colorwheel in degrees.
+            Rotation of the colorwheel in radians. (Default is ``0.0``)
         saturation (float):
-            Saturation of the colors.
+            Color saturation in *[0, 1]*. (Default is ``1.0``)
         center (int):
-            Center of the colorwheel.
+            Color value at the center of the wheel. (Default is ``0``)
         radius (int):
-            Radius of the colorwheel.
+            Maximum color value at the rim of the wheel. (Default is ``255``)
         dtype (np.dtype):
-            Data type of the output colormap.
+            Output dtype of the color array. (Default is ``np.uint8``)
         bit_depth (int):
-            Bit depth of the colorwheel.
+            Number of samples used to discretize the wheel:
+            ``2 ** bit_depth``. (Default is ``16``)
         exponent (float):
-            Exponent used to adjust the color intensity.
+            Exponent applied to each base color wave to sharpen transitions.
+            (Default is ``10``)
         normalize (bool):
-            Whether to normalize the colorwheel.
-        colors (list):
-            List of colors to use for the colorwheel. Should be a list of tuples
-            or lists containing RGB values. Ex:
-            [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+            If ``True``, normalizes the per-angle color sum to ``1`` so that
+            color intensity is uniform around the wheel. (Default is
+            ``True``)
+        colors (List[Union[List, Tuple]]):
+            Sequence of base RGB triples used to build the rainbow.
+            (Default is a 12-color rainbow)
+
+    Attributes:
+        fn_interp (Callable):
+            Interpolator that maps an angle (radians) to per-base-color
+            weights along the wheel.
+        colors (np.ndarray):
+            Array of base colors. shape: *(n_colors, 3)*.
     """
     def __init__(
         self,
@@ -3204,9 +3356,7 @@ class Colorwheel:
             [1  , 0  , 0.5], 
         ],        
     ):
-        """
-        Initializes the ColorwheelColormap with given parameters.
-        """
+        """Builds the angle-to-color interpolator from the rainbow base waves."""
         import scipy.interpolate
         import scipy.special
 
@@ -3260,20 +3410,23 @@ class Colorwheel:
         normalize_magnitudes: bool = True,
     ) -> np.ndarray:
         """
-        Outputs colors for a given set of angles and magnitudes.
-        RH 2024
+        Returns RGB colors for the given angles and (optional) magnitudes. RH 2024
 
         Args:
-            angles (Union[np.ndarray, List[float, int], Tuple[float, int], float, int]):
-                Array of angles in radians. *Shape: (n_samples,)*
-            magnitudes (Optional[Union[np.ndarray, List[float, int], Tuple[float, int], float, int]]):
-                Array of magnitudes. *Shape: (n_samples,)*
+            angles (Union[np.ndarray, List[Union[float, int]], Tuple[Union[float, int]], float, int]):
+                Angles in radians. shape: *(n_samples,)*.
+            magnitudes (Optional[Union[np.ndarray, List[Union[float, int]], Tuple[Union[float, int]], float, int]]):
+                Magnitudes for each angle. shape: *(n_samples,)*. If
+                ``None``, treated as ones. (Default is ``None``)
             normalize_magnitudes (bool):
-                If True, applies min-max normalization to the magnitudes. (Default is ``True``)
+                If ``True``, applies min-max normalization to ``magnitudes``
+                before use. (Default is ``True``)
 
         Returns:
-            np.ndarray:
-                Array with RGB values. *Shape: (n_samples, 3)*
+            (np.ndarray):
+                rgb (np.ndarray):
+                    RGB values. shape: *(n_samples, 3)*, dtype:
+                    ``self.dtype``.
         """
         # Check inputs
         def check_input(arg):
@@ -3321,12 +3474,13 @@ class Colorwheel:
 
     def plot_colorwheel(self, n_samples: int = 100000):
         """
-        Plots the colorwheel colormap.
-        RH 2024
+        Renders the colorwheel as a 2D image and displays it. RH 2024
 
         Args:
             n_samples (int):
-                Number of samples to plot. (Default is ``100000``)
+                Approximate number of samples used to build the wheel; the
+                actual grid is ``ceil(sqrt(n_samples))`` per side. (Default
+                is ``100000``)
         """
         import matplotlib.pyplot as plt
         l = int(np.ceil(n_samples**0.5))
@@ -3352,9 +3506,7 @@ class Colorwheel:
         axs[1].set_xlabel('Phase (rads)')
 
     def __repr__(self) -> str:
-        """
-        Returns a string representation of the ColorwheelColormap object.
-        """
+        """Returns a debug string with the colorwheel construction parameters."""
         return (f"ColorwheelColormap(rotation={self.rotation}, "
                 f"saturation={self.saturation}, center={self.center}, "
                 f"radius={self.radius}, dtype={self.dtype}, "
@@ -3369,25 +3521,24 @@ class Colorwheel:
 
 def clahe(im, grid_size=50, clipLimit=0, normalize=True):
     """
-    Perform Contrast Limited Adaptive Histogram Equalization (CLAHE)
-     on an image.
-    RH 2022
+    Applies Contrast Limited Adaptive Histogram Equalization to an image. RH 2022
 
     Args:
         im (np.ndarray):
-            Input image
+            Input image.
         grid_size (int):
-            Grid size.
-            See cv2.createCLAHE for more info.
+            Tile grid size passed to ``cv2.createCLAHE``. (Default is ``50``)
         clipLimit (int):
-            Clip limit.
-            See cv2.createCLAHE for more info.
+            Contrast clip limit passed to ``cv2.createCLAHE``. (Default is
+            ``0``)
         normalize (bool):
-            Whether to normalize the output image.
-        
+            If ``True``, normalizes the input to span the full 16-bit range
+            before applying CLAHE. (Default is ``True``)
+
     Returns:
-        im_out (np.ndarray):
-            Output image
+        (np.ndarray):
+            im_c (np.ndarray):
+                CLAHE-enhanced image. dtype: *uint16*.
     """
     import cv2
     im_tu = (im / im.max())*(2**16) if normalize else im
@@ -3399,35 +3550,36 @@ def clahe(im, grid_size=50, clipLimit=0, normalize=True):
 
 def add_text_to_images(images, text, position=(10,10), font_size=1, color=(255,255,255), line_width=1, font=None, show=False, frameRate=30):
     """
-    Add text to images using cv2.putText()
-    RH 2022
+    Overlays multi-line text onto each frame using ``cv2.putText``. RH 2022
 
     Args:
-        images (np.array):
-            frames of video or images.
-            shape: (n_frames, height, width, n_channels)
-        text (list of lists):
-            text to add to images.
-            Outer list: one element per frame.
-            Inner list: each element is a line of text.
-        position (tuple):
-            (x,y) position of text (top left corner)
+        images (np.ndarray):
+            Frames of video or images. shape: *(n_frames, H, W, C)*.
+        text (List[List[str]]):
+            Text per frame. Outer list has one element per frame; each
+            inner list holds the lines of text drawn on that frame.
+        position (Tuple[int, int]):
+            ``(x, y)`` position of the top-left corner of the text. (Default
+            is ``(10, 10)``)
         font_size (int):
-            font size of text
-        color (tuple):
-            (r,g,b) color of text
+            Font scale passed to ``cv2.putText``. (Default is ``1``)
+        color (Tuple[int, int, int]):
+            ``(R, G, B)`` text color. (Default is ``(255, 255, 255)``)
         line_width (int):
-            line width of text
-        font (str):
-            font to use.
-            If None, then will use cv2.FONT_HERSHEY_SIMPLEX
-            See cv2.FONT... for more options
+            Line thickness passed to ``cv2.putText``. (Default is ``1``)
+        font (Optional[int]):
+            OpenCV font constant. If ``None``, uses
+            ``cv2.FONT_HERSHEY_SIMPLEX``. (Default is ``None``)
         show (bool):
-            if True, then will show the images with text added.
+            If ``True``, displays each annotated frame using
+            ``cv2.imshow``. (Default is ``False``)
+        frameRate (float):
+            Display frame rate when ``show`` is ``True``. (Default is ``30``)
 
     Returns:
-        images_with_text (np.array):
-            frames of video or images with text added.
+        (np.ndarray):
+            images_with_text (np.ndarray):
+                Frames of video or images with text overlays applied.
     """
     import cv2
     import copy
@@ -3521,35 +3673,40 @@ def find_geometric_transformation(
     gaussFiltSize: int = 1
 ) -> np.ndarray:
     """
-    Find the transformation between two images.
-    Wrapper function for cv2.findTransformECC
-    RH 2022
+    Estimates the geometric transformation between two images via ECC. RH 2022
+
+    Wraps ``cv2.findTransformECC``.
 
     Args:
         im_template (np.ndarray):
-            Template image. The dtype must be either ``np.uint8`` or ``np.float32``.
+            Template image. dtype: *uint8* or *float32*.
         im_moving (np.ndarray):
-            Moving image. The dtype must be either ``np.uint8`` or ``np.float32``.
+            Moving image. dtype: *uint8* or *float32*.
         warp_mode (str):
-            Warp mode. \n
-            * 'translation': Sets a translational motion model; warpMatrix is 2x3 with the first 2x2 part being the unity matrix and the rest two parameters being estimated.
-            * 'euclidean':   Sets a Euclidean (rigid) transformation as motion model; three parameters are estimated; warpMatrix is 2x3.
-            * 'affine':      Sets an affine motion model; six parameters are estimated; warpMatrix is 2x3. (Default)
-            * 'homography':  Sets a homography as a motion model; eight parameters are estimated;`warpMatrix` is 3x3.
+            Motion model. One of \n
+            * ``'translation'``: 2x3 warpMatrix; only translation is
+              estimated.
+            * ``'euclidean'``: 2x3 warpMatrix; rigid (rotation + translation).
+            * ``'affine'``: 2x3 warpMatrix; six parameters.
+            * ``'homography'``: 3x3 warpMatrix; eight parameters. \n
+            (Default is ``'euclidean'``)
         n_iter (int):
-            Number of iterations. (Default is *5000*)
+            Maximum number of iterations. (Default is ``5000``)
         termination_eps (float):
-            Termination epsilon. This is the threshold of the increment in the correlation coefficient between two iterations. (Default is *1e-10*)
-        mask (np.ndarray):
-            Binary mask. Regions where mask is zero are ignored during the registration. If ``None``, no mask is used. (Default is ``None``)
+            Threshold on the per-iteration increment of the correlation
+            coefficient. (Default is ``1e-10``)
+        mask (Optional[np.ndarray]):
+            Binary mask. Pixels where mask is zero are ignored. If
+            ``None``, no mask is used. (Default is ``None``)
         gaussFiltSize (int):
-            Gaussian filter size. If *0*, no gaussian filter is used. (Default is *1*)
+            Gaussian filter size. ``0`` disables filtering. (Default is
+            ``1``)
 
     Returns:
-        (np.ndarray): 
+        (np.ndarray):
             warp_matrix (np.ndarray):
-                Warp matrix. See cv2.findTransformECC for more info. Can be
-                applied using cv2.warpAffine or cv2.warpPerspective.
+                Estimated warp matrix. Apply with ``cv2.warpAffine`` or
+                ``cv2.warpPerspective``.
     """
     LUT_modes = {
         'translation': cv2.MOTION_TRANSLATION,
@@ -3607,9 +3764,10 @@ def apply_warp_transform(
     borderValue: int = 0
 ) -> np.ndarray:
     """
-    Apply a warp transform to an image. 
-    Wrapper function for ``cv2.warpAffine`` and ``cv2.warpPerspective``. 
-    RH 2022
+    Applies a warp transform to an image. RH 2022
+
+    Wraps ``cv2.warpAffine`` (for 2x3 matrices) and ``cv2.warpPerspective``
+    (for 3x3 matrices).
 
     Args:
         im_in (np.ndarray): 
@@ -3669,23 +3827,22 @@ def warp_matrix_to_remappingIdx(
     y: int
 ) -> Union[np.ndarray, torch.Tensor]:
     """
-    Convert a warp matrix (2x3 or 3x3) into remapping indices (2D). 
-    RH 2023
-    
+    Converts a warp matrix (2x3 or 3x3) into a 2D remapping index field. RH 2023
+
     Args:
-        warp_matrix (Union[np.ndarray, torch.Tensor]): 
-            Warp matrix of shape *(2, 3)* for affine transformations, and *(3,
-            3)* for homography.
-        x (int): 
-            Width of the desired remapping indices.
-        y (int): 
-            Height of the desired remapping indices.
-        
+        warp_matrix (Union[np.ndarray, torch.Tensor]):
+            Warp matrix of shape *(2, 3)* for affine transformations, or
+            *(3, 3)* for homography.
+        x (int):
+            Width of the output remapping field.
+        y (int):
+            Height of the output remapping field.
+
     Returns:
-        (Union[np.ndarray, torch.Tensor]): 
-            remapIdx (Union[np.ndarray, torch.Tensor]): 
-                Remapping indices of shape *(x, y, 2)* representing the x and y
-                displacements in pixels.
+        (Union[np.ndarray, torch.Tensor]):
+            remapIdx (Union[np.ndarray, torch.Tensor]):
+                Remapping indices. shape: *(y, x, 2)*. The last axis stores
+                the pixel coordinate ``(x, y)`` to sample from.
     """
     assert warp_matrix.shape in [(2, 3), (3, 3)], f"warp_matrix.shape {warp_matrix.shape} not recognized. Must be (2, 3) or (3, 3)"
     assert isinstance(x, int) and isinstance(y, int), f"x and y must be integers"
@@ -4088,24 +4245,22 @@ def flowField_to_remappingIdx(
     ff: Union[np.ndarray, object],
 ) -> Union[np.ndarray, object]:
     """
-    Convert a flow field to a remapping index. **WARNING**: Technically, it is
-    not possible to convert a flow field to a remapping index, since the
-    remapping index describes an interpolation mapping, while the flow field
-    describes a displacement.
-    RH 2023
+    Converts a flow field into a remapping index by adding the pixel grid. RH 2023
+
+    **WARNING**: Strictly speaking, a flow field (displacement) and a
+    remapping index (interpolation mapping) are different concepts; this
+    helper performs the obvious sum and is correct under the standard
+    convention.
 
     Args:
-        ff (Union[np.ndarray, object]): 
-            Flow field represented as a numpy ndarray or torch Tensor. 
-            It describes the displacement of each pixel. 
-            Shape *(H, W, 2)*. Last dimension is *(x, y)*.
+        ff (Union[np.ndarray, torch.Tensor]):
+            Flow field describing the displacement of each pixel. shape:
+            *(H, W, 2)*. Last dimension is *(x, y)*.
 
     Returns:
-        (Union[np.ndarray, object]): 
-            ri (Union[np.ndarray, object]):
-                Remapping index. It describes the index of the pixel in 
-                the original image that should be mapped to the new pixel. 
-                Shape *(H, W, 2)*.
+        (Union[np.ndarray, torch.Tensor]):
+            ri (Union[np.ndarray, torch.Tensor]):
+                Remapping index of source pixel coordinates. shape: *(H, W, 2)*.
     """
     ri = ff + _make_idx_grid(ff)
     return ri
@@ -4113,24 +4268,21 @@ def remappingIdx_to_flowField(
     ri: Union[np.ndarray, object],
 ) -> Union[np.ndarray, object]:
     """
-    Convert a remapping index to a flow field. **WARNING**: Technically, it is
-    not possible to convert a remapping index to a flow field, since the
-    remapping index describes an interpolation mapping, while the flow field
-    describes a displacement.
-    RH 2023
+    Converts a remapping index into a flow field by subtracting the pixel grid. RH 2023
+
+    **WARNING**: Strictly speaking, a remapping index (interpolation
+    mapping) and a flow field (displacement) are different concepts; this
+    helper performs the obvious subtraction.
 
     Args:
-        ri (Union[np.ndarray, object]): 
-            Remapping index represented as a numpy ndarray or torch Tensor. 
-            It describes the index of the pixel in the original image that 
-            should be mapped to the new pixel. Shape *(H, W, 2)*. Last 
-            dimension is *(x, y)*.
+        ri (Union[np.ndarray, torch.Tensor]):
+            Remapping index. shape: *(H, W, 2)*. Last dimension is
+            *(x, y)*.
 
     Returns:
-        (Union[np.ndarray, object]): 
-            ff (Union[np.ndarray, object]):
-                Flow field. It describes the displacement of each pixel. 
-                Shape *(H, W, 2)*.
+        (Union[np.ndarray, torch.Tensor]):
+            ff (Union[np.ndarray, torch.Tensor]):
+                Flow field. shape: *(H, W, 2)*.
     """
     ff = ri - _make_idx_grid(ri)
     return ff
@@ -4170,34 +4322,35 @@ def remap_points(
     fill_value: float = None,
 ) -> np.ndarray:
     """
-    Remaps a set of points using an index map.
+    Remaps a set of 2D points through an index map produced for image warping.
 
     Args:
-        points (np.ndarray): 
-            Array of points to be remapped. It should be a 2D array with the
-            shape *(n_points, 2)*, where each point is represented by a pair of
-            floating point coordinates within the image.
-        remappingIdx (np.ndarray): 
-            Index map for the remapping. It should be a 3D array with the shape
-            *(height, width, 2)*. The data type should be a floating point
-            subtype.
+        points (np.ndarray):
+            Array of points to be remapped. shape: *(n_points, 2)*, dtype:
+            *floating*. Each row is an ``(x, y)`` coordinate within the
+            image.
+        remappingIdx (np.ndarray):
+            Index map describing the warp. shape: *(height, width, 2)*,
+            dtype: *floating*.
         interpolation (str):
-            Interpolation method to use.
-            See scipy.interpolate.RegularGridInterpolator. Can be:
-                * ``'linear'``
-                * ``'nearest'``
-                * ``'slinear'``
-                * ``'cubic'``
-                * ``'quintic'``
-                * ``'pchip'``
-        fill_value (float, optional):
-            Value used to fill points outside the convex hull. If ``None``, values
-            outside the convex hull are extrapolated.
+            Interpolation method passed to
+            ``scipy.interpolate.RegularGridInterpolator``. One of \n
+            * ``'linear'``
+            * ``'nearest'``
+            * ``'slinear'``
+            * ``'cubic'``
+            * ``'quintic'``
+            * ``'pchip'`` \n
+            (Default is ``'linear'``)
+        fill_value (Optional[float]):
+            Value used to fill points outside the convex hull. If ``None``,
+            values outside the convex hull are extrapolated. (Default is
+            ``None``)
 
     Returns:
-        (np.ndarray): 
-            points_remap (np.ndarray): 
-                Remapped points array. It has the same shape as the input.
+        (np.ndarray):
+            points_remap (np.ndarray):
+                Remapped points. shape: *(n_points, 2)*.
     """
     ### Assert points is a 2D numpy.ndarray of shape (n_points, 2) and that all points are within the image and that points are float
     assert isinstance(points, np.ndarray), 'points must be a numpy.ndarray'
@@ -4241,26 +4394,40 @@ import psutil
 
 class _Device_Checker_Base():
     """
-    Superclass for checking resource utilization.
-    Subclasses must have:
-        - self.check_utilization() which returns info_changing dict
+    Base class for periodic resource utilization tracking.
+
+    Subclasses must implement ``check_utilization`` returning a dict of
+    measurement values keyed by metric name.
+
+    Args:
+        verbose (int):
+            Verbosity level. ``0`` silences output, ``1`` prints basic
+            statements and warnings. (Default is ``1``)
+
+    Attributes:
+        log (Dict[str, Dict[int, Any]]):
+            Per-metric history populated by ``log_utilization``.
+        fn_timer (_RepeatTimer):
+            Background repeating timer created by ``track_utilization``.
     """
     def __init__(self, verbose=1):
-        """
-        Initialize the class.
-
-        Args:
-            verbose (int):
-                Verbosity level. 
-                0: no print statements. 
-                1: basic statements and warnings.
-        """
+        """Stores the verbosity level for the checker."""
         self._verbose = int(verbose)
-                
+
     def log_utilization(self, path_save=None):
         """
-        Logs current utilization info from device.
-        If self.log does not exist, creates it, else appends to it.
+        Records one utilization snapshot, optionally appending to a CSV file.
+
+        Args:
+            path_save (Optional[str]):
+                If provided, appends the snapshot as a row to a ``.csv``
+                file at this path (creating it with a header if needed).
+                (Default is ``None``)
+
+        Returns:
+            (Dict[str, Dict[int, Any]]):
+                log (Dict[str, Dict[int, Any]]):
+                    Updated history of all collected metrics.
         """
         info_changing = self.check_utilization()
         
@@ -4300,23 +4467,24 @@ class _Device_Checker_Base():
     
     
     def track_utilization(
-        self, 
+        self,
         interval=0.2,
         path_save=None,
     ):
         """
-        Starts tracking utilization at specified interval and
-         logs utilization to self.log using self.log_utilization().
-        Creates a background thread (called self.fn_timer) that runs
-         self.log_utilization() every interval seconds.
+        Begins periodic logging on a background thread.
+
+        Replaces any existing tracker and stores the new one as
+        ``self.fn_timer``. Each call to ``log_utilization`` happens every
+        ``interval`` seconds.
 
         Args:
             interval (float):
-                Interval in seconds at which to log utilization.
-                Minimum useful interval is 0.2 seconds.
-            path_save (str):
-                Path to save log to. If None, does not save.
-                File should be a .csv file.
+                Polling interval in seconds. ``0.2`` is the minimum useful
+                value. (Default is ``0.2``)
+            path_save (Optional[str]):
+                ``.csv`` path to which each snapshot is appended. ``None``
+                disables saving. (Default is ``None``)
         """
         self.stop_tracking()
         ## Make a background thread that runs self.log_utilization() every interval seconds
@@ -4327,34 +4495,37 @@ class _Device_Checker_Base():
         self.fn_timer.start()
         
     def stop_tracking(self):
-        """
-        Stops tracking utilization by canceling self.fn_timer thread.
-        """
+        """Cancels the background ``fn_timer`` thread (if one is running)."""
         if hasattr(self, 'fn_timer'):
             self.fn_timer.cancel()
 
     def __del__(self):
+        """Stops the background tracker before the checker is garbage-collected."""
         self.stop_tracking()
 
 
 class NVIDIA_Device_Checker(_Device_Checker_Base):
     """
-    Class for checking NVIDIA GPU utilization.
-    Requires nvidia-ml-py3 package.
+    Resource utilization checker for an NVIDIA GPU.
+
+    Requires the ``nvidia-ml-py3`` package.
+
+    Args:
+        device_index (Optional[int]):
+            Index of the GPU to monitor. If ``None`` and only one device is
+            present, that device is used; otherwise an error is raised.
+            (Default is ``None``)
+        verbose (int):
+            Verbosity level passed to the base class. (Default is ``1``)
+
+    Attributes:
+        info_static (Dict[str, Any]):
+            Static device info (name, index, total memory, power limit).
+        handle (object):
+            ``nvidia_smi`` device handle for the monitored GPU.
     """
     def __init__(self, device_index=None, verbose=1):
-        """
-        Initialize NVIDIA_Device_Checker class.
-        Calls nvidia_smi.nvmlInit(), gets device handles, and gets static info.
-
-        Args:
-            device_index (int):
-                Index of device to monitor. If None, will monitor device 0.
-            verbose (int):
-                Verbosity level. 
-                0: no print statements. 
-                1: basic statements and warnings.
-        """
+        """Initializes NVML, looks up device handles, and captures static device info."""
         try:
             import nvidia_smi
         except ImportError:
@@ -4384,13 +4555,21 @@ class NVIDIA_Device_Checker(_Device_Checker_Base):
         self.info_static['power_limit']  = nvidia_smi.nvmlDeviceGetPowerManagementLimit(self.handle)
     
     def get_device_handles(self):
+        """Returns one ``nvmlDeviceGetHandleByIndex`` handle per GPU detected by NVML."""
         nvidia_smi = self.nvidia_smi
         return [nvidia_smi.nvmlDeviceGetHandleByIndex(i_device) for i_device in range(nvidia_smi.nvmlDeviceGetCount())]
 
     def check_utilization(self):
         """
-        Retrieves current utilization info from device.
-        Includes: current time, memory, power, and processor utilization, fan speed, and temperature.
+        Returns a snapshot of the current GPU utilization metrics.
+
+        Returns:
+            (Dict[str, Any]):
+                info_changing (Dict[str, Any]):
+                    Includes ``time``, ``memory_free``, ``memory_used``,
+                    ``memory_used_percentage``, ``power_used``,
+                    ``power_used_percentage``, ``processor_used_percentage``,
+                    ``temperature``, and ``fan_speed``.
         """
         nvidia_smi = self.nvidia_smi
         h = self.handle
@@ -4416,6 +4595,7 @@ class NVIDIA_Device_Checker(_Device_Checker_Base):
         return info_changing
     
     def __del__(self):
+        """Shuts down NVML and cancels any background tracker before destruction."""
         nvidia_smi = self.nvidia_smi
         nvidia_smi.nvmlShutdown()  ## This stops the ability to get device info
         super().__del__()
@@ -4423,12 +4603,18 @@ class NVIDIA_Device_Checker(_Device_Checker_Base):
 
 class CPU_Device_Checker(_Device_Checker_Base):
     """
-    Class for checking CPU utilization.
+    Resource utilization checker for the host CPU and disk.
+
+    Args:
+        verbose (int):
+            Verbosity level passed to the base class. (Default is ``1``)
+
+    Attributes:
+        info_static (Dict[str, Any]):
+            Static info (CPU count, frequency, total RAM, total disk).
     """
     def __init__(self, verbose=1):
-        """
-        Initialize CPU_Device_Checker class.
-        """
+        """Captures static CPU, memory, and disk info."""
         super().__init__(verbose=verbose)
 
         self.info_static = {}
@@ -4442,8 +4628,14 @@ class CPU_Device_Checker(_Device_Checker_Base):
 
     def check_utilization(self):
         """
-        Retrieves current utilization info from device.
-        Includes: current time, memory, power, processor utilization, network utilization, and disk utilization.
+        Returns a snapshot of CPU, memory, network, and disk utilization.
+
+        Returns:
+            (Dict[str, Any]):
+                info_changing (Dict[str, Any]):
+                    Per-snapshot metrics including memory, network I/O, disk
+                    free/used, disk read/write throughput, and overall +
+                    per-core CPU usage percentages.
         """
         info_changing = {}
         
@@ -4478,7 +4670,9 @@ class CPU_Device_Checker(_Device_Checker_Base):
 
 
 class _RepeatTimer(Timer):
+    """Subclass of ``threading.Timer`` that re-fires its callback every ``interval`` seconds."""
     def run(self):
+        """Calls ``self.function`` repeatedly until ``self.finished`` is set."""
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
 
@@ -4519,9 +4713,7 @@ class Equivalence_checker():
         assert_mode=False,
         verbose=False,
     ) -> None:
-        """
-        Initializes the Allclose_checker.
-        """
+        """Stores comparison settings for later use by ``__call__``."""
         self._kwargs_allclose = kwargs_allclose
         self._assert_mode = assert_mode
         self._verbose = verbose
@@ -4585,31 +4777,31 @@ class Equivalence_checker():
 
     def __call__(
         self,
-        test: Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None], 
-        true: Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None], 
+        test: Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None],
+        true: Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None],
         path: Optional[List[str]] = None,
     ) -> Dict[str, Tuple[bool, str]]:
         """
-        Compares the test and true values and returns the comparison result.
-        Handles various data types including dictionaries, iterables,
-        np.ndarray, scalars, strings, numbers, bool, and None.
+        Recursively compares ``test`` to ``true`` and returns the result.
+
+        Handles dictionaries, iterables, ``np.ndarray``, scalars, strings,
+        numbers, booleans, and ``None``.
 
         Args:
-            test (Union[dict, list, tuple, set, np.ndarray, int, float, complex,
-            str, bool, None]): 
+            test (Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None]):
                 Test value to compare.
-            true (Union[dict, list, tuple, set, np.ndarray, int, float, complex,
-            str, bool, None]): 
-                True value to compare.
-            path (Optional[List[str]]): 
-                The path of the data structure that is currently being compared.
-                (Default is ``None``)
+            true (Union[dict, list, tuple, set, np.ndarray, int, float, complex, str, bool, None]):
+                Reference value.
+            path (Optional[List[str]]):
+                Hierarchical path within the data structure currently being
+                compared (used in recursion). (Default is ``None``)
 
         Returns:
-            Dict[Tuple[bool, str]]: 
-                result Dict[Tuple[bool, str]]: 
-                    The comparison result as a dictionary or a tuple depending
-                    on the data types of test and true.
+            (Union[Tuple[Optional[bool], str], Dict[str, Any]]):
+                result (Union[Tuple[Optional[bool], str], Dict[str, Any]]):
+                    For leaf values, a ``(passed, reason)`` tuple. For
+                    container values, a nested dictionary keyed by the
+                    container's keys / indices.
         """
         if path is None:
             path = ['']
@@ -4683,30 +4875,27 @@ def order_cp_factors_by_EVR(
     orthogonalizable_EVR: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Get the sorting order of the CP factors by their explained variance ratio.
-    RH 2024
+    Sorts CP factors by descending explained variance ratio. RH 2024
 
     Args:
         tensor_dense (Union[np.ndarray, torch.Tensor]):
             Dense tensor to be reconstructed.
-        cp_factors (Union[list, 'tensorly.CPTensor']):
-            CP factors. If a list of factors, then each factor should be a 2D 
-            array of shape *(n_samples, rank)*. Can also be a tensorly 
-            CPTensor object.
+        cp_factors (Union[list, object]):
+            CP factors. Either a list of 2D factor matrices of shape
+            *(n_samples, rank)* or a ``tensorly.CPTensor`` object.
         cp_weights (Optional[Union[np.ndarray, torch.Tensor]]):
-            Weights for each factor. shape *(rank)*. (Default is ``None``)
+            Per-rank weights of length *(rank,)*. (Default is ``None``)
         orthogonalizable_EVR (bool):
-            Whether to use the orthogonalizable EVR calculation, which optimizes
-            the scaling of each factor to maximize the EVR. Uses OLS to 
-            orthogonalize the dense tensor relative to each factor. (Default is 
-            ``True``)
+            If ``True``, optimizes each factor's scaling to maximize EVR by
+            OLS-orthogonalizing the dense tensor against each factor.
+            (Default is ``True``)
 
     Returns:
-        (Tuple[np.ndarray, np.ndarray]): 
-            order (np.ndarray): 
-                Sorting order of the factors by EVR.
-            evrs (np.ndarray): 
-                Explained variance ratios of each factor.
+        (tuple): tuple containing:
+            order (np.ndarray):
+                Indices that sort the factors by descending EVR.
+            evrs (np.ndarray):
+                Sorted explained variance ratios.
     """
     if isinstance(cp_factors, list):
         # If cp_factors is a list, use it directly
@@ -4753,18 +4942,20 @@ def order_cp_factors_by_EVR(
 
 def cp_reconstruction_EVR(tensor_dense, tensor_CP):
     """
-    Explained variance of a reconstructed tensor using
-    by a CP tensor (similar to kruskal tensor).
-    RH 2023
+    Explained variance ratio of a CP-reconstructed tensor. RH 2023
 
     Args:
-        tensor_dense (np.ndarray or torch.Tensor):
-            Dense tensor to be reconstructed. shape (n_samples, n_features)
-        tensor_CP (tensorly CPTensor or list of np.ndarray/torch.Tensor):
-            CP tensor.
-            If a list of factors, then each factor should be a 2D array of shape
-            (n_samples, rank).
-            Can also be a tensorly CPTensor object.
+        tensor_dense (Union[np.ndarray, torch.Tensor]):
+            Dense reference tensor. shape: *(n_samples, n_features)*.
+        tensor_CP (Union[list, object]):
+            CP tensor. Either a list of 2D factor matrices of shape
+            *(n_samples, rank)* or a ``tensorly.CPTensor`` object.
+
+    Returns:
+        (Union[float, torch.Tensor]):
+            ev (Union[float, torch.Tensor]):
+                Explained variance ratio
+                ``1 - var(tensor_dense - tensor_rec) / var(tensor_dense)``.
     """
     tensor_rec = None
     try:
@@ -4796,21 +4987,18 @@ from typing import Union
 
 def rolling_mean(tensor: torch.Tensor, dim: int) -> torch.Tensor:
     """
-    Computes the running mean along a specified dimension using a rolling accumulation method
-    (Welford's update for the mean).
-
-    RH 2025
+    Computes the running mean along ``dim`` using Welford's update. RH 2025
 
     Args:
         tensor (torch.Tensor):
-            The input tensor on which the running mean is computed.
+            Input tensor.
         dim (int):
-            The dimension along which to compute the running mean.
+            Dimension along which the running mean is accumulated.
 
     Returns:
-        torch.Tensor:
-            A tensor of the same shape as `tensor`, where each element along the specified dimension
-            is the running mean of the elements from the start up to that index.
+        (torch.Tensor):
+            mean (torch.Tensor):
+                Final mean across ``dim`` (last accumulated value).
     """
     # Ensure the dimension is non-negative and valid.
     if dim < 0:
@@ -4857,28 +5045,34 @@ def play_video_cv2(
     kwargs_text={},
 ):
     """
-    Play or save a video using OpenCV.
+    Plays or saves a video using OpenCV. RH 2021/2024
 
     Args:
-        array (np.ndarray, optional):
-            3-D ``(frames, H, W)`` or 4-D ``(frames, H, W, channels)`` uint8
-            array. Values are clipped to [0, 255]. If None, ``path_video``
-            must be supplied and ``decord`` will be used to read it.
-        path_video (str or Path, optional):
-            Path to a video file. Used only when ``array`` is None.
+        array (Optional[np.ndarray]):
+            3D ``(frames, H, W)`` or 4D ``(frames, H, W, channels)`` ``uint8``
+            array. Values are clipped to ``[0, 255]``. If ``None``,
+            ``path_video`` must be supplied and ``decord`` is used to read
+            it. (Default is ``None``)
+        path_video (Optional[Union[str, pathlib.Path]]):
+            Path to a video file. Used only when ``array`` is ``None``.
+            (Default is ``None``)
         frameRate (float):
-            Playback / output frame rate in Hz.
-        path_save (str or Path, optional):
-            Destination path for the saved video file. If None the video is
-            not written to disk.
+            Playback / output frame rate in Hz. (Default is ``30``)
+        path_save (Optional[Union[str, pathlib.Path]]):
+            Destination path for the saved video. ``None`` disables saving.
+            (Default is ``None``)
         show (bool):
-            Whether to display the video in a cv2 window.
+            If ``True``, displays the video in a ``cv2`` window. (Default
+            is ``True``)
         fourcc_code (str):
             FourCC codec string passed to ``cv2.VideoWriter_fourcc``.
-        text (str or list of str, optional):
+            (Default is ``'MJPG'``)
+        text (Optional[Union[str, List[str]]]):
             Text overlay. If a list, element ``i`` is drawn on frame ``i``.
+            (Default is ``None``)
         kwargs_text (dict):
-            Keyword arguments forwarded to ``cv2.putText``.
+            Keyword arguments forwarded to ``cv2.putText``. (Default is
+            ``{}``)
     """
     wait_frames = max(int((1 / frameRate) * 1000), 1)
     if path_save is not None:
@@ -4950,23 +5144,25 @@ def make_tiled_video_array(
     verbose: bool = True,
 ):
     """
-    Tile a list of video arrays into a single grid array.
+    Tiles a list of videos into a single grid video array. RH 2021/2024
 
-    Order of videos is top to bottom, then left to right.
+    Videos are placed top-to-bottom and then left-to-right.
 
     Args:
         videos (List[np.ndarray]):
-            List of video arrays with shape ``(frames, H, W, channels)`` or
-            ``(frames, H, W)``. All videos must share the same dtype.
-        shape (Tuple[int, int], optional):
-            Grid layout ``(n_rows, n_cols)``. If None the smallest square
-            grid that fits all videos is used.
+            List of video arrays with shape *(frames, H, W, channels)* or
+            *(frames, H, W)*. All videos must share the same dtype.
+        shape (Optional[Tuple[int, int]]):
+            Grid layout ``(n_rows, n_cols)``. If ``None``, uses the smallest
+            square grid that fits all videos. (Default is ``None``)
         verbose (bool):
-            Whether to print progress messages.
+            If ``True``, prints progress messages. (Default is ``True``)
 
     Returns:
-        np.ndarray: Tiled video array of shape
-        ``(max_frames, total_H, total_W, channels)``.
+        (np.ndarray):
+            video_array (np.ndarray):
+                Tiled video. shape: *(max_frames, total_H, total_W,
+                channels)*.
     """
     assert isinstance(videos, list), f"videos must be a list. Got {type(videos)}"
     assert all(isinstance(v, np.ndarray) for v in videos), \

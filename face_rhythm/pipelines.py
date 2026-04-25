@@ -1,37 +1,45 @@
 """
-This file contains example pipelines for running the face_rhythm package. \n
-In each case, a params dictionary is input, which must contain all the necessary parameters for the pipeline. \n
+Example end-to-end pipelines for running the ``face_rhythm`` package.
+
+Each pipeline accepts a ``params`` dictionary that must contain all fields
+required by the steps it executes.
 """
 
 def pipeline_basic(params):
     """
-    This function runs the basic face_rhythm pipeline, similar to the
-    interactive jupyter notebook: /notebooks/interactive_pipeline_basic.ipynb \n
-    Note that the ROIs must be defined and saved as an ROIs.h5 file and then
-    referenced in params['ROIs']['initialize']['path_file']. \n
+    Runs the basic ``face_rhythm`` pipeline, mirroring
+    ``notebooks/interactive_pipeline_basic.ipynb``. RH 2023
 
-    This pipeline performs the following steps: \n
-    - Load video data \n
-    - Load ROIs from file \n
-    - Track points \n
-    - Compute spectrograms \n
-    - Perform tensor component analysis \n
-    - Save results \n
+    The ROIs must be defined ahead of time and saved as an ``ROIs.h5`` file
+    referenced by ``params['ROIs']['initialize']['path_file']``. Steps
+    executed (gated by ``params['steps']``): \n
+    * ``'load_videos'``: Load video data via ``BufferedVideoReader``.
+    * ``'ROIs'``: Load ROIs and seed point positions.
+    * ``'point_tracking'``: Track points across frames.
+    * ``'VQT'``: Compute variable-Q spectrograms.
+    * ``'TCA'``: Perform tensor component analysis.
+    \n
+    Each step also persists its outputs to the project's ``analysis_files``
+    directory.
 
     Args:
-        params (dict): 
-            Dictionary of parameters. See function for required fields. \n
-            Also, /scripts/params_pipeline_basic.json contains an example
-            parameters file. \n
+        params (dict):
+            Dictionary of parameters controlling every pipeline step. See
+            ``scripts/params_pipeline_basic.json`` for a complete example.
+            Top-level keys consumed include ``'project'``, ``'paths_videos'``,
+            ``'figure_saver'``, ``'steps'``, ``'BufferedVideoReader'``,
+            ``'Dataset_videos'``, ``'ROIs'``, ``'PointTracker'``,
+            ``'VQT_Analyzer'``, and ``'TCA'``.
 
     Returns:
         (dict):
-            Dictionary containing the following keys: \n
-            - path_config (str): Path to the config file \n
-            - path_run_info (str): Path to the run_info file \n
-            - directory_project (str): Path to the project directory \n
-            - SEED (int): Random seed used \n
-            - params (dict): Dictionary of parameters used \n
+            results (dict):
+                Dictionary with keys: \n
+                * ``'path_config'`` (str): Path to the saved config file.
+                * ``'path_run_info'`` (str): Path to the saved run_info file.
+                * ``'directory_project'`` (str): Path to the project directory.
+                * ``'SEED'`` (int): Random seed used for the run.
+                * ``'params'`` (dict): The parameter dictionary that was used.
     """
 
     ########################################
@@ -400,20 +408,21 @@ def pipeline_basic(params):
 
 def _set_random_seed(seed=None, deterministic=False):
     """
-    Set random seed for reproducibility.
-    RH 2023
+    Sets the random seed for ``numpy``, ``torch``, ``random``, and ``cv2`` to
+    enable reproducible runs. RH 2023
 
     Args:
-        seed (int, optional):
-            Random seed.
-            If None, a random seed (spanning int32 integer range) is generated.
-        deterministic (bool, optional):
-            Whether to make packages deterministic.
+        seed (Optional[int]):
+            Random seed to apply across libraries. If ``None``, a fresh seed
+            spanning the int32 range is generated. (Default is ``None``)
+        deterministic (bool):
+            If ``True``, enables deterministic algorithms in ``torch`` and
+            disables the ``cudnn`` benchmark mode. (Default is ``False``)
 
     Returns:
         (int):
             seed (int):
-                Random seed.
+                The random seed that was actually applied.
     """
     ### random seed (note that optuna requires a random seed to be set within the pipeline)
     import numpy as np

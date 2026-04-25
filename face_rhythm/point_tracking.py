@@ -1,6 +1,8 @@
-"""Point tracking via Lucas-Kanade optical flow, with mesh-relaxation and outlier handling.
+"""
+Point tracking via Lucas-Kanade optical flow, with mesh-relaxation and outlier
+handling.
 
-``PointTracker`` advects a set of (x, y) seed points through a
+``PointTracker`` advects a set of ``(x, y)`` seed points through a
 ``BufferedVideoReader`` using either CPU or CUDA OpenCV LK optical flow. Mesh
 distances to k-nearest neighbors are regularized toward their initial values,
 and frames with any point displaced beyond a threshold halt and replay the
@@ -23,6 +25,147 @@ from .visualization import FrameVisualizer
 
 ## Define class for performing point tracking using optical flow
 class PointTracker(FR_Module):
+    """
+    Tracks a set of seed points across video frames with Lucas-Kanade optical
+    flow, mesh-rigidity regularization, and outlier handling.
+
+    Wraps OpenCV LK (CPU or CUDA when available) and applies a k-nearest-
+    neighbor mesh constraint plus a relaxation force toward the original
+    point positions. Frames where any point is displaced beyond a threshold
+    trigger a rewind-and-replay of the surrounding window so violating points
+    are frozen. Optional ``frames_freeze`` masks proactively zero the optical
+    flow delta on chosen frames.
+
+    Args:
+        buffered_video_reader (BufferedVideoReader):
+            ``BufferedVideoReader`` object containing the videos to track.
+            Created by ``fr.helpers.BufferedVideoReader``.
+        point_positions (np.ndarray):
+            Initial seed points to track. Each row is one point; columns
+            are ``(x, y)``. Typically produced by ``fr.rois.ROIs`` via the
+            ``ROIs.point_positions`` attribute. shape: *(n_points, 2)*,
+            dtype: *float*.
+        rois_masks (Union[np.ndarray, List[np.ndarray], ROIs]):
+            ROI mask(s) used to zero-out non-ROI pixels before tracking.
+            A single 2D bool array (shape: *(H, W)*) or a list of such
+            arrays. When a list is provided, the masks are intersected
+            into a single combined mask. (Default is ``None``)
+        contiguous (bool):
+            If ``True``, all videos are treated as one continuous stream
+            (the first frame of each video continues from the previous
+            video). If ``False``, point tracking restarts for each video.
+            (Default is ``False``)
+        params_optical_flow (dict):
+            Parameters for optical flow. Missing keys fall back to defaults.
+            Supported keys: \n
+            * ``'method'``: Optical flow method. Only ``'lucas_kanade'`` is
+              supported.
+            * ``'mesh_rigidity'``: Strength of the mesh-distance restoring
+              force. Depends on point spacing.
+            * ``'mesh_n_neighbors'``: Number of nearest neighbors used for
+              the mesh constraint.
+            * ``'relaxation'``: Per-frame fraction by which points relax
+              back toward their original positions.
+            * ``'kwargs_method'``: Extra kwargs forwarded to
+              ``cv2.calcOpticalFlowPyrLK`` (``winSize``, ``maxLevel``,
+              ``criteria``). \n
+            See the OpenCV LK optical flow docs for parameter meanings.
+            (Default is the dict shown in the signature)
+        params_clahe (dict):
+            Keyword arguments forwarded to ``cv2.createCLAHE`` (or
+            ``cv2.cuda.createCLAHE``). If ``None``, CLAHE is not applied.
+            (Default is ``{'clipLimit': 40.0, 'tileGridSize': (150, 150)}``)
+        params_outlier_handling (dict):
+            Parameters for outlier (violation) handling. A violation is
+            a frame in which a point exceeds the displacement threshold
+            from its original position; on a violation the affected point
+            has its velocity frozen for a window around the event.
+            Supported keys: \n
+            * ``'threshold_displacement'``: Maximum allowed displacement
+              from the original position, in pixels.
+            * ``'framesHalted_before'``: Number of frames to halt before
+              a violation.
+            * ``'framesHalted_after'``: Number of frames to halt after a
+              violation. \n
+            (Default is the dict shown in the signature)
+        frames_freeze (Optional[np.ndarray]):
+            1D bool array marking frames whose optical flow delta should
+            be proactively zeroed. ``True`` = freeze the OF delta for that
+            frame. Length should equal the total number of frames across
+            all videos in contiguous mode, or per-video length in
+            non-contiguous mode. (Default is ``None``)
+        relaxation_during_freeze_frames (bool):
+            Controls behavior on proactively frozen frames. If ``True``,
+            the OF delta is zeroed but mesh rigidity and relaxation forces
+            still apply, so the mesh can maintain shape and relax toward
+            home positions. If ``False``, points are fully frozen and
+            their positions are copied from the previous frame with no
+            forces applied. (Default is ``True``)
+        idx_start (Union[int, list, np.ndarray]):
+            Index of the first frame to track. If an ``int``, it is used
+            for all videos (or for the contiguous index when
+            ``contiguous=True``). If a list/array and ``contiguous=False``,
+            each entry is the start index for the corresponding video.
+            (Default is ``0``)
+        visualize_video (bool):
+            If ``True``, displays the tracked frames via ``cv2.imshow``.
+            Set to ``False`` on headless systems. (Default is ``False``)
+        params_visualization (dict):
+            Parameters forwarded to ``fr.visualization.FrameVisualizer``.
+            Do not include ``'points_colors'`` since it is reserved for
+            outlier coloring. (Default is
+            ``{'alpha': 1.0, 'point_sizes': 1}``)
+        verbose (Union[bool, int]):
+            Verbosity level. \n
+            * ``0``: silent.
+            * ``1``: warnings only.
+            * ``2``: all info. \n
+            (Default is ``1``)
+
+    Attributes:
+        point_positions (np.ndarray):
+            Initial seed point positions. shape: *(n_points, 2)*.
+        num_points (int):
+            Number of points being tracked.
+        mask (torch.Tensor):
+            Combined ROI mask. shape: *(H, W)*, dtype: *bool*.
+        neighbors (torch.Tensor):
+            Indices of the k-nearest neighbors of each point.
+            shape: *(n_points, mesh_n_neighbors)*, dtype: *int64*.
+        d_0 (torch.Tensor):
+            Initial mean neighbor-distance vectors per point. dtype:
+            *float32*.
+        idx_start (Union[int, List[int]]):
+            Resolved per-video (or contiguous) starting frame indices.
+        videos (list):
+            List of per-video iterables built from
+            ``buffered_video_reader``.
+        params_optical_flow (dict):
+            Optical flow parameters with defaults filled in.
+        params_outlier_handling (dict):
+            Outlier-handling parameters with defaults filled in.
+        params_visualization (dict):
+            Visualization parameters with defaults filled in.
+        points_tracked (Union[list, dict]):
+            Tracked point arrays. Populated by ``track_points``; first
+            stored as a list of arrays per video, then re-keyed as a dict
+            ``{str(video_idx): np.ndarray}``.
+        violations (list):
+            Per-video sparse COO matrices of violation flags (populated
+            by ``track_points``).
+        violations_sparseCOO (dict):
+            Per-video violation flags packed as ``{'row', 'col', 'data',
+            'shape'}`` dicts (populated by ``track_points``).
+        violation_fraction (List[float]):
+            Per-video fraction of frames that contain at least one
+            violation.
+        config (dict):
+            Snapshot of the configuration used to construct the tracker.
+        run_info (dict):
+            Run summary populated by ``track_points``.
+        run_data (dict):
+            Run data dictionary used by ``FR_Module`` save/load.
+    """
     def __init__(
         self,
         buffered_video_reader: BufferedVideoReader,
@@ -58,110 +201,7 @@ class PointTracker(FR_Module):
         },
         verbose: Union[bool, int]=1,
     ):
-        """
-        Prepare for point tracking.
-        Sets up parameters for optical flow, makes initial points,
-         to track, and prepares masks for the video.
-
-        Args:
-            buffered_video_reader (BuffereVideoReader):
-                A BufferedVideoReader object, containing the videos to track.
-                Object comes from fr.helpers.BufferedVideoReader
-            point_positions (2D array of floats):
-                An array of points to track.
-                Each row is a point, and the columns are the x and y coordinates.
-                Can be made using the fr.rois.ROIs class, and the 
-                 ROIs.point_positions attribute.
-            rois_masks (2D array of booleans or list of 2D arrays of booleans):
-                An ROI is a 2D array of booleans, where True indicates a pixel
-                 that is within the region of interest.
-                If a list of ROIs is provided, then each ROI will be tracked
-                 separately.
-            contiguous (bool, optional):
-                Whether or not videos should be treated as contiguous.
-                If True, the first frame of each video will be treated
-                 as the next frame of the previous video.
-                If False, the point tracking will be restarted for each
-                 video.
-            params_optical_flow (dict, optional):
-                Parameters for optical flow.
-                If None, the following parameters will be used:
-                    params_optical_flow = {
-                        "method": "lucas_kanade",  ## method for optical flow. Only "lucas_kanade" is supported for now.
-                        "point_spacing": 10,  ## spacing between points, in pixels
-                        "mesh_rigidity": 0.005,  ## Rigidity of mesh. Changes depending on point spacing.
-                        "relaxation": 0.5,  ## How quickly points relax back to their original position.
-                        "kwargs_method": {
-                            "winSize": (15,15),  ## Size of window to use for optical flow
-                            "maxLevel": 2,  ## Maximum number of pyramid levels
-                            "criteria": (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),  ## Stopping criteria for optical flow optimization
-                        },
-                    }
-                See https://docs.opencv.org/3.4/d4/dee/tutorial_optical_flow.html
-                 and https://docs.opencv.org/3.4/dc/d6b/group__video__track.html#ga473e4b886d0bcc6b65831eb88ed93323
-                 for more information about the lucas kanade optical flow parameters.
-            params_clahe (dict, optional):
-                Parameters for CLAHE.
-                If None, no CLAHE will be applied.
-                kwargs will be passed to cv2.createCLAHE.
-            params_outlier_handling (dict, optional):
-                Parameters for outlier handling.
-                Outliers/violations are frames when a point goes beyond a
-                 threshold distance from its original position. For these
-                 frames, the violating point has its velocity frozen for
-                 'framesHalted_before' frames before and 'framesHalted_after'
-                 frames after the violation.
-                If None, the following parameters will be used:
-                    params_outlier_handling = {
-                        'threshold_displacement': 25,  ## Maximum displacement between frames, in pixels.
-                        'framesHalted_before': 30,  ## Number of frames to halt tracking before a violation.
-                        'framesHalted_after': 30,  ## Number of frames to halt tracking after a violation.
-                    }
-            frames_freeze (np.ndarray, optional):
-                1D boolean array specifying frames where the optical flow
-                 displacement delta should be zeroed out (proactive freezing).
-                True = freeze OF delta for that frame.
-                Length should match the total number of frames across all
-                 videos (contiguous mode) or per video (non-contiguous mode,
-                 as a dict of {str(video_idx): 1D_bool_array}).
-                If None, no proactive freezing is applied (default).
-            relaxation_during_freeze_frames (bool, optional):
-                Controls behavior during proactively frozen frames.
-                If True (default), the OF delta is zeroed but mesh rigidity
-                 and relaxation forces still apply. This allows the mesh to
-                 maintain its shape and relax toward home positions even
-                 during frozen frames.
-                If False, points are fully frozen — their positions are
-                 copied exactly from the previous frame with no forces
-                 applied.
-            idx_start (int, list, np.ndarray, optional):
-                The index of the first frame to track.
-                If an integer, this will be the index for all videos or for the
-                contiguous index if 'contiguous' is True. If a list or array and
-                'contiguous' is False, then each index will be used for each
-                video.
-            visualize_video (bool, optional):
-                Whether or not to visualize the video.
-                If on a server or system without a display, this should be False.
-            params_visualization (dict, optional):
-                Parameters for visualization.
-                If None, the following parameters will be used:
-                    params_visualization = {
-                        'alpha':1.0,
-                        'point_sizes':1,
-                        'writer_cv2':None,
-                    }
-                See fr.visualization.FrameVisualizer for more information.
-                Leave out 'points_colors' as this is reserved for outlier coloring.
-            frame_start (int, optional):
-                The frame to start tracking from. Try to only change only for 
-                 visualization and set to 0 for actualy runs.
-            verbose (bool or int, optional):
-                Whether or not to print progress updates.
-                0: no progress updates
-                1: warnings
-                2: all info
-        """
+        """Initializes the tracker, validates inputs, and prepares masks, mesh, and optical flow state."""
         ## Imports
         super().__init__()
         
@@ -405,7 +445,8 @@ class PointTracker(FR_Module):
 
     def cleanup(self):
         """
-        Delete the large data objects that are no longer needed.
+        Deletes all instance attributes and runs garbage collection to free
+        the large arrays held by the tracker.
         """
         import gc
         print(f"FR: Deleting all attributes")
@@ -418,9 +459,13 @@ class PointTracker(FR_Module):
 
     def track_points(self):
         """
-        Point tracking workflow.
-        Tracks points in videos using specified parameters, roi_points,
-         and roi_masks.
+        Runs the full point tracking workflow across all videos.
+
+        Tracks the seed points through every video using the configured
+        optical flow, mesh, outlier handling, and freeze parameters.
+        Populates ``self.points_tracked``, ``self.violations``,
+        ``self.violations_sparseCOO``, ``self.violation_fraction``, and the
+        ``run_info``/``run_data`` dictionaries used by ``FR_Module``.
         """
         ## Initialize points_tracked
         self.points_tracked = []
@@ -504,37 +549,37 @@ class PointTracker(FR_Module):
         frames_freeze=None,
     ):
         """
-        Track points in a single video.
-        
+        Tracks points through a single video, handling rewind on violations.
+
         Args:
             video (BufferedVideoReader):
-                A BufferedVideoReader object.
-                Should be a single video object, where iterating over
-                 the object returns frames. The frames should either
-                  be 3D arrays of shape (height, width, channels) or
-                  2D arrays of shape (height, width).
-                If frames are not np.uint8, they will be converted.
-            points_prev (np.ndarray, np.float32):
-                A 2D array of np.float32, where each row is a point
-                 to track. The points should be in the same order
-                 as the points in the previous video. Order (x,y).
-            frame_prev (np.ndarray, uint8):
-                Previous frame. Should be formatted correctly, as no
-                 corrective formatting will be done here.
-            idx_start (int, optional):
-                The index of the first frame to track.
-                If None, the index will defer to the idx_start defined in the __init__.
-            frames_freeze (np.ndarray, optional):
-                1D boolean array for this video. True = freeze OF delta for
-                 that frame. Length should match the number of frames in the
-                 video. If None, no proactive freezing is applied.
+                Single video iterable yielding frames as 3D arrays
+                (shape: *(H, W, C)*) or 2D arrays (shape: *(H, W)*).
+                Non-uint8 frames are converted internally.
+            points_prev (np.ndarray):
+                Previous-frame point positions, ordered ``(x, y)``.
+                shape: *(n_points, 2)*, dtype: *float32*.
+            frame_prev (np.ndarray):
+                Already-formatted previous frame; no corrective formatting
+                is applied here. dtype: *uint8*.
+            idx_start (Optional[int]):
+                Index of the first frame to track. If ``None``, falls back
+                to the start index resolved in ``__init__``. (Default is
+                ``None``)
+            frames_freeze (Optional[np.ndarray]):
+                1D bool array for this video. ``True`` = freeze the OF
+                delta for that frame. Length must equal the number of
+                frames in the video. If ``None``, no proactive freezing
+                is applied. (Default is ``None``)
 
         Returns:
-            points (np.ndarray, np.float32):
-                A 2D array of np.float32, where each row is a point
-                 that has been tracked. Order (x,y).
-            frame_last (np.ndarray, uint8):
-                Last frame of the video. Formatted correctly.
+            (tuple): tuple containing:
+                points_tracked (np.ndarray):
+                    Tracked point positions for every frame of this video.
+                    Order ``(x, y)``. shape: *(n_frames, n_points, 2)*,
+                    dtype: *float32*.
+                frame_last (np.ndarray):
+                    Final formatted frame from the video. dtype: *uint8*.
         """
         ## Assert that points_prev is a 2D array of integers
         assert isinstance(points_prev, np.ndarray), "FR ERROR: points_prev must be a numpy array"
@@ -588,19 +633,25 @@ class PointTracker(FR_Module):
 
     def _track_points_singleFrame(self, frame_new, frame_prev, points_prev):
         """
-        Track points in a single frame.
-        
+        Tracks points from one frame to the next and updates violations.
+
+        Calls the optical flow routine, updates the violation tracker, and
+        optionally renders the result via the ``FrameVisualizer``.
+
         Args:
-            frame_new (np.ndarray, uint8):
-                A 2D array of integers, where each element is a pixel
-                 value. The frame should be the new frame.
-            frame_prev (np.ndarray, uint8):
-                A 2D array of integers, where each element is a pixel
-                 value. The frame should be the previous frame.
-            points_prev (np.ndarray, np.float32):
-                A 2D array of np.float32, where each row is a point
-                 to track. The points should be in the same order
-                 as the points in the previous video. Order (x,y).
+            frame_new (np.ndarray):
+                Current frame. shape: *(H, W)*, dtype: *uint8*.
+            frame_prev (np.ndarray):
+                Previous frame. shape: *(H, W)*, dtype: *uint8*.
+            points_prev (np.ndarray):
+                Previous-frame point positions, ordered ``(x, y)``.
+                shape: *(n_points, 2)*, dtype: *float32*.
+
+        Returns:
+            (np.ndarray):
+                points_new (np.ndarray):
+                    Tracked point positions for this frame. Order
+                    ``(x, y)``. shape: *(n_points, 2)*, dtype: *float32*.
         """
         ## Call optical flow function
         points_new = self._optical_flow(frame_new=frame_new, frame_prev=frame_prev, points_prev=points_prev)
@@ -623,18 +674,18 @@ class PointTracker(FR_Module):
 
     def _update_violations(self, points_new):
         """
-        Update violations.
-        Finds points that violate the max displacement threshold.
-        Sets the countdown for these points.
-        Updates the countdown for existing violating points.
-        Updates the violation event flag.
-        Updates the current violation points.
+        Updates the violation tracker for the current frame.
+
+        Flags points (and their mesh neighbors) whose displacement from
+        the original position exceeds the threshold, marks the surrounding
+        ``framesHalted_before``/``framesHalted_after`` window in
+        ``self.violations_currentVideo``, sets ``self._violation_event``,
+        and refreshes ``self._pointIdx_violations_current``.
 
         Args:
-            points_new (np.ndarray, np.float32):
-                The points that have been tracked. Order (x,y).
-                A 2D array of np.float32, where each row is a point
-                 to track.
+            points_new (np.ndarray):
+                Tracked point positions for the current frame, ordered
+                ``(x, y)``. shape: *(n_points, 2)*, dtype: *float32*.
         """
         displacement = points_new - self.point_positions
         pointIdx_violations_new = np.linalg.norm(displacement, axis=1) > self._params_outlier_handling['threshold_displacement']
@@ -655,22 +706,26 @@ class PointTracker(FR_Module):
 
     def _format_decordTorchVideo_for_opticalFlow(self, vid, mask=None):
         """
-        Format a video array properly for optical flow.
+        Formats a decord/torch video tensor into the layout expected by the
+        optical flow routine.
+
+        Performs grayscale conversion and ROI masking (on GPU when ``vid``
+        is CUDA), transfers to CPU NumPy, and optionally applies CLAHE.
 
         Args:
             vid (torch.Tensor):
-                4D uint8 tensor of shape ``(batch, height, width, channels)``.
-                Can be on CPU or CUDA. If on CUDA, grayscale conversion and
-                masking run on GPU before transferring to CPU for CLAHE.
+                Input frames. shape: *(batch, H, W, C)*, dtype: *uint8*.
+                Can live on CPU or CUDA; grayscale and masking run on the
+                same device as ``vid``.
             mask (torch.Tensor):
-                2D bool tensor of shape ``(height, width)``. Pixels where
-                mask is False are zeroed out.
+                ROI mask. Pixels where ``mask`` is ``False`` are zeroed.
+                shape: *(H, W)*, dtype: *bool*. (Default is ``None``)
 
         Returns:
             (np.ndarray):
                 vid (np.ndarray):
-                    3D uint8 array of shape ``(batch, height, width)``.
-                    Grayscale, masked, and optionally CLAHE-enhanced.
+                    Grayscale, masked, optionally CLAHE-enhanced frames.
+                    shape: *(batch, H, W)*, dtype: *uint8*.
         """
         ## Move mask to same device as vid for the JIT function
         if mask is not None and mask.device != vid.device:
@@ -698,19 +753,28 @@ class PointTracker(FR_Module):
 
     def _optical_flow(self, frame_new, frame_prev, points_prev):
         """
-        Track points in a single frame using optical flow.
-        
+        Runs one optical flow step and applies freeze, mesh, and relaxation
+        forces.
+
+        Dispatches to CUDA or CPU Lucas-Kanade based on availability,
+        applies proactive (``frames_freeze``) and reactive (violation)
+        freezing, then subtracts the mesh-rigidity and relaxation forces.
+
         Args:
-            frame_new (np.ndarray, uint8):
-                A 2D array of integers, where each element is a pixel
-                 value. The frame should be the new frame.
-            frame_prev (np.ndarray, uint8):
-                A 2D array of integers, where each element is a pixel
-                 value. The frame should be the previous frame.
-            points_prev (np.ndarray, np.float32):
-                A 2D array of np.float32, where each row is a point
-                 to track. The points should be in the same order
-                 as the points in the previous video. Order (x,y).
+            frame_new (np.ndarray):
+                Current frame. shape: *(H, W)*, dtype: *uint8*.
+            frame_prev (np.ndarray):
+                Previous frame. shape: *(H, W)*, dtype: *uint8*.
+            points_prev (np.ndarray):
+                Previous-frame point positions, ordered ``(x, y)``.
+                shape: *(n_points, 2)*, dtype: *float32*.
+
+        Returns:
+            (np.ndarray):
+                points_new (np.ndarray):
+                    Updated point positions for the current frame after
+                    freeze, mesh-rigidity, and relaxation forces. Order
+                    ``(x, y)``. shape: *(n_points, 2)*, dtype: *float32*.
         """
         ## Call optical flow function
         if self.params_optical_flow['method'] == 'lucas_kanade':
@@ -767,6 +831,23 @@ class PointTracker(FR_Module):
 
 @torch.jit.script
 def _helper_format_decordTorchVideo_for_opticalFlow(vid, mask=None):
+    """
+    TorchScript helper that converts a 4D color video tensor to grayscale
+    and applies an optional ROI mask.
+
+    Args:
+        vid (torch.Tensor):
+            Input frames. shape: *(batch, H, W, C)*, dtype: *uint8*.
+        mask (torch.Tensor):
+            Optional ROI mask; pixels where ``mask`` is ``False`` are
+            zeroed. shape: *(H, W)*, dtype: *bool*. (Default is ``None``)
+
+    Returns:
+        (torch.Tensor):
+            vid (torch.Tensor):
+                Grayscale (and optionally masked) frames.
+                shape: *(batch, H, W)*, dtype: *uint8*.
+    """
     ## Collapse channels
     vid = vid.type(torch.float32).mean(dim=-1).type(torch.uint8)
 
@@ -779,21 +860,22 @@ def _helper_format_decordTorchVideo_for_opticalFlow(vid, mask=None):
 @torch.jit.script
 def _vector_distance(pi, neighbors):
     """
-    Calculate the distance between each point and its neighbors.
+    Computes the mean ``(x, y)`` distance vector between each point and its
+    nearest neighbors.
 
     Args:
-        pi (torch.Tensor, dtype=torch.float32):
-            A 2D array of torch.float32, where each row is a
-             (y,x) point.
-        neighbors (torch.Tensor, dtype=torch.int64):
-            A 2D array of torch.int64 listing the indices of the
-             neighbors of each point.
+        pi (torch.Tensor):
+            Point coordinates, one ``(y, x)`` per row.
+            shape: *(n_points, 2)*, dtype: *float32*.
+        neighbors (torch.Tensor):
+            Indices of each point's nearest neighbors.
+            shape: *(n_points, k)*, dtype: *int64*.
 
     Returns:
-        d (torch.Tensor, dtype=torch.float32):
-            A 2D array of torch.float32, where each row is a
-             (y,x) vector describing the mean distance between
-              each point and its neighbors.
+        (torch.Tensor):
+            d (torch.Tensor):
+                Mean neighbor-distance vector per point.
+                shape: *(n_points, 2)*, dtype: *float32*.
     """
     pm = torch.tile(pi.T[:,:,None], (1,1,neighbors.shape[1]))
     d = pm - pi.T[:, neighbors]
@@ -803,25 +885,24 @@ def _vector_distance(pi, neighbors):
 @torch.jit.script
 def _vector_displacement(di, dj, neighbors):
     """
-    Calculate the displacement between each point and its
-     neighbors relative to a reference distance (dj).
+    Computes the mean displacement of each point from its neighbors relative
+    to a reference distance vector.
 
     Args:
-        di (torch.Tensor, dtype=torch.float32):
-            A 2D array of torch.float32, where each row is a
-             (y,x) point.
-        dj (torch.Tensor, dtype=torch.float32):
-            A 2D array of torch.float32, where each row is a
-             (y,x) distance vector.
-        neighbors (torch.Tensor, dtype=torch.int64):
-            A 2D array of torch.int64 listing the indices of the
-             neighbors of each point.
+        di (torch.Tensor):
+            Current point coordinates, one ``(y, x)`` per row.
+            shape: *(n_points, 2)*, dtype: *float32*.
+        dj (torch.Tensor):
+            Reference per-point distance vectors (e.g. ``self.d_0``).
+            shape: *(n_points, 2)*, dtype: *float32*.
+        neighbors (torch.Tensor):
+            Indices of each point's nearest neighbors.
+            shape: *(n_points, k)*, dtype: *int64*.
 
     Returns:
-        d (torch.Tensor, dtype=torch.float32):
-            A 2D array of torch.float32, where each row is a
-             (y,x) vector describing the mean displacement between
-             each point and its neighbors relative to the reference
-             distance.
+        (torch.Tensor):
+            d (torch.Tensor):
+                Per-point mean displacement relative to ``dj``.
+                shape: *(n_points, 2)*, dtype: *float32*.
     """
     return _vector_distance(di, neighbors) - dj

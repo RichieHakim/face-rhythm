@@ -20,9 +20,100 @@ from .helpers import BufferedVideoReader
 
 class FrameVisualizer:
     """
-    Class for playing back a video.
-    Allows for playing back one frame at a time, or playing back
-     an array of frames.
+    Wraps OpenCV draw primitives and an optional ``cv2.VideoWriter`` to overlay
+    points and text on single frames, optionally displaying them via
+    ``cv2.imshow`` and/or writing them to a video file. RH 2022
+
+    Args:
+        display (bool):
+            If ``True``, display each frame using ``cv2.imshow``.
+            (Default is ``False``)
+        handle_cv2Imshow (str):
+            Window name passed to ``cv2.imshow``. Used to close the window
+            later. (Default is ``'FaceRhythmPointVisualizer'``)
+        path_save (Optional[str]):
+            If not ``None``, frames are written to this video file path. Use
+            an ``.avi`` extension (e.g. ``'directory/filename.avi'``).
+            (Default is ``None``)
+        frame_height_width (Tuple[int, int]):
+            Height and width of the displayed and/or saved video.
+            (Default is ``(480, 640)``)
+        frame_rate (Optional[int]):
+            Frame rate of the displayed and/or saved video. If ``None``,
+            playback runs at top speed and saved videos default to 60 fps.
+            (Default is ``None``)
+        fourcc (str):
+            Four-character codec passed to ``cv2.VideoWriter``.
+            (Default is ``'MJPG'``)
+        error_checking (bool):
+            If ``True``, perform input validation in
+            ``visualize_image_with_points``. (Default is ``True``)
+        verbose (int):
+            Verbosity level. \n
+            * ``0``: No messages.
+            * ``1``: Warnings.
+            * ``2``: Info. \n
+            (Default is ``1``)
+        point_sizes (Optional[Union[int, List[int]]]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. Passed to ``cv2.circle``. If an
+            int, all points use this radius; if a list, each element is the
+            radius for one batch of points. (Default is ``None``)
+        points_colors (Optional[Union[Tuple[int, int, int], List]]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. Passed to ``cv2.circle``. If a
+            tuple of 3 ints in ``[0, 255]``, all points use this color; if a
+            list, each element is a color or a per-point color array of
+            shape *(N, 3)* for one batch. (Default is ``None``)
+        alpha (Optional[float]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. Transparency of the overlaid
+            points; values other than ``1`` are slow. (Default is ``None``)
+        text (Optional[Union[str, List[str]]]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. If ``None``, no text is drawn;
+            if a string, the same string is drawn at every position; if a
+            list, each element is drawn at the corresponding row of
+            ``text_positions``. (Default is ``None``)
+        text_positions (Optional[np.ndarray]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. Must be specified if ``text`` is
+            not ``None``. shape: *(n_text, 2)*, order *(x, y)*.
+            (Default is ``None``)
+        text_color (Optional[Union[str, List[str]]]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. Passed to ``cv2.putText``. If a
+            string, the same color is used for all text; if a list, each
+            element is the color for one text item. (Default is ``None``)
+        text_size (Optional[Union[int, List[int]]]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. Passed to ``cv2.putText``. If
+            an int, the same scale is used for all text; if a list, each
+            element is the scale for one text item. (Default is ``None``)
+        text_thickness (Optional[Union[int, List[int]]]):
+            Optional override applied in every call to
+            ``visualize_image_with_points``. Passed to ``cv2.putText``. If
+            an int, the same thickness is used for all text; if a list, each
+            element is the thickness for one text item. (Default is ``None``)
+
+    Attributes:
+        display (bool):
+            Whether ``cv2.imshow`` is called on each visualized frame.
+        error_checking (bool):
+            Whether input validation runs in ``visualize_image_with_points``.
+        handle_cv2Imshow (str):
+            Window name used by ``cv2.imshow``.
+        path_save (Optional[str]):
+            Resolved absolute path to the output video file, or ``None``.
+        frame_height_width (Tuple[int, int]):
+            Height and width of frames written to the video file.
+        frame_rate (Optional[int]):
+            Frame rate used for both display timing and the video writer.
+        fourcc (str):
+            Four-character codec used by ``cv2.VideoWriter``.
+        video_writer (Optional[object]):
+            Underlying ``cv2.VideoWriter`` instance, or ``None`` if
+            ``path_save`` is not set.
     """
     def __init__(
         self,
@@ -47,91 +138,7 @@ class FrameVisualizer:
         text_thickness=None,
 
     ):
-        """
-        Initialize the VideoPlayback object.
-        This class wraps the primary function which is:
-         self.visualize_image_with_points. It is used to visualize
-         single frame inputs of images and overlayed points.
-
-        Args:
-            display (bool):
-                If True: Display image using cv2.imshow.
-            handle_cv2Imshow (str):
-                Used as argument for cv2.imshow.
-                Can be used to close window later.
-            path_save (str):
-                If not None: Save video to this path.
-                Use .avi extension: 'directory/filename.avi'
-            frame_height_width (tuple of int):
-                Height and width of played back and/or saved video.
-            frame_rate (int):
-                Frame rate of played back and/or saved video.
-                If None, will playback at top speed, and saved videos
-                 will have frame rate of 60.
-            fourcc (str):
-                Codec for cv2.VideoWriter video compression.
-                Defaults to `MJPG`
-            error_checking (bool):
-                If True: Perform error checking.
-            verbose (bool or int):
-                Whether to print progress messages.
-                0: No messages
-                1: Warnings
-                2: Info
-
-            point_sizes (int or list):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Used as argument for cv2.circle.
-                If int: All points will be this size.
-                If list: Each element is a size for a batch of points.
-                    Length of list must match the first dimension of points.
-                    points must be 3D array.
-            points_colors (tuple of int or list of tuple of int):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Used as argument for cv2.circle.
-                If tuple: All points will be this color.
-                    Elements of tuple should be 3 integers between 0 and 255.
-                If list: Each element is a color or colors for a batch of 
-                    points.
-                    Length of list must match the first dimension of points.
-                    points must be 3D array.
-                    Each element should either be a tuple of 3 integers or
-                     a 2D array of integers between 0 and 255. Shape should
-                     be (N, 3) where N is the number of points.
-            alpha (float):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Transparency of points.
-                Note that values other than 1 will be slow for now.
-            text (str or list):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Used as argument for cv2.putText.
-                If None: No text will be plotted.
-                If str: All text will be this string.
-                If list: Each element is a string for a batch of text.
-                    text_positions must be 3D array.
-            text_positions (np.ndarray, np.float32):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Must be specified if text is not None.
-                2D array: Each row is a text position. Order (x,y).
-            text_color (str or list):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Used as argument for cv2.putText.
-                If str: All text will be this color.
-                If list: Each element is a color for a different text.
-                    Length of list must match the length of text.
-            text_size (int or list):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Used as argument for cv2.putText.
-                If int: All text will be this size.
-                If list: Each element is a size for a different text.
-                    Length of list must match the length of text.
-            text_thickness (int or list):
-                OPTIONAL. Can be set during call to visualize_image_with_points.
-                Used as argument for cv2.putText.
-                If int: All text will be this thickness.
-                If list: Each element is a thickness for a different text.
-                    Length of list must match the length of text.
-        """
+        """Initializes the visualizer and opens the underlying video writer when ``path_save`` is provided."""
         ## Store arguments
         self.point_sizes = point_sizes if point_sizes is not None else None
         self.points_colors = points_colors if points_colors is not None else None
@@ -181,70 +188,60 @@ class FrameVisualizer:
         text_thickness=1,
     ):
         """
-        Visualize an image with points and text.
-        Be careful to follow input formats as little error checking is done
-        to save time.
+        Draws points and text onto a single image and optionally displays
+        and/or writes the result. Input validation is intentionally minimal
+        for performance, so the caller must follow the documented formats.
 
         Args:
-            image (np.ndarray, uint8):
-                3D array of integers, where each element is a 
-                pixel value. Last dimension should be channels.
-            points (list of np.ndarray of dtype int):
-                list of 2D array: List elements are batches of points.
-                    Each batch can have different colors and sizes.
-                    Each list element is a different batch.
-                    Shape of each array: (n_points, 2)
-                    First dimension of each array is point number, and
-                     second dimension is point coordinates. Order (x,y).
-            point_sizes (int or list):
-                Used as argument for cv2.circle.
-                If int: All points will be this size.
-                If list: Each element is a size for a batch of points.
-                    Length of list must match the first dimension of points.
-                    points must be 3D array.
-            points_colors (tuple of int or list of tuple of int):
-                Used as argument for cv2.circle.
-                If tuple: All points will be this color.
-                    Elements of tuple should be 3 integers between 0 and 255.
-                If list: Each element is a color or colors for a batch of 
-                    points.
-                    Length of list must match the first dimension of points.
-                    points must be 3D array.
-                    Each element should either be a tuple of 3 integers or
-                     a 2D array of integers between 0 and 255. Shape should
-                     be (N, 3) where N is the number of points.
-            alpha (float):
-                Transparency of points.
-                Note that values other than 1 will be slow for now.
-            text (str or list):
-                Used as argument for cv2.putText.
-                If None: No text will be plotted.
-                If str: All text will be this string.
-                If list: Each element is a string for a batch of text.
-                    text_positions must be 3D array.
-            text_positions (np.ndarray, np.float32):
-                Must be specified if text is not None.
-                2D array: Each row is a text position. Order (x,y).
-            text_color (str or list):
-                Used as argument for cv2.putText.
-                If str: All text will be this color.
-                If list: Each element is a color for a different text.
-                    Length of list must match the length of text.
-            text_size (int or list):
-                Used as argument for cv2.putText.
-                If int: All text will be this size.
-                If list: Each element is a size for a different text.
-                    Length of list must match the length of text.
-            text_thickness (int or list):
-                Used as argument for cv2.putText.
-                If int: All text will be this thickness.
-                If list: Each element is a thickness for a different text.
-                    Length of list must match the length of text.
+            image (np.ndarray):
+                Image to draw on. shape: *(H, W, 3)*, dtype: *uint8*. The
+                last dimension is channels.
+            points (Optional[Union[np.ndarray, List[np.ndarray]]]):
+                Points to overlay. If a single ``np.ndarray`` of shape
+                *(n_points, 2)* and integer dtype, it is treated as one
+                batch and clamped to the image bounds. If a list, each
+                element is one batch of shape *(n_points, 2)* and dtype
+                *int*; column order is *(x, y)*. (Default is ``None``)
+            point_sizes (Optional[Union[int, List[int]]]):
+                Radius passed to ``cv2.circle``. If an int, every point
+                uses this size; if a list, each element is the size for one
+                batch of ``points``. (Default is ``None``)
+            points_colors (Union[Tuple[int, int, int], List]):
+                Color passed to ``cv2.circle``. If a tuple of 3 ints in
+                ``[0, 255]``, every point uses this color; if a list, each
+                element is either a 3-tuple for one batch or an
+                ``np.ndarray`` of shape *(n_points, 3)* with per-point
+                colors in ``[0, 255]``. (Default is ``(0, 255, 255)``)
+            alpha (Optional[float]):
+                Transparency of the overlaid points; values other than
+                ``1`` are slow. (Default is ``None``)
+            text (Optional[Union[str, List[str]]]):
+                Text passed to ``cv2.putText``. If ``None``, no text is
+                drawn; if a string, the same string is drawn at every row
+                of ``text_positions``; if a list, each element is drawn at
+                the matching row. (Default is ``None``)
+            text_positions (Optional[np.ndarray]):
+                Positions for each text item. Required if ``text`` is not
+                ``None``. shape: *(n_text, 2)*, order *(x, y)*.
+                (Default is ``None``)
+            text_color (Union[str, List[str]]):
+                Color passed to ``cv2.putText``. If a string, all text uses
+                this color; if a list, each element is the color for one
+                text item. (Default is ``'white'``)
+            text_size (Union[int, List[int]]):
+                Font scale passed to ``cv2.putText``. If an int, all text
+                uses this scale; if a list, each element is the scale for
+                one text item. (Default is ``1``)
+            text_thickness (Union[int, List[int]]):
+                Stroke thickness passed to ``cv2.putText``. If an int, all
+                text uses this thickness; if a list, each element is the
+                thickness for one text item. (Default is ``1``)
 
         Returns:
-            image (np.ndarray, uint8):
-                A 3D array of integers, where each element is a 
-                pixel value.
+            (np.ndarray):
+                image_out (np.ndarray):
+                    Copy of ``image`` with points and text drawn on top.
+                    shape: *(H, W, 3)*, dtype: *uint8*.
         """
         ## Get arguments from self if not None
         point_sizes = self.point_sizes if self.point_sizes is not None else point_sizes
@@ -428,6 +425,7 @@ class FrameVisualizer:
         return image_out
 
     def close(self):
+        """Closes the OpenCV display window and releases the video writer if either is active."""
         if self.video_writer is not None:
             cv2.destroyWindow(self.handle_cv2Imshow)
             try:
@@ -436,10 +434,7 @@ class FrameVisualizer:
                 pass
 
     def __call__(self, *args, **kwds):
-        """
-        Calls self.visualize_image_with_points(*args, **kwds).
-        See that function for details.
-        """
+        """Forwards positional and keyword arguments to ``visualize_image_with_points``."""
         self.visualize_image_with_points(*args, **kwds)
     def __del__(self):
         self.close()
@@ -455,23 +450,23 @@ def play_video_with_points(
         idx_frames=None,
     ):
         """
-        Play a video with points overlaid on it.
-        Optionally, save the video to a file.
-        RH 2022
+        Plays a video with optional point overlays and optionally writes it
+        to disk via the supplied ``FrameVisualizer``. RH 2022
 
         Args:
-            bufferedVideoReader (BufferedVideoReader): 
-                BufferedVideoReader object.
-                Made using the fr.helpers.BufferedVideoReader class.
-            frameVisualizer (FrameVisualizer, optional):
-                FrameVisualizer object.
-                Made using the fr.visualization.FrameVisualizer class.
-            points (np.ndarray, optional):
-                Points to overlay on the video.
-                Shape: (num_frames, num_points, 2)
-            idx_frames (np.ndarray, optional):
-                Indices of frames to play.
-                Defaults to np.arange(len(bufferedVideoReader))
+            bufferedVideoReader (BufferedVideoReader):
+                Source of frames, created with
+                ``fr.helpers.BufferedVideoReader``.
+            frameVisualizer (FrameVisualizer):
+                Visualizer that draws and optionally saves each frame,
+                created with ``fr.visualization.FrameVisualizer``. Required
+                in practice despite the default. (Default is ``None``)
+            points (Optional[np.ndarray]):
+                Points to overlay on the video. shape:
+                *(num_frames, num_points, 2)*. (Default is ``None``)
+            idx_frames (Optional[np.ndarray]):
+                Indices of frames to play. If ``None``, all frames in the
+                reader are played. (Default is ``None``)
         """
         ## Check arguments
         print(type(bufferedVideoReader)) if frameVisualizer._verbose > 1 else None
@@ -552,24 +547,35 @@ def play_video_with_points(
 
 def display_toggle_image_stack(images, image_size=None, clim=None, interpolation='nearest'):
     """
-    Display images in a slider using Jupyter Notebook.
-    RH 2023
+    Renders an HTML image slider in a Jupyter notebook to scrub through a
+    stack of images. RH 2023
 
     Args:
-        images (list of numpy arrays or PyTorch tensors):
-            List of images as numpy arrays or PyTorch tensors
-        image_size (tuple of ints, or float, optional):
-            If tuple: (width, height) for resizing images.
-            If float: resize factor to apply to each image.
-            If None (default), images are not resized.
-        clim (tuple of floats, optional):
-            Tuple of (min, max) values for scaling pixel intensities.
-            If None (default), min and max values are computed from the images
-             and used as bounds for scaling.
-        interpolation (string, optional):
-            String specifying the interpolation method for resizing.
-            Options: 'nearest', 'box', 'bilinear', 'hamming', 'bicubic', 'lanczos'.
-            Uses the Image.Resampling.* methods from PIL.
+        images (List[Union[np.ndarray, torch.Tensor]]):
+            Images to display, each as a 2D or 3D ``np.ndarray`` or
+            ``torch.Tensor``. All images must share an interpretation
+            compatible with PIL ``fromarray``.
+        image_size (Optional[Union[Tuple[int, int], float]]):
+            Output size per image. \n
+            * ``Tuple[int, int]``: explicit ``(width, height)`` applied to
+              every image.
+            * ``float``: scale factor applied to each image's native shape.
+            * ``None``: images are displayed at their native size. \n
+            (Default is ``None``)
+        clim (Optional[Tuple[float, float]]):
+            ``(min, max)`` intensity bounds used to scale pixel values to
+            ``[0, 255]``. If ``None``, the per-image min and max are used.
+            (Default is ``None``)
+        interpolation (str):
+            Resampling method used when resizing. One of \n
+            * ``'nearest'``
+            * ``'box'``
+            * ``'bilinear'``
+            * ``'hamming'``
+            * ``'bicubic'``
+            * ``'lanczos'`` \n
+            Mapped to the matching ``PIL.Image.Resampling.*`` constant.
+            (Default is ``'nearest'``)
     """
     from IPython.display import display, HTML
     import numpy as np
@@ -694,22 +700,29 @@ def complex_colormap(
     color_cos: Tuple[int, int, int] = (0, 0, 255),
 ) -> np.ndarray:
     """
-    Generates an RGB colormap for complex values based on magnitude and angle.
-
-    The colors vary with the angle and the brightness varies with
-    the magnitude.
+    Generates an RGB colormap for complex values, where hue tracks the
+    angle and brightness tracks the magnitude.
 
     Args:
-        mags (np.ndarray): 
-            Array of magnitudes.
-        angles (np.ndarray): 
-            Array of angles in radians.
+        mags (np.ndarray):
+            Magnitudes of the complex values. Must broadcast against
+            ``angles``.
+        angles (np.ndarray):
+            Angles in radians. Must share shape with ``mags``.
         normalize_mags (bool):
-            If True, applies min-max normalization to the magnitudes.
+            If ``True``, apply min-max normalization to ``mags`` before
+            scaling brightness. (Default is ``True``)
+        color_sin (Tuple[int, int, int]):
+            RGB color contributed in proportion to ``sin(angles)``.
+            (Default is ``(255, 0, 0)``)
+        color_cos (Tuple[int, int, int]):
+            RGB color contributed in proportion to ``cos(angles)``.
+            (Default is ``(0, 0, 255)``)
 
     Returns:
-        np.ndarray: 
-            Array with RGB values.
+        (np.ndarray):
+            rgb (np.ndarray):
+                RGB values per element. shape: *(mags.size, 3)*.
     """
     assert mags.shape == angles.shape, "The shapes of mags and angles must be the same."
 

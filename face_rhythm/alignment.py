@@ -22,6 +22,41 @@ from tqdm.auto import tqdm
 from face_rhythm import rois
 
 class Image_preparation_pipeline():
+    """
+    Builds a clean reference image for registration by downsampling frames,
+    selecting frames with low spectral variance via a VQT spectrogram, and
+    applying CLAHE contrast enhancement. RH 2023
+
+    Args:
+        ds_factor (int):
+            Spatial downsampling factor applied before spectral analysis.
+            (Default is ``20``)
+        ptile_specVar_keep (float):
+            Percentile cutoff for the per-frame mean spectral magnitude;
+            frames at or below this percentile are kept as **low-variance**
+            (non-behavior) frames. (Default is ``10``)
+        ptile_intensity_keep (float):
+            Percentile cutoff used when normalizing pixel intensities (kept
+            for backwards compatibility; current implementation no longer
+            applies this clip). (Default is ``90``)
+        params_vqt (Dict):
+            Keyword arguments forwarded to ``vqt.VQT`` for the spectral
+            analysis. Recognized keys include ``Fs_sample`` (sample rate),
+            ``Q_lowF``, ``Q_highF`` (quality factors at the low and high
+            frequency bounds), ``F_min``, ``F_max`` (frequency range),
+            ``n_freq_bins`` (number of frequency bins), ``window_type``,
+            ``downsample_factor``, ``fft_conv`` (use FFT-based convolution),
+            and ``plot_pref``. (Default is the dictionary shown in the
+            signature)
+        clip_limit (float):
+            ``clipLimit`` argument forwarded to OpenCV CLAHE.
+            (Default is ``2.0``)
+        grid_size (int):
+            Tile grid size forwarded to OpenCV CLAHE. (Default is ``20``)
+        verbose (bool):
+            If ``True``, prints progress messages and shows intermediate
+            plots. (Default is ``True``)
+    """
     def __init__(
         self,
         ds_factor: int = 20,
@@ -46,6 +81,7 @@ class Image_preparation_pipeline():
         
         verbose: bool = True,
     ) -> None:
+        """Initializes the pipeline and stores all preprocessing parameters."""
         self.ds_factor = ds_factor
         self.ptile_specVar_keep = ptile_specVar_keep
         self.ptile_intensity_keep = ptile_intensity_keep
@@ -55,6 +91,25 @@ class Image_preparation_pipeline():
         self.verbose = verbose
 
     def downsample(self, images: np.ndarray, ds_factor: Optional[int]=None) -> np.ndarray:
+        """
+        Spatially downsamples a stack of images by ``ds_factor`` using bilinear
+        interpolation, collapsing any color channel by mean.
+
+        Args:
+            images (np.ndarray):
+                Input image stack. shape: *(n_frames, H, W)* or
+                *(n_frames, H, W, C)*.
+            ds_factor (Optional[int]):
+                Integer downsampling factor. If ``None``, ``self.ds_factor``
+                is used. (Default is ``None``)
+
+        Returns:
+            (np.ndarray):
+                images_ds (np.ndarray):
+                    Downsampled image stack.
+                    shape: *(n_frames, H // ds_factor, W // ds_factor)*,
+                    dtype: *float32*.
+        """
         import torch
         images_tensor = torch.as_tensor(images, dtype=torch.float32)
         images_tensor = images_tensor.mean(-1) if images_tensor.ndim == 4 else images_tensor
@@ -87,6 +142,39 @@ class Image_preparation_pipeline():
             "plot_pref": False,
         },
     ):
+        """
+        Selects frames whose mean VQT spectral magnitude lies in the lowest
+        ``ptile_specVar_keep`` percentile and returns a normalized mean image
+        over those frames for use as a registration reference.
+
+        Args:
+            images_ds (np.ndarray):
+                Downsampled image stack used to compute spectrograms.
+                shape: *(n_frames, H_ds, W_ds)*.
+            images (np.ndarray):
+                Full-resolution image stack used to build the reference image.
+                shape: *(n_frames, H, W)* or *(n_frames, H, W, C)*.
+            ptile_specVar_keep (Optional[float]):
+                Percentile cutoff for the mean spectral magnitude; frames at
+                or below this percentile are kept. If ``None``,
+                ``self.ptile_specVar_keep`` is used. (Default is ``10``)
+            ptile_intensity_keep (Optional[float]):
+                Percentile cutoff for intensity normalization (currently
+                unused in the active code path; retained for backwards
+                compatibility). If ``None``, ``self.ptile_intensity_keep`` is
+                used. (Default is ``90``)
+            params_vqt (Optional[Dict]):
+                Keyword arguments forwarded to ``vqt.VQT``. If ``None``,
+                ``self.params_vqt`` is used. (Default is the dictionary shown
+                in the signature)
+
+        Returns:
+            (np.ndarray):
+                im (np.ndarray):
+                    Square-rooted, max-normalized mean of the kept full-
+                    resolution frames. shape: *(H, W)*, dtype: *float32* (or
+                    matching the dtype of ``images.mean(0)``).
+        """
         import vqt
         import torch
         
@@ -130,6 +218,25 @@ class Image_preparation_pipeline():
         clip_limit: Optional[float] = 2.0,
         grid_size: Optional[int] = 20,
     ) -> np.ndarray:
+        """
+        Applies CLAHE contrast enhancement to a single image via
+        ``rois.Image_Aligner.augment_images``.
+
+        Args:
+            image (np.ndarray):
+                Input image. shape: *(H, W)*.
+            clip_limit (Optional[float]):
+                CLAHE ``clipLimit`` argument. If ``None``, ``self.clip_limit``
+                is used. (Default is ``2.0``)
+            grid_size (Optional[int]):
+                CLAHE tile grid size. If ``None``, ``self.grid_size`` is used.
+                (Default is ``20``)
+
+        Returns:
+            (np.ndarray):
+                im_aug (np.ndarray):
+                    CLAHE-enhanced image. shape: *(H, W)*.
+        """
         import functools
         
         clip_limit = self.clip_limit if clip_limit is None else clip_limit
@@ -157,6 +264,20 @@ class Image_preparation_pipeline():
         self,
         images: np.ndarray,
     ):
+        """
+        Runs the full reference-image pipeline: downsample, select
+        low-spectral-variance frames, then apply CLAHE.
+
+        Args:
+            images (np.ndarray):
+                Input image stack. shape: *(n_frames, H, W)* or
+                *(n_frames, H, W, C)*.
+
+        Returns:
+            (np.ndarray):
+                im_aug (np.ndarray):
+                    CLAHE-enhanced reference image. shape: *(H, W)*.
+        """
         print(f"downsampling...") if self.verbose > 0 else None
         images_ds = self.downsample(images)
         print(f"computing spectrograms...") if self.verbose > 0 else None
@@ -169,25 +290,28 @@ class Image_preparation_pipeline():
 
 class SFTPVideoFrameExtractor:
     """
-    A class to extract the first frame from remote video files via SFTP and return it as a NumPy array.
-    
-    The password is stored in an encoded form and only decoded when constructing the SFTP URL.
-    The extraction leverages ffmpeg to stream just the required data.
-    
-    RH 2023
-    
+    Extracts frames from remote video files over SFTP and returns them as a
+    NumPy array. The password is held base64-encoded with a random salt and
+    only decoded transiently when constructing the SFTP URL; frame extraction
+    is streamed through ffmpeg so the full file is never downloaded. RH 2023
+
     Args:
         host (str):
-            The hostname or IP address of the remote server.
+            Hostname or IP address of the remote server.
         username (str):
-            The username to authenticate with the remote server.
+            Username for authenticating to the remote server.
         password (str):
-            The password to authenticate with the remote server.
-        port (int, optional):
-            The port to use for SFTP. Defaults to 22.
+            Password for authenticating to the remote server. Stored
+            internally in base64-encoded form with a random salt.
+        port (int):
+            TCP port for the SFTP connection. (Default is ``22``)
+        verbose (bool):
+            If ``True``, prints progress messages during probing and frame
+            retrieval. (Default is ``True``)
     """
     
     def __init__(self, host: str, username: str, password: str, port: int = 22, verbose: bool = True) -> None:
+        """Stores the connection parameters and base64-encodes the password with a random salt."""
         # Encode the password in base64 for secure internal storage.
         self.host = host
         self.username = username
@@ -199,39 +323,44 @@ class SFTPVideoFrameExtractor:
     
     def _decode_password(self) -> str:
         """
-        Decodes the stored password from its encoded form.
-        
+        Decodes the stored password by stripping the random salt prefix and
+        base64-decoding the remainder.
+
         Returns:
-            str:
-                The decoded password.
+            (str):
+                password (str):
+                    Plaintext password.
         """
         return base64.b64decode(self._encoded_password)[32:].decode()
     
     def extract_frames(self, remote_video_path: str, time_start: float, duration: int, fps: Optional[float]=None) -> np.ndarray:
         """
-        Extracts the first frame from a video file located on a remote server via SFTP,
-        and returns it as a NumPy array.
-        
+        Streams a window of frames from a remote video over SFTP using ffmpeg
+        and returns them as a stacked NumPy array. The number of frames
+        returned is ``int(fps * duration)``.
+
         Args:
             remote_video_path (str):
-                The path to the video file on the remote server, e.g. "/path/to/video.mp4".
+                Path to the video file on the remote server, e.g.
+                ``"/path/to/video.mp4"``.
             time_start (float):
-                The time in seconds from which to start extracting frames.
+                Start time, in seconds, of the extraction window.
             duration (int):
-                The duration in seconds for which to extract frames.
-                This is used to determine the number of frames to extract.
-                The number of frames is calculated as fps * duration.
-                This is used to determine the number of frames to extract.
-            fps (float, optional):
-                The frames per second of the video. If not provided, it will 
-                be determined from the video metadata.
-                
+                Length of the extraction window, in seconds. The total number
+                of frames returned is ``fps * duration``.
+            fps (Optional[float]):
+                Frame rate of the video. If ``None``, it is probed from the
+                video metadata via ``ffmpeg.probe``. (Default is ``None``)
+
         Returns:
-            np.ndarray:
-                The first frame of the video as a NumPy array.
-                
+            (np.ndarray):
+                frames (np.ndarray):
+                    Decoded frames stacked along axis 0.
+                    shape: *(n_frames, H, W, 3)*, dtype: *uint8*.
+
         Raises:
-            RuntimeError: If ffmpeg fails to extract the frame.
+            RuntimeError:
+                If ffmpeg fails while extracting frames from the SFTP stream.
         """
         # Decode password for constructing the SFTP URL.
         password = self._decode_password()
@@ -271,6 +400,20 @@ class SFTPVideoFrameExtractor:
 
         # Helper function to split concatenated PNG images from the pipe.
         def split_pngs(data: bytes) -> list:
+            """
+            Splits a buffer of concatenated PNG byte streams into a list of
+            individual PNG byte strings using the PNG file signature.
+
+            Args:
+                data (bytes):
+                    Concatenated PNG byte stream as produced by ffmpeg's
+                    ``image2pipe`` muxer.
+
+            Returns:
+                (list):
+                    images (list):
+                        List of ``bytes`` objects, one per PNG image.
+            """
             signature = b'\x89PNG\r\n\x1a\n'
             images = []
             start = data.find(signature)
@@ -295,6 +438,34 @@ class SFTPVideoFrameExtractor:
     
     
 def get_frames(path, time_start, time_end, verbose=False):
+    """
+    Reads a contiguous range of frames from a local video using OpenCV by
+    seeking with ``cv2.CAP_PROP_POS_FRAMES``. Stops early if the requested
+    range extends past EOF rather than raising.
+
+    Args:
+        path (str):
+            Path to the local video file.
+        time_start (float):
+            Start time, in seconds, of the read window.
+        time_end (float):
+            End time, in seconds, of the read window. The number of frames
+            requested is ``int((time_end - time_start) * fps)``.
+        verbose (bool):
+            If ``True``, displays a tqdm progress bar over the seek loop.
+            (Default is ``False``)
+
+    Returns:
+        (np.ndarray):
+            ims (np.ndarray):
+                Decoded frames stacked along axis 0. shape:
+                *(n_frames, H, W, 3)*, dtype matches the dtype returned by
+                ``cv2.VideoCapture.read`` (typically *uint8*).
+
+    Raises:
+        ValueError:
+            If no frames could be read in the requested interval.
+    """
     vc = cv2.VideoCapture(path)
     ## Get Fs
     fps = vc.get(cv2.CAP_PROP_FPS)

@@ -13,10 +13,65 @@ from .helpers import VideoReaderWrapper, BufferedVideoReader
 ## Define Dataset class as a subclass of utils.FR_Module
 class Dataset_videos(FR_Module):
     """
-    Class for handling video data.
-    Imports videos using decord and generates lazy video reader
-     objects for each video.
-    RH 2022
+    Container for one or more videos used as input to the face-rhythm pipeline. RH 2022
+
+    Imports videos via ``decord`` (or wraps an existing
+    :class:`BufferedVideoReader`) and exposes lazy per-video readers along
+    with aggregated metadata (frame counts, frame rate, frame shape, channel
+    count). Acts as a sequence of video readers.
+
+    Args:
+        bufferedVideoReader (object):
+            Pre-built :class:`BufferedVideoReader` whose readers and metadata
+            are reused. Mutually exclusive with ``paths_videos``; exactly one
+            must be provided. (Default is ``None``)
+        paths_videos (Union[str, List[str]]):
+            Path or list of paths to the video files to load. Used when
+            ``bufferedVideoReader`` is ``None``. (Default is ``None``)
+        contiguous (bool):
+            If ``True``, videos are treated as a single contiguous stream
+            (the first frame of each subsequent video continues the frame
+            index of the previous one). (Default is ``False``)
+        frame_rate_clamp (float):
+            If ``None`` the frame rate stored in ``self.frame_rate`` is the
+            median of the per-video metadata frame rates. If a float, that
+            value is used verbatim. (Default is ``None``)
+        verbose (Union[bool, int]):
+            Verbosity level. \n
+            * ``0``: Silent.
+            * ``1``: Warnings only.
+            * ``2``: Warnings and informational progress messages. \n
+            (Default is ``1``)
+
+    Attributes:
+        videos (List[object]):
+            Per-video lazy reader objects (``VideoReaderWrapper`` instances
+            or readers borrowed from ``bufferedVideoReader``).
+        paths_videos (List[str]):
+            Absolute paths to the source video files.
+        metadata (dict):
+            Per-video metadata with keys ``'paths_videos'``, ``'num_frames'``,
+            ``'frame_rate'``, ``'frame_height_width'``, and ``'num_channels'``.
+        num_frames_total (int):
+            Total number of frames summed across all videos.
+        frame_rate (float):
+            Effective frame rate used by the pipeline.
+        frame_height_width (List[int]):
+            Frame height and width shared by all videos.
+        num_channels (int):
+            Number of channels shared by all videos.
+        example_image (np.ndarray):
+            The first frame of the first video, materialized as a CPU
+            ``numpy`` array.
+        contiguous (bool):
+            Whether videos are treated as a single contiguous stream.
+        config (dict):
+            Inputs needed to reconstruct this object, used by ``FR_Module``.
+        run_info (dict):
+            Derived run-level metadata, used by ``FR_Module``.
+        run_data (dict):
+            Heavyweight outputs (currently ``example_image``), used by
+            ``FR_Module``.
     """
     def __init__(
         self,
@@ -26,32 +81,7 @@ class Dataset_videos(FR_Module):
         frame_rate_clamp: float=None,
         verbose: Union[bool, int]=1,
     ):
-        """
-        Initialize the Dataset_videos object.
-
-        Args:
-            bufferedVideoReader (BufferedVideoReader, optional):
-                Optional. If None, then paths_videos must be specified.
-                BufferedVideoReader object to use for reading videos.
-                Object should have all the desired videos loaded.
-            paths_videos (str or list of str):
-                Optional. If None, then bufferedVideoReader must be
-                 specified.
-                Path(s) to video(s) to load.
-            contiguous (bool):
-                Whether the videos should be treated as contiguous.
-                I.e. Whether the first frame of the next video should be
-                 considered to be the subsequent frame of the last video.
-            frame_rate_clamp (float):
-                If None then the frame rate metadata from the videos will
-                 be used.
-                If a float then the frame rate will be set to this value.
-            verbose (bool or int):
-                Whether to print progress messages.
-                0: No messages
-                1: Warnings
-                2: Info
-        """
+        """Initializes the dataset, opens each video, and collects metadata."""
         ## Imports
         super().__init__()
 
@@ -170,10 +200,19 @@ class Dataset_videos(FR_Module):
         # self.run_data.update(self.run_info)
 
     def __repr__(self):
+        """Returns a one-line summary of dataset shape, frame rate, and channel count."""
         return f"Dataset_videos, num_videos={len(self.paths_videos)}, num_frames_total={self.num_frames_total}, frame_rate={self.frame_rate}, frame_height_width={self.frame_height_width}, num_channels={self.num_channels}"
 
     ## Define methods for loading and handling videos
-    def __getitem__(self, index): return self.videos[index]
-    def __len__(self): return len(self.videos)
-    def __iter__(self): return iter(self.videos)
-    def __next__(self): return next(self.videos)
+    def __getitem__(self, index):
+        """Returns the lazy video reader at position ``index``."""
+        return self.videos[index]
+    def __len__(self):
+        """Returns the number of videos in the dataset."""
+        return len(self.videos)
+    def __iter__(self):
+        """Returns an iterator over the per-video lazy readers."""
+        return iter(self.videos)
+    def __next__(self):
+        """Returns the next per-video lazy reader from the iterator."""
+        return next(self.videos)
