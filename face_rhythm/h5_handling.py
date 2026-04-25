@@ -10,10 +10,14 @@ import h5py
 import numpy as np
 
 def close_all_h5():
-    '''
-    Closes all h5 objects in workspace. Not tested thoroughly.
-    from here: https://stackoverflow.com/questions/29863342/close-an-open-h5py-data-file
-    '''
+    """
+    Closes every open :class:`h5py.File` object found in the Python workspace.
+
+    Iterates over all live objects via :mod:`gc` and calls ``close`` on any
+    :class:`h5py.File` instance. Falls back to
+    ``tables.file._open_files.close_all`` if the primary loop raises. Adapted
+    from https://stackoverflow.com/questions/29863342/close-an-open-h5py-data-file.
+    """
     try:
         for obj in gc.get_objects():   # Browse through ALL objects
             if isinstance(obj, h5py.File):   # Just HDF5 files
@@ -31,21 +35,23 @@ def close_all_h5():
 
 
 def show_group_items(hObj):
-    '''
-    Simple function that displays all the items and groups in the
-     highest hierarchical level of an h5 object or python dict.
-    See 'show_item_tree' to view the whole tree
-    RH 2021
+    """
+    Prints the items at the top hierarchical level of an HDF5 object or dict. RH 2021
+
+    See :func:`show_item_tree` for a full recursive listing.
 
     Args:
-        hObj: 'hierarchical Object' hdf5 object or subgroup object OR python dictionary
-    
-    ##############
+        hObj (object):
+            Hierarchical object: an :class:`h5py.File`, :class:`h5py.Group`, or a
+            Python ``dict``.
 
-    example usage:
-        with h5py.File(path , 'r') as f:
-            h5_handling.show_group_items(f)
-    '''
+    Example:
+        .. highlight:: python
+        .. code-block:: python
+
+            with h5py.File(path, 'r') as f:
+                h5_handling.show_group_items(f)
+    """
 
     for ii,val in enumerate(list(iter(hObj))):
         if isinstance(hObj[val] , h5py.Group) or isinstance(hObj[val]):
@@ -61,31 +67,38 @@ def show_group_items(hObj):
 
 
 def show_item_tree(hObj=None , path=None, depth=None, show_metadata=True, print_metadata=False, indent_level=0):
-    '''
-    Recursive function that displays all the items 
-     and groups in an h5 object or python dict
-    RH 2021
+    """
+    Recursively prints the items and groups in an HDF5 object or dict. RH 2021
 
     Args:
-        hObj:
-            'hierarchical Object'. hdf5 object OR python dictionary
-        path (Path or string):
-            If not None, then path to h5 object is used instead of hObj
-        depth (int):
-            how many levels deep to show the tree
-        show_metadata (bool): 
-            whether or not to list metadata with items
-        print_metadata (bool): 
-            whether or not to show values of metadata items
-        indent_level: 
-            used internally to function. User should leave blank
+        hObj (object):
+            Hierarchical object: an :class:`h5py.File`, :class:`h5py.Group`, or a
+            Python ``dict``. Ignored when ``path`` is provided. (Default is
+            ``None``)
+        path (Optional[object]):
+            Path-like to an HDF5 file to open in read mode. If not ``None``,
+            the file is opened and traversed in place of ``hObj``. (Default is
+            ``None``)
+        depth (Optional[int]):
+            Maximum number of hierarchical levels to descend. ``None`` means
+            unlimited. (Default is ``None``)
+        show_metadata (bool):
+            If ``True``, list per-node metadata attributes alongside items.
+            (Default is ``True``)
+        print_metadata (bool):
+            If ``True``, also print the value of each metadata attribute;
+            otherwise only its shape and dtype are shown. (Default is ``False``)
+        indent_level (int):
+            Internal recursion bookkeeping for indentation; users should leave
+            this at the default. (Default is ``0``)
 
-    ##############
-    
-    example usage:
-        with h5py.File(path , 'r') as f:
-            h5_handling.show_item_tree(f)
-    '''
+    Example:
+        .. highlight:: python
+        .. code-block:: python
+
+            with h5py.File(path, 'r') as f:
+                h5_handling.show_item_tree(f)
+    """
 
     if depth is None:
         depth = int(10000000000000000000)
@@ -122,12 +135,28 @@ def show_item_tree(hObj=None , path=None, depth=None, show_metadata=True, print_
 
 
 def make_h5_tree(dict_obj , h5_obj , group_string='', use_compression=False, track_order=True):
-    '''
-    This function is meant to be called by write_dict_to_h5. It probably shouldn't be called alone.
-    This function creates an h5 group and dataset tree structure based on the hierarchy and values within a python dict.
-    There is a recursion in this function.
-    RH 2021
-    '''
+    """
+    Recursively writes a Python dict into an HDF5 group/dataset tree. RH 2021
+
+    Intended to be called by :func:`write_dict_to_h5`; using it directly is
+    **not** recommended.
+
+    Args:
+        dict_obj (dict):
+            Source dictionary whose hierarchy and leaf values become groups and
+            datasets, respectively.
+        h5_obj (h5py.File):
+            Open HDF5 file (or group) into which the tree is written.
+        group_string (str):
+            Path of the current HDF5 group within ``h5_obj`` during recursion.
+            An empty string is treated as the root ``'/'``. (Default is ``''``)
+        use_compression (bool):
+            If ``True``, write each dataset with gzip level 9 compression.
+            (Default is ``False``)
+        track_order (bool):
+            If ``True``, set :func:`h5py.get_config` to preserve insertion
+            order of items. (Default is ``True``)
+    """
     ## Set track_order to True to keep track of the order of the items in the dict
     ##  This is useful for reading the dict back in from the h5 file
     h5py.get_config().track_order = track_order
@@ -154,25 +183,32 @@ def write_dict_to_h5(
     write_mode='w-', 
     show_item_tree_pref=True
 ):
-    '''
-    Writes an h5 file that matches the hierarchy and data within a python dict.
-    This function calls the function 'make_h5_tree'
-    RH 2021
-   
+    """
+    Writes a Python dict to an HDF5 file, mirroring its hierarchy and data. RH 2021
+
+    Wraps :func:`make_h5_tree` and optionally prints the resulting tree.
+
     Args:
-        path_save (string or Path): 
-            Full path name of file to write
-        input_dict (dict): 
-            Dict containing only variables that can be written as a 'dataset' in an h5 file (generally np.ndarrays and strings)
+        path_save (object):
+            Full path of the file to write. ``str`` or :class:`pathlib.Path`.
+        input_dict (dict):
+            Dictionary whose leaves are HDF5-writable values (typically
+            :class:`numpy.ndarray` or strings).
         use_compression (bool):
-            Whether or not to use compression when writing the h5 file
+            If ``True``, write each dataset with gzip compression. (Default is
+            ``False``)
         track_order (bool):
-            Whether or not to keep track of the order of the items in the dict
-        write_mode ('w' or 'w-'): 
-            The priveleges of the h5 file object. 'w' will overwrite. 'w-' will not overwrite
-        show_item_tree_pref (bool): 
-            Whether you'd like to print the item tree or not
-    '''
+            If ``True``, preserve dict insertion order in the HDF5 file.
+            (Default is ``True``)
+        write_mode (str):
+            File-open mode forwarded to :class:`h5py.File`. Either \n
+            * ``'w'``: Overwrite any existing file.
+            * ``'w-'``: Refuse to overwrite an existing file. \n
+            (Default is ``'w-'``)
+        show_item_tree_pref (bool):
+            If ``True``, print the resulting HDF5 hierarchy after writing.
+            (Default is ``True``)
+    """
     with h5py.File(path_save , write_mode) as hf:
         make_h5_tree(input_dict , hf , '', use_compression=use_compression, track_order=track_order)
         if show_item_tree_pref:
@@ -182,17 +218,24 @@ def write_dict_to_h5(
 
 def simple_load(filepath, return_dict=True, verbose=False):
     """
-    Returns a dictionary object containing the groups
-    as keys and the datasets as values from
-    given hdf file.
-    RH 2023
+    Loads an HDF5 file and returns it as a nested ``dict`` or an open file. RH 2023
 
     Args:
-        filepath (string or Path): 
-            Full path name of file to read.
+        filepath (object):
+            Full path of the file to read. ``str`` or :class:`pathlib.Path`.
         return_dict (bool):
-            Whether or not to return a dict object (True)
-            or an h5py object (False)
+            If ``True``, return a nested ``dict`` whose keys are group names
+            and whose leaves are the dataset arrays. If ``False``, return the
+            open :class:`h5py.File` object instead. (Default is ``True``)
+        verbose (bool):
+            If ``True``, print the file's hierarchy via :func:`show_item_tree`
+            before returning. (Default is ``False``)
+
+    Returns:
+        (object):
+            data (object):
+                Either a nested ``dict`` of arrays (when ``return_dict`` is
+                ``True``) or an open :class:`h5py.File` handle.
     """
     if return_dict:
         with h5py.File(filepath, 'r') as h5_file:
@@ -218,10 +261,19 @@ def simple_load(filepath, return_dict=True, verbose=False):
         return h5py.File(filepath, 'r')
 
 def h5Obj_to_dict(hObj):
-    '''
-    Converts an h5py object to a python dict object
-    RH 2023
-    '''
+    """
+    Converts an :mod:`h5py` group or file into a nested Python ``dict``. RH 2023
+
+    Args:
+        hObj (object):
+            An :class:`h5py.File` or :class:`h5py.Group` to traverse.
+
+    Returns:
+        (dict):
+            h5_dict (dict):
+                Nested dictionary mirroring the HDF5 hierarchy. Datasets are
+                materialized via ``[()]``.
+    """
     h5_dict = {}
     for ii,val in enumerate(list(iter(hObj))):
         if isinstance(hObj[val], h5py.Group):
@@ -240,27 +292,29 @@ def simple_save(
     verbose=False
 ):
     """
-    Saves a python dict to an hdf file.
-    Also allows for adding new data to
-     an existing hdf file.
-    RH 2021
+    Saves a Python dict to an HDF5 file or appends it to an existing one. RH 2021
 
     Args:
         dict_to_save (dict):
-            Python dict to save to hdf file.
-        path (string or Path):
-            Full path name of file to write.
-        write_mode ('w', 'w-', 'a'):
-            The priveleges of the h5 file object.
-            'w' will overwrite.
-            'w-' will not overwrite.
-            'a' will append/add a new dataset to the h5 file.
+            Dictionary to save to the HDF5 file.
+        path (object):
+            Full path of the file to write. ``str`` or :class:`pathlib.Path`.
+            (Default is ``None``)
         use_compression (bool):
-            Whether or not to use compression when writing the h5 file
+            If ``True``, write each dataset with gzip compression. (Default is
+            ``False``)
         track_order (bool):
-            Whether or not to keep track of the order of the items in the dict
+            If ``True``, preserve dict insertion order in the HDF5 file.
+            (Default is ``True``)
+        write_mode (str):
+            File-open mode forwarded to :class:`h5py.File`. Either \n
+            * ``'w'``: Overwrite any existing file.
+            * ``'w-'``: Refuse to overwrite an existing file.
+            * ``'a'``: Append a new dataset to an existing file. \n
+            (Default is ``'w-'``)
         verbose (bool):
-            Whether or not to print out the h5 file hierarchy.
+            If ``True``, print the resulting HDF5 hierarchy after writing.
+            (Default is ``False``)
     """
 
     write_dict_to_h5(
@@ -275,14 +329,16 @@ def simple_save(
 
 def merge_helper(d, group):
     """
-    Merge a dictionary into an existing HDF5 file identified
-     by an h5py.File object.
+    Recursively merges a dictionary into an open :class:`h5py.Group`.
+
+    Sub-dictionaries map to subgroups; non-dict values are written as
+    datasets, replacing any existing dataset with the same name.
 
     Args:
-        d (dict): 
-            The dictionary containing the data to be merged.
-        group (h5py.Group): 
-            The HDF5 group to which the data should be merged.
+        d (dict):
+            Dictionary containing the data to merge.
+        group (object):
+            Target :class:`h5py.Group` (or :class:`h5py.File`) to merge into.
     """
     for key, value in d.items():
         if isinstance(value, dict):
@@ -299,21 +355,21 @@ def merge_helper(d, group):
             group.create_dataset(key, data=value)
 def merge_dict_into_h5_file(d, filepath=None, h5Obj=None,):
     """
-    Merge a dictionary into an existing HDF5 file identified
-     by a file path.
-    This function wraps a recursive function that goes through
-     each hierarchical level of the input dictionary and merges
-     it into the appropriate HDF5 group.
+    Merges a dictionary into an existing HDF5 file or open file object.
+
+    Wraps :func:`merge_helper`, which recursively walks the dict and merges
+    each level into the matching HDF5 group. Exactly one of ``filepath`` or
+    ``h5Obj`` must be supplied.
 
     Args:
-        d (dict): 
-            The dictionary containing the data to be merged.
-        filepath (str): 
-            The file path of the HDF5 file.
-            Do not specify if hObj is specified.
-        h5Obj (h5py.File):
-            An h5py.File object.
-            Do not specify if filepath is specified.
+        d (dict):
+            Dictionary containing the data to merge.
+        filepath (Optional[str]):
+            Path to an HDF5 file to open in append mode. Do not specify when
+            ``h5Obj`` is provided. (Default is ``None``)
+        h5Obj (object):
+            Open :class:`h5py.File` object to merge into. Do not specify when
+            ``filepath`` is provided. (Default is ``None``)
     """
     if filepath is None and h5Obj is None:
         raise ValueError('Either filepath or h5Obj must be specified.')

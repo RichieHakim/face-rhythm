@@ -52,26 +52,44 @@ elif not has_cv2_headless and not has_cv2_normal:
 else:
     raise ValueError("This should never happen. Please report this error to the developer.")
 
-if run_cv2_imshow:
-    def prepare_cv2_imshow():
-        """
-        This function is necessary because cv2.imshow() 
-        can crash the kernel if called after importing 
-        av and decord.
-        RH 2022
-        """
-        import numpy as np
-        import cv2
-        test = np.zeros((1,300,400,3))
-        for frame in test:
-            cv2.putText(frame, "WELCOME TO FACE RHYTHM!", (10,50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
-            cv2.putText(frame, "Prepping CV2", (10,100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
-            cv2.putText(frame, "Calling this figure allows cv2.imshow ", (10,150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-            cv2.putText(frame, "to work without crashing if this function", (10,170), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-            cv2.putText(frame, "is called before importing av and decord", (10,190), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-            cv2.imshow('startup', frame)
-            cv2.waitKey(1000)
-        cv2.destroyWindow('startup')
+def prepare_cv2_imshow():
+    """
+    This function is necessary because cv2.imshow()
+    can crash the kernel if called after importing
+    other libraries that wrap libavcodec (e.g. torchcodec, av, decord).
+    Calling it once at import time forces cv2 to initialize its GUI
+    subsystem before those libraries can hijack the relevant symbols.
+    RH 2022
+    """
+    import numpy as np
+    import cv2
+    test = np.zeros((1,300,400,3))
+    for frame in test:
+        cv2.putText(frame, "WELCOME TO FACE RHYTHM!", (10,50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+        cv2.putText(frame, "Prepping CV2", (10,100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+        cv2.putText(frame, "Calling this figure allows cv2.imshow ", (10,150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "to work without crashing if this function", (10,170), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.putText(frame, "is called before importing torchcodec/av", (10,190), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        cv2.imshow('startup', frame)
+        cv2.waitKey(1000)
+    cv2.destroyWindow('startup')
+
+
+def _display_available():
+    """True if a GUI display is available for cv2.imshow at runtime.
+
+    Linux: requires X11 ($DISPLAY) or Wayland ($WAYLAND_DISPLAY).
+    macOS / Windows: assume yes (cv2 generally works in those environments;
+    truly headless macOS users typically install opencv-contrib-python-headless,
+    which is detected separately above).
+    """
+    import sys, os
+    if sys.platform.startswith('linux'):
+        return bool(os.environ.get('DISPLAY')) or bool(os.environ.get('WAYLAND_DISPLAY'))
+    return True
+
+
+if run_cv2_imshow and _display_available():
     prepare_cv2_imshow()
 
 

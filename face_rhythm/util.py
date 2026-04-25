@@ -30,32 +30,34 @@ def get_default_parameters(
     path_ROIs=None,
 ):
     """
-    This function returns a dictionary of parameters that can be used to run
-    different pipelines. RH 2023
+    Returns a dictionary of default parameters for running face-rhythm pipelines. RH 2023
 
     Args:
-        path_defaults (str):
-            A path to a json file containing a parameters dictionary. The
-            parameters from the file will be loaded. If None, the default
-            parameters will be used.
-        directory_project (str):
-            The directory to use as the project directory. Used in
-            fr.project.prepare_project.
-        directory_videos (str):
-            The directory containing the videos. Used in fr.helpers.find_paths
-            to find the video paths.
-        filename_videos_strMatch (str):
-            A string that the video filenames must match. Used in
-            fr.helpers.find_paths to find the video paths.
-        path_ROIs (str):
-            The path to the file containing the ROIs. Used in fr.rois.ROIs to
-            load the ROIs if using 'file' mode instead of 'gui' as in the
-            interactive notebook.
+        path_defaults (Optional[str]):
+            Path to a JSON file containing a parameters dictionary. If
+            provided, parameters are loaded from this file. If ``None``, the
+            built-in defaults are used. (Default is ``None``)
+        directory_project (Optional[str]):
+            Directory to use as the project directory. Passed through to
+            ``fr.project.prepare_project``. (Default is ``None``)
+        directory_videos (Optional[str]):
+            Directory containing the videos. Passed through to
+            ``fr.helpers.find_paths`` to discover video paths. (Default is
+            ``None``)
+        filename_videos_strMatch (Optional[str]):
+            Regex that video filenames must match. Passed through to
+            ``fr.helpers.find_paths`` to filter discovered videos. (Default is
+            ``None``)
+        path_ROIs (Optional[str]):
+            Path to the file containing the ROIs. Used by ``fr.rois.ROIs``
+            when running in ``'file'`` mode instead of ``'gui'`` mode.
+            (Default is ``None``)
 
     Returns:
         (dict):
             params (dict):
-                A dictionary containing the default parameters.
+                Dictionary containing the default (or loaded) parameters for
+                each pipeline stage.
     """
 
     if path_defaults is not None:
@@ -102,6 +104,7 @@ def get_default_parameters(
                 "prefetch": 1,
                 "posthold": 1,
                 "method_getitem": "by_video",
+                "backend": "torchcodec",
                 "verbose": 1,
             },
             "Dataset_videos": {
@@ -229,11 +232,22 @@ def get_default_parameters(
 
 class FR_Module:
     """
-    The superclass for all of the Face Rhythm module classes.
-    Allows for saving run_data, run_info, and config files.
-    RH 2022
+    Superclass for all face-rhythm module classes. Provides shared helpers
+    for saving ``run_data``, ``run_info``, and ``config`` files. RH 2022
+
+    Attributes:
+        run_info (Optional[dict]):
+            Per-run metadata populated by the subclass. Saved by
+            :meth:`save_run_info`.
+        run_data (Optional[dict]):
+            Per-run output data populated by the subclass. Saved by
+            :meth:`save_run_data`.
+        module_name (str):
+            Name of the concrete subclass; used as the top-level key in the
+            config and run_info files.
     """
     def __init__(self):
+        """Initializes empty ``run_info`` and ``run_data`` and records the subclass name."""
         self.run_info = None
         self.run_data = None
 
@@ -242,24 +256,29 @@ class FR_Module:
 
 
     def save_config(
-        self, 
-        path_config=None, 
-        overwrite=True, 
+        self,
+        path_config=None,
+        overwrite=True,
         verbose=1
     ):
         """
-        Appends the self.config dictionary to the config.yaml file.
-        This dictionary is created by the subclass and should contain
-         all the parameters used to run the module.
-        RH 2022
+        Appends ``self.config`` to the ``config.yaml`` file. RH 2022
+
+        ``self.config`` is created by the subclass and should contain all
+        parameters used to run the module.
 
         Args:
             path_config (str):
-                Path to config.yaml file.
+                Path to the ``config.yaml`` file. (Default is ``None``)
             overwrite (bool):
-                If True, overwrites fields within the config.yaml file.
+                If ``True``, overwrites the existing field for this module
+                inside ``config.yaml``. (Default is ``True``)
             verbose (int):
-                Verbosity level. 0 is silent. 1 is print warnings. 2 is print all.
+                Verbosity level. Either \n
+                * ``0``: Silent.
+                * ``1``: Print warnings.
+                * ``2``: Print all info. \n
+                (Default is ``1``)
         """
         ## Assert if self.config is not None
         assert self.config is not None, 'FR ERROR: self.config is None. Module likely did not run properly. Please set self.config before saving.'
@@ -294,28 +313,35 @@ class FR_Module:
 
 
     def save_run_info(
-        self, 
-        path_run_info=None, 
+        self,
+        path_run_info=None,
         path_config=None,
-        overwrite=True, 
+        overwrite=True,
         verbose=1
     ):
         """
-        Appends the self.run_info dictionary to the run_info.yaml file.
+        Appends ``self.run_info`` to the ``run_info.json`` file.
+
+        Exactly one of ``path_run_info`` or ``path_config`` must be supplied.
 
         Args:
-            path_run_info (str):
-                Path to run_info.yaml file.
-                Optional. If None, then path_config must be provided, and must
-                 contain: config['paths']['project'].
-                If the file does not exist, it will be created.
-            path_config (str):
-                Path to config.yaml file.
-                Optional. If None, then path_run_info must be provided.
+            path_run_info (Optional[str]):
+                Path to the ``run_info.json`` file. If ``None``,
+                ``path_config`` must be provided and must contain
+                ``config['paths']['run_info']``. If the file does not exist,
+                it will be created. (Default is ``None``)
+            path_config (Optional[str]):
+                Path to the ``config.yaml`` file. If ``None``,
+                ``path_run_info`` must be provided. (Default is ``None``)
             overwrite (bool):
-                If True, overwrites fields within the run_info.yaml file.
+                If ``True``, overwrites the existing field for this module
+                inside ``run_info.json``. (Default is ``True``)
             verbose (int):
-                Verbosity level. 0 is silent. 1 is print warnings. 2 is print all.
+                Verbosity level. Either \n
+                * ``0``: Silent.
+                * ``1``: Print warnings.
+                * ``2``: Print all info. \n
+                (Default is ``1``)
         """
         ## Assert self.run_info and self.run_data are not None
         assert self.run_info is not None, 'FR ERROR: self.run_info is None. Module likely did not run properly. Please set self.run_info before saving.'
@@ -364,45 +390,48 @@ class FR_Module:
             
 
     def save_run_data(
-        self, 
-        path_run_data=None, 
+        self,
+        path_run_data=None,
         path_config=None,
-        overwrite=True, 
+        overwrite=True,
         use_compression=False,
         track_order=True,
         verbose=1
     ):
         """
-        Appends the self.run_data dictionary to a .h5 file in the
-         .../project/analaysis_files/'object method name'.h5.
-        The self.run_data dictionary is created by the subclass and should contain
-         all the data generated by the module.
-        The project directory should already exist and can be created using
-         the face_rhythm.project.prepare_project function.
-        RH 2022
+        Saves ``self.run_data`` to an ``.h5`` file under the project's
+        ``analysis_files`` directory. RH 2022
+
+        ``self.run_data`` is created by the subclass and should contain all
+        the data generated by the module. Exactly one of ``path_run_data`` or
+        ``path_config`` must be supplied. The project directory should
+        already exist (use ``face_rhythm.project.prepare_project``).
 
         Args:
-            path_run_data (str):
-                Path to .h5 file.
-                Optional. If None, then path_config must be provided, and must
-                 contain: config['paths']['project']
-                If the file does not exist, it will be created.
-            path_config (str):
-                Path to config.yaml file.
-                Optional. If None, then path_run_data must be provided.
-                Should contain: config['paths']['project']. path_run_data will be:
-                 .../config['paths']['project']/analysis_files/'object method name'.h5
+            path_run_data (Optional[str]):
+                Path to the output ``.h5`` file. If ``None``, ``path_config``
+                must be provided and must contain ``config['paths']['project']``.
+                Resolved path will be
+                ``<project>/analysis_files/<module_name>.h5``. If the file
+                does not exist, it will be created. (Default is ``None``)
+            path_config (Optional[str]):
+                Path to the ``config.yaml`` file. If ``None``,
+                ``path_run_data`` must be provided. (Default is ``None``)
             overwrite (bool):
-                If True, overwrites fields within the .h5 file.
+                If ``True``, overwrites the existing ``.h5`` file. (Default
+                is ``True``)
             use_compression (bool):
-                If True, uses compression when saving the .h5 file.
+                If ``True``, uses compression when writing the ``.h5`` file.
+                (Default is ``False``)
             track_order (bool):
-                If True, tracks the order of the data in the .h5 file.
+                If ``True``, preserves insertion order of keys inside the
+                ``.h5`` file. (Default is ``True``)
             verbose (int):
-                Verbosity level. 
-                0: silent
-                1: print warnings
-                2: print all info
+                Verbosity level. Either \n
+                * ``0``: Silent.
+                * ``1``: Print warnings.
+                * ``2``: Print all info. \n
+                (Default is ``1``)
         """
         ## Assert self.run_data is not None
         assert self.run_data is not None, 'FR ERROR: self.run_data is None. Module likely did not run properly. Please set self.run_data before saving.'
@@ -475,16 +504,18 @@ class FR_Module:
 
 def load_yaml_safe(path, verbose=0):
     """
-    loads yaml file
+    Loads a YAML file, falling back to ``yaml.Loader`` if ``FullLoader`` fails.
 
     Args:
-        path (str): 
-            path to .yaml file
+        path (str):
+            Path to the ``.yaml`` file.
+        verbose (int):
+            Verbosity level. Higher values print more info. (Default is ``0``)
 
     Returns:
-        (dict): 
-            yaml file as a dictionary
-
+        (dict):
+            data (dict):
+                Parsed YAML file as a dictionary.
     """
     print(f'FR: Loading file {path}') if verbose > 1 else None
     try:
@@ -497,37 +528,78 @@ def load_yaml_safe(path, verbose=0):
 
 def load_config_file(path, verbose=0):
     """
-    Loads config.yaml file
+    Loads a ``config.yaml`` file as a dictionary.
 
     Args:
-        path (str): 
-            path to config.yaml file
+        path (str):
+            Path to the ``config.yaml`` file.
+        verbose (int):
+            Verbosity level. Higher values print more info. (Default is ``0``)
 
     Returns:
-        (dict): 
-            config.yaml file as a dictionary
-
+        (dict):
+            config (dict):
+                Parsed ``config.yaml`` file as a dictionary.
     """
     return load_yaml_safe(path, verbose=verbose)
 def load_run_info_file(path, verbose=0):
     """
-    Loads run_info.json file
+    Loads a ``run_info.json`` file as a dictionary.
 
     Args:
-        path (str): 
-            path to run_info.json file
+        path (str):
+            Path to the ``run_info.json`` file.
+        verbose (int):
+            Verbosity level. Higher values print more info. (Default is ``0``)
 
     Returns:
-        (dict): 
-            run_info.json file as a dictionary
-
+        (dict):
+            run_info (dict):
+                Parsed ``run_info.json`` file as a dictionary.
     """
     return helpers.json_load(path, mode='r')
 
 
 class Saver_Viz_Base:
     """
-    Super class for saving visualizations i.e. (Figuer_Saver, Image_Saver)
+    Superclass for saving visualizations (e.g. :class:`Figure_Saver`,
+    :class:`Image_Saver`).
+
+    Args:
+        path_config (Optional[str]):
+            Path to the ``config.yaml`` file. Optional if ``dir_save`` is
+            specified. (Default is ``None``)
+        dir_save (Optional[str]):
+            Directory to save visualizations into. Optional if ``path_config``
+            is specified. (Default is ``None``)
+        formats_save (List[str]):
+            File formats to save visualizations as. Valid values depend on
+            the saving method used by the subclass. (Default is ``['png']``)
+        kwargs_method (Dict[str, Any]):
+            Keyword arguments forwarded to the underlying save method.
+            (Default is ``{}``)
+        overwrite (bool):
+            If ``True``, overwrites existing files. (Default is ``False``)
+        verbose (int):
+            Verbosity level. Either \n
+            * ``0``: Silent.
+            * ``1``: Print warnings.
+            * ``2``: Print warnings and info. \n
+            (Default is ``1``)
+
+    Attributes:
+        path_config (Optional[str]):
+            Stored path to the ``config.yaml`` file.
+        dir_save (str):
+            Resolved directory used for saving outputs.
+        formats_save (List[str]):
+            Stored list of file formats.
+        kwargs_method (Dict[str, Any]):
+            Stored keyword arguments forwarded to the save method.
+        overwrite (bool):
+            Stored overwrite flag.
+        verbose (int):
+            Stored verbosity level.
     """
     def __init__(
         self,
@@ -538,28 +610,7 @@ class Saver_Viz_Base:
         overwrite: bool=False,
         verbose: int=1,
     ):
-        """
-        Initializes Visualization_Saver object.
-
-        Args:
-            path_config (str):
-                Path to config.yaml file
-                Optional if dir_save is specified
-            dir_save (str):
-                Directory to save visualizations
-                Optional if path_config is specified
-            formats_save (list):
-                List of formats to save visualizations as.
-                Depedenent on the method used to save the visualization.
-            kwargs_method (dict):
-                Dictionary of keyword arguments to pass to the method 
-                 used to save the visualization.
-            overwrite (bool):
-                Whether to overwrite existing files.
-            verbose (int):
-                Level of verbosity. 0 prints nothing. 1 prints warnings.
-                 2 prints warnings and information.
-        """
+        """Initializes the saver, validates inputs, and ensures ``dir_save`` exists."""
         ## Validate inputs
         assert isinstance(path_config, str) or isinstance(dir_save, str), "FR ERROR: Either path_config or dir_save must be specified as a string."
         if path_config is not None:
@@ -598,18 +649,19 @@ class Saver_Viz_Base:
 
         Args:
             name_save (str):
-                Name of the file to save the visualization as.
+                Name of the file to save the visualization as (without
+                extension).
             obj_save (object):
-                Object to save.
-            fn_save (callable):
-                Function to use to save the visualization.
-                Should take args: (obj_save, path_save, format_save, **kwargs_method)
-            kwargs_method (dict):
-                Dictionary of keyword arguments to pass to the method 
-                 used to save the visualization.
-            format_save (str):
-                Format to save the visualization as.
-                If None, then the default format is used.
+                Object to save (e.g. a figure or image array).
+            fn_save (Callable):
+                Function used to save the visualization. Must accept the
+                kwargs ``obj_save``, ``path_save``, ``format_save``, and
+                ``kwargs_method``.
+            kwargs_method (Dict[str, Any]):
+                Keyword arguments forwarded to ``fn_save``. (Default is ``{}``)
+            format_save (Optional[str]):
+                File format to save the visualization as. If ``None``, the
+                default format is used. (Default is ``None``)
         """
         ## Validate inputs
         assert isinstance(name_save, str), "FR ERROR: name_save must be a string"
@@ -638,6 +690,21 @@ class Saver_Viz_Base:
         )
 
     def _inherit_from_attrs(self, vars, attrs):
+        """
+        Yields each value in ``vars``, falling back to the matching attribute
+        on ``self`` when the value is ``None``.
+
+        Args:
+            vars (List[Any]):
+                Candidate values supplied at the call site.
+            attrs (List[str]):
+                Attribute names on ``self`` to use as fallback values.
+
+        Yields:
+            (Any):
+                value (Any):
+                    Either the original value or the corresponding attribute.
+        """
         for var, attr in zip(vars, attrs):
             if var is None:
                 assert hasattr(self, attr), f"FR ERROR: {attr} must be specified in either the constructor or the method call"
@@ -645,13 +712,41 @@ class Saver_Viz_Base:
             yield var
 
     def __repr__(self):
+        """Returns a string representation of the saver and its key attributes."""
         return f"Figure_Saver(path_config={self.path_config}, dir_save={self.dir_save}, formats_save={self.formats_save}, kwargs_method={self.kwargs_method}, overwrite={self.overwrite}, verbose={self.verbose})"
 
 
 class Figure_Saver(Saver_Viz_Base):
     """
-    Class for saving figures
-    RH 2022
+    Saves matplotlib figures to disk in one or more file formats. RH 2022
+
+    Args:
+        path_config (Optional[str]):
+            Path to the ``config.yaml`` file. If ``None``, ``dir_save`` must
+            be specified. (Default is ``None``)
+        dir_save (Optional[str]):
+            Directory to save the figure into. Used when ``path_config`` is
+            ``None``. (Default is ``None``)
+        formats_save (List[str]):
+            File formats to save the figure as. Common choices are
+            ``'png'``, ``'svg'``, ``'eps'``, and ``'pdf'``. (Default is
+            ``['png']``)
+        kwargs_savefig (Dict[str, Any]):
+            Keyword arguments forwarded to ``matplotlib.figure.Figure.savefig``.
+            (Default is ``{'bbox_inches': 'tight', 'pad_inches': 0.1,
+            'transparent': True, 'dpi': 300}``)
+        overwrite (bool):
+            If ``True``, overwrites existing files. (Default is ``False``)
+        verbose (int):
+            Verbosity level. Either \n
+            * ``0``: Silent.
+            * ``1``: Print warnings.
+            * ``2``: Print warnings and info. \n
+            (Default is ``1``)
+
+    Attributes:
+        kwargs_savefig (Dict[str, Any]):
+            Stored ``savefig`` keyword arguments.
     """
     def __init__(
         self,
@@ -667,29 +762,7 @@ class Figure_Saver(Saver_Viz_Base):
         overwrite: bool=False,
         verbose: int=1,
     ):
-        """
-        Initializes Figure_Saver object
-
-        Args:
-            path_config (str):
-                Path to config.yaml file. If None, then path_save must
-                be specified.
-            dir_save (str):
-                Directory to save the figure. Used if path_config is None.
-                Must be specified if path_config is None.
-            formats_save (list of str):
-                Format(s) to save the figure. Default is 'png'.
-                Others: ['png', 'svg', 'eps', 'pdf']
-            overwrite (bool):
-                If True, then overwrite the file if it exists.
-            kwargs_savefig (dict):
-                Keyword arguments to pass to fig.savefig().
-            verbose (int):
-                Verbosity level.
-                0: No output.
-                1: Warning.
-                2: All info.
-        """
+        """Initializes the figure saver and stores ``kwargs_savefig``."""
         ## Initialize super
         super().__init__(
             path_config=path_config,
@@ -713,22 +786,26 @@ class Figure_Saver(Saver_Viz_Base):
         kwargs_savefig: dict=None,
     ):
         """
-        Saves a single figure.
+        Saves a single matplotlib figure to one or more file formats.
 
         Args:
             fig (matplotlib.figure.Figure):
                 Figure to save.
-            name_save (str):
-                Name of the file to save the figure as. 
-                If None, then the name of the figure is used.
-            dir_save (str):
-                Directory to save the figure. If None, then the directory
-                 specified in the initialization is used.
-            formats_save (str):
-                Formats to save the figure as. If None, then the format
-                 specified in the initialization is used.
-            kwargs_savefig (dict):
-                Keyword arguments to pass to fig.savefig().
+            name_save (Optional[str]):
+                Name of the file to save the figure as (without extension).
+                If ``None``, the figure's label is used. (Default is ``None``)
+            dir_save (Optional[str]):
+                Directory to save the figure into. If ``None``, the
+                directory stored on the instance is used. (Default is
+                ``None``)
+            formats_save (Optional[Union[str, List[str]]]):
+                File format(s) to save the figure as. If ``None``, the
+                formats stored on the instance are used. (Default is
+                ``None``)
+            kwargs_savefig (Optional[Dict[str, Any]]):
+                Keyword arguments forwarded to
+                ``matplotlib.figure.Figure.savefig``. If ``None``, the
+                stored kwargs are used. (Default is ``None``)
         """
         import matplotlib
 
@@ -756,6 +833,35 @@ class Figure_Saver(Saver_Viz_Base):
             )
 
 class Image_Saver(Saver_Viz_Base):
+    """
+    Saves images and animated GIFs to disk using PIL. RH 2022
+
+    Args:
+        path_config (Optional[str]):
+            Path to the ``config.yaml`` file. If ``None``, ``dir_save`` must
+            be specified. (Default is ``None``)
+        dir_save (Optional[str]):
+            Directory to save the image into. Used when ``path_config`` is
+            ``None``. (Default is ``None``)
+        formats_save (List[str]):
+            File formats to save the image as. Common choices are
+            ``'png'``, ``'jpg'``, and ``'tif'``. (Default is ``['png']``)
+        kwargs_PIL_save (Dict[str, Any]):
+            Keyword arguments forwarded to ``PIL.Image.Image.save``.
+            (Default is ``{}``)
+        overwrite (bool):
+            If ``True``, overwrites existing files. (Default is ``False``)
+        verbose (int):
+            Verbosity level. Either \n
+            * ``0``: Silent.
+            * ``1``: Print warnings.
+            * ``2``: Print warnings and info. \n
+            (Default is ``1``)
+
+    Attributes:
+        kwargs_PIL_save (Dict[str, Any]):
+            Stored ``PIL.Image.save`` keyword arguments.
+    """
     def __init__(
         self,
         path_config: str=None,
@@ -766,29 +872,7 @@ class Image_Saver(Saver_Viz_Base):
         overwrite: bool=False,
         verbose: int=1,
     ):
-        """
-        Initializes Image_Saver object
-
-        Args:
-            path_config (str):
-                Path to config.yaml file. If None, then path_save must
-                be specified.
-            dir_save (str):
-                Directory to save the figure. Used if path_config is None.
-                Must be specified if path_config is None.
-            formats_save (list of str):
-                Format(s) to save the figure. Default is 'png'.
-                Others: ['png', 'svg', 'eps', 'pdf']
-            kwargs_PIL_save (dict):
-                Keyword arguments to pass to PIL.Image.save().
-            overwrite (bool):
-                If True, then overwrite the file if it exists.
-            verbose (int):
-                Verbosity level.
-                0: No output.
-                1: Warning.
-                2: All info.
-        """
+        """Initializes the image saver and stores ``kwargs_PIL_save``."""
         ## Initialize super
         super().__init__(
             path_config=path_config,
@@ -812,24 +896,27 @@ class Image_Saver(Saver_Viz_Base):
         kwargs_PIL_save: dict=None,
     ):
         """
-        Saves a single image.
+        Saves a single image array as one or more files using PIL.
 
         Args:
-            array_image (numpy.ndarray):
-                Image to save. If float, then should be between 0 and 1. 
-                Will be * 255 and cast to uint8.
-                If int, then should be between 0 and 255. Will be cast to uint8.
-            name_save (str):
-                Name of the file to save the figure as. 
-                If None, then the name of the figure is used.
-            dir_save (str):
-                Directory to save the figure. If None, then the directory
-                 specified in the initialization is used.
-            formats_save (str):
-                Formats to save the figure as. If None, then the format
-                 specified in the initialization is used.
-            kwargs_PIL_save (dict):
-                Keyword arguments to pass to PIL.Image.save(). 
+            array_image (np.ndarray):
+                Image to save. shape: *(H, W)* or *(H, W, C)* with ``C`` in
+                ``{1, 3}``. If ``dtype`` is float, values must lie in
+                ``[0, 1]`` and will be scaled by ``255`` and cast to *uint8*.
+                If ``dtype`` is int, values must lie in ``[0, 255]`` and will
+                be cast to *uint8*.
+            name_save (Optional[str]):
+                Name of the file to save the image as (without extension).
+                If ``None``, ``'image'`` is used. (Default is ``None``)
+            dir_save (Optional[str]):
+                Directory to save the image into. If ``None``, the directory
+                stored on the instance is used. (Default is ``None``)
+            formats_save (Optional[Union[str, List[str]]]):
+                File format(s) to save the image as. If ``None``, the
+                formats stored on the instance are used. (Default is ``None``)
+            kwargs_PIL_save (Optional[Dict[str, Any]]):
+                Keyword arguments forwarded to ``PIL.Image.Image.save``. If
+                ``None``, the stored kwargs are used. (Default is ``None``)
         """
 
         ## Set missing inputs
@@ -864,7 +951,29 @@ class Image_Saver(Saver_Viz_Base):
         kwargs_PIL_save: dict=None,
     ):
         """
-        Saves multiple images as a gif using PIL.
+        Saves a sequence of images as an animated GIF using PIL.
+
+        Args:
+            array_images (List[np.ndarray]):
+                List of frames to save. Each frame has shape *(H, W)* or
+                *(H, W, C)* with ``C`` in ``{1, 3}``.
+            name_save (Optional[str]):
+                Name of the file to save the GIF as (without extension). If
+                ``None``, ``'image'`` is used. (Default is ``None``)
+            dir_save (Optional[str]):
+                Directory to save the GIF into. If ``None``, the directory
+                stored on the instance is used. (Default is ``None``)
+            frame_rate (float):
+                Playback frame rate in frames per second. (Default is ``5.0``)
+            loop (Union[int, bool]):
+                Number of times the GIF should loop. ``True`` loops forever.
+                (Default is ``True``)
+            optimize (bool):
+                If ``True``, applies PIL's GIF size optimization. (Default
+                is ``True``)
+            kwargs_PIL_save (Optional[Dict[str, Any]]):
+                Keyword arguments forwarded to ``PIL.Image.Image.save``. If
+                ``None``, the stored kwargs are used. (Default is ``None``)
         """
         ## Set missing inputs
         name_save = name_save if name_save is not None else 'image'
@@ -897,8 +1006,20 @@ class Image_Saver(Saver_Viz_Base):
 
     def _fn_save_single_image(self, obj_save, path_save, format_save, kwargs_method):
         """
-        Converts a single 3D numpy.ndarray with shape[-1] == 3 or 1 to a PIL.Image
-         and saves it.
+        Converts a 3D ``np.ndarray`` with ``shape[-1] in {1, 3}`` to a
+        ``PIL.Image.Image`` and writes it to disk.
+
+        Args:
+            obj_save (np.ndarray):
+                Image array. shape: *(H, W, C)* with ``C`` in ``{1, 3}``,
+                dtype: *uint8*.
+            path_save (str):
+                Output file path.
+            format_save (str):
+                File format string. Aliases ``'jpg'`` -> ``'JPEG'`` and
+                ``'tif'`` -> ``'TIFF'`` are applied.
+            kwargs_method (Dict[str, Any]):
+                Keyword arguments forwarded to ``PIL.Image.Image.save``.
         """
         format_LUT = {
             'jpg': 'JPEG',
@@ -910,8 +1031,20 @@ class Image_Saver(Saver_Viz_Base):
 
     def _fn_save_gif(self, obj_save, path_save, format_save, kwargs_method):
         """
-        Converts a list of 3D numpy.ndarrays with shape[-1] == 3 or 1 to a PIL.Image
-         and saves it.
+        Saves a list of image arrays as an animated GIF using
+        :func:`face_rhythm.helpers.save_gif`.
+
+        Args:
+            obj_save (List[np.ndarray]):
+                Frames to save. Each has shape *(H, W, C)* with ``C`` in
+                ``{1, 3}``, dtype: *uint8*.
+            path_save (str):
+                Output file path.
+            format_save (str):
+                File format string (``'gif'``).
+            kwargs_method (Dict[str, Any]):
+                Dictionary with keys ``'frame_rate'``, ``'loop'``, and
+                ``'kwargs_PIL_save'`` forwarded to the GIF backend.
         """
         helpers.save_gif(
             array=obj_save, 
@@ -926,9 +1059,18 @@ class Image_Saver(Saver_Viz_Base):
     
     def _prepare_array_image(self, array_image):
         """
-        Converts an input array_image from a 2D or 3D numpy.ndarray of floats
-         between 0 and 1 or ints between 0 and 255 to a 3D numpy.ndarray of
-         uint8s between 0 and 255.
+        Normalizes an input image to a 3D ``uint8`` array with channel
+        dimension last.
+
+        Args:
+            array_image (np.ndarray):
+                Input image. shape: *(H, W)* or *(H, W, C)*. Floats must lie
+                in ``[0, 1]``; ints must lie in ``[0, 255]``.
+
+        Returns:
+            (np.ndarray):
+                array_image (np.ndarray):
+                    Prepared image. shape: *(H, W, C)*, dtype: *uint8*.
         """
         ## Validate inputs
         assert isinstance(array_image, np.ndarray), "FR ERROR: array_image must be a numpy.ndarray"
@@ -953,18 +1095,22 @@ class Image_Saver(Saver_Viz_Base):
 
 def system_info(verbose: bool = False,) -> Dict:
     """
-    Checks and prints the versions of various important software packages.
-    RH 2022
+    Collects information about the OS, CPU, RAM, GPU, and key Python
+    packages, and optionally prints it. RH 2022
 
     Args:
-        verbose (bool): 
-            Whether to print the software versions. 
+        verbose (bool):
+            If ``True``, prints each section to stdout as it is collected.
             (Default is ``False``)
 
     Returns:
-        (Dict): 
+        (Dict):
             versions (Dict):
-                Dictionary containing the versions of various software packages.
+                Dictionary containing the system snapshot. Keys include
+                ``'datetime'``, ``'face_rhythm'``, ``'operating_system'``,
+                ``'cpu_info'``, ``'user'``, ``'ram'``, ``'gpu_info'``,
+                ``'conda_env'``, ``'python'``, ``'gcc'``, ``'torch'``,
+                ``'cuda'``, ``'cudnn'``, ``'torch_devices'``, and ``'pkgs'``.
     """
     ## Operating system and version
     import platform
@@ -1090,116 +1236,57 @@ def system_info(verbose: bool = False,) -> Dict:
     return versions
 
 def batch_run(
-    paths_scripts, 
-    params_list, 
-    sbatch_config_list, 
+    paths_scripts,
+    params_list,
+    sbatch_config_list,
     max_n_jobs=2,
     dir_save=None,
-    name_save='jobNum_', 
+    name_save='jobNum_',
     verbose=True,
 ):
     r"""
-    MODIFIED FROM BNPM
-    Run a batch of jobs.
-    Workflow 1: run a single script over a sweep of parameters
-        - Make a script that takes in the set of parameters
-           you wish to sweep over as variables.
-        - Prepend the script to take in string arguments
-           pointing to a param_config file (maybe a dict).
-           See paths_scripts Arg below for details.
-        - Save the script in .py file.
-        - In a new script, call this function (batch_run)
-        - A new job will be run for each item in params_list
-            - Each job will make a new directory, and within
-               it will save (1) a .json file containing the 
-               parameters used, and (2) the .sh file that 
-               was run.
-        - Save output files using the 'dir_save' argument
+    Submits a batch of SLURM jobs that each run a Python script with a
+    parameter file. Adapted from BNPM. RH 2021
 
-    Alternative workflows where you have multiple different
-     scripts or different config files are also possible.
-
-    RH 2021
+    A typical workflow is to sweep one script over a list of parameter
+    dictionaries: each entry in ``params_list`` is written to its own job
+    directory as ``params.json``, the corresponding SBATCH script is
+    materialized, and ``sbatch`` is invoked. Variants with multiple scripts
+    or multiple SBATCH configs are also supported -- any of
+    ``paths_scripts``, ``params_list``, and ``sbatch_config_list`` may have
+    length ``1`` (broadcast) or length ``n_jobs``.
 
     Args:
-        paths_scripts (List):
-            - List of script paths to run.
-            - List can contain either 1 or n_jobs items.
-            - Each script must save its results it's own way
-               using a relative path (see 'dir_save' below)
-            - Each script should contain the following to handle
-               input arguments specified by the user and this
-               function, DEMO:
-                ```
-                import sys
-                    path_script, path_params, dir_save = sys.argv
-                
-                import json
-                with open(path_params, 'r') as f:
-                    params = json.load(f)
-                ```                
-            - It's also good practice to save the script .py file
-               within dir_save DEMO:
-                ```
-                import shutil
-                shutil.copy2(
-                    path_script, 
-                    str(Path(dir_save) / Path(path_script).name)
-                    );
-                ```
-        params_list (List):
-            - Parameters (arguments) to be used
-            - List can contain either 1 or n_jobs items.
-            - Each will be saved as a .json file (so nothing too big)   
-            - Will be save into each inner/job directory and the path
-               will be passed to the script for each job.
-        sbatch_config_list (List):
-            - List of string blocks containing the arguments to 
-               pass for each job/script.
-            - List can contain either 1 or n_jobs items.
-            - Must contain: python "$@" at the bottom (to take in 
-               arguments), and raw string must have '\n' to signify
-               line breaks.
-               Demo: '#!/usr/bin/bash
-                    #SBATCH --job-name=python_01
-                    #SBATCH --output=jupyter_logs/python_01_%j.log
-                    #SBATCH --partition=priority
-                    #SBATCH -c 1
-                    #SBATCH -n 1
-                    #SBATCH --mem=1GB
-                    #SBATCH --time=0-00:00:10
-
-                    unset XDG_RUNTIME_DIR
-
-                    cd /path/to/working/directory/
-
-                    date
-
-                    echo "loading modules"
-                    module load gcc/9.2.0 cuda/11.2
-
-                    echo "activating environment"
-                    source activate ROI_env
-
-                    echo "starting job"
-                    python "$@" '
-        max_n_jobs (int):
-            - Maximum number of jobs that can be called
-            - Used as a safety precaution
-            - Be careful that params_list has the right len
-        dir_save (str or Path):
-            - Outer directory to save results to.
-            - Will be created if it does not exist.
-            - Will be populated by folders for each job
-            - Will be sent to the script for each job as the
-               third argument. See paths_scripts demo for details.
-        name_save (str or List):
-            - Name of each job (used as inner directory name)
-            - If str, then will be used for all jobs 
-            - Job iteration always appended to the end.
-            - If List, then must have len(params_list) items.
+        paths_scripts (List[str]):
+            Paths to the Python scripts to run. Length must be ``1`` or
+            ``n_jobs``. Each script should accept the kwargs
+            ``--path_params`` and ``--directory_save`` injected by this
+            function.
+        params_list (List[Dict[str, Any]]):
+            Parameter dictionaries, one per job. Length must be ``1`` or
+            ``n_jobs``. Each dictionary is written as ``params.json`` inside
+            its job directory and its path is passed to the script.
+        sbatch_config_list (List[str]):
+            SBATCH script bodies, one per job. Length must be ``1`` or
+            ``n_jobs``. Each string must contain the literal ``python "$@"``
+            on its final command line; this is replaced with the resolved
+            ``python <script> --path_params <...> --directory_save <...>``
+            invocation before being written to disk.
+        max_n_jobs (Optional[int]):
+            Safety cap on the number of jobs that may be submitted. If the
+            inferred ``n_jobs`` exceeds this value, a ``ValueError`` is
+            raised. Set to ``None`` to disable the cap. (Default is ``2``)
+        dir_save (Union[str, pathlib.Path]):
+            Outer directory under which each job's subdirectory is created.
+            Created if it does not exist. Must be supplied -- there is no
+            sensible default. (Default is ``None``)
+        name_save (Union[str, List[str]]):
+            Base name for each job's subdirectory; the job index is always
+            appended. If a string, it is reused for every job; if a list,
+            it must have ``n_jobs`` items. (Default is ``'jobNum_'``)
         verbose (bool):
-            - Whether or not to print progress
+            If ``True``, prints a status line per submitted job. (Default
+            is ``True``)
     """
     import json
     import os

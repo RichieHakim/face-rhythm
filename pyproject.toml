@@ -50,7 +50,21 @@ dependencies = [
     "tqdm",
     "h5py",
     "Pillow",
-    "eva_decord",
+    ## torchcodec is the primary video decoding backend. Ships wheels for
+    ## Linux x86_64 + macOS arm64/x86_64 (CPU and CUDA). Includes a
+    ## built-in workaround for issue #905 (H.264 AVI sequential-access
+    ## drain bug). See TorchCodecVideoReader in face_rhythm/helpers.py.
+    ## NOTE: torchcodec has no Windows wheels. The decord backend below
+    ## is installed everywhere as a guaranteed fallback; Windows users
+    ## must construct BufferedVideoReader with backend='decord'.
+    "torchcodec; sys_platform != 'win32'",
+    ## decord backend (always installed). decord2 is an actively maintained
+    ## fork of decord (same C++ codebase, identical API; the installed module
+    ## is named ``decord``). Ships vendored FFmpeg 8.0 + cibuildwheel CI for
+    ## Linux x86_64/aarch64 and macOS arm64, Python 3.10-3.14. eva_decord is
+    ## the Windows fallback (decord2 has no Windows wheels yet).
+    "decord2; sys_platform != 'win32'",
+    "eva_decord; sys_platform == 'win32'",
     "natsort",
     "pandas",
     "tables",
@@ -89,8 +103,9 @@ dev = [
 ## Sphinx docs stack — mirrors docs/conf.py extensions.
 docs = [
     "sphinx",
-    "sphinx_rtd_theme",
+    "sphinx_rtd_theme>=2.0,<3.0",
     "myst-parser",
+    "sphinx_copybutton",
 ]
 ## Multi-session (cross-session) alignment stack.
 ## Enables the RoMa backend in face_rhythm.alignment_multisession.Aligner.
@@ -102,6 +117,7 @@ multisession = [
 ]
 ## Meta-extra: full install used by README ("pip install -e .[all]").
 ## Explicit union (not self-referential) to keep pip error messages readable.
+## Note: decord2/eva_decord and torchcodec are required deps now, not extras.
 all = [
     "jupyter",
     "notebook<7",
@@ -110,8 +126,9 @@ all = [
     "pytest",
     "pytest-cov",
     "sphinx",
-    "sphinx_rtd_theme",
+    "sphinx_rtd_theme>=2.0,<3.0",
     "myst-parser",
+    "sphinx_copybutton",
     "romatch-roicat>=0.1.2.post1",
     "openpyxl",
     "plotly>=6",

@@ -63,12 +63,18 @@ from face_rhythm import helpers  ## local  (warp_matrix_to_remappingIdx, remap_i
 ## ---------------------------------------------------------------------------
 
 class _AlignerModuleStub:
-    """Tiny base class providing the param-tracking hooks the ported Aligner
-    expects. Replaces ``roicat.util.ROICaT_Module`` without pulling in the
-    serialization machinery or ``system_info()`` side-effects.
+    """
+    Minimal base class providing the param-tracking hooks that the ported
+    :class:`Aligner` expects. Replaces ``roicat.util.ROICaT_Module`` without
+    pulling in the serialization machinery or ``system_info()`` side-effects.
+
+    Attributes:
+        params (Dict[str, Dict[str, Any]]):
+            Per-method kwargs captured at call-time via :meth:`_locals_to_params`.
     """
 
     def __init__(self):
+        """Initializes the stub with an empty ``params`` dictionary."""
         self.params: Dict[str, Dict[str, Any]] = {}
 
     @staticmethod
@@ -76,14 +82,19 @@ class _AlignerModuleStub:
         locals_dict: Dict[str, Any],
         keys: List[str],
     ) -> Dict[str, Any]:
-        """Extract a subset of keys from a ``locals()`` dict.
+        """
+        Extracts a subset of keys from a ``locals()`` dict.
 
         Args:
-            locals_dict (Dict[str, Any]): The dict returned by ``locals()``.
-            keys (List[str]): Keys to extract.
+            locals_dict (Dict[str, Any]):
+                The dict returned by ``locals()``.
+            keys (List[str]):
+                Keys to extract.
 
         Returns:
-            (Dict[str, Any]): Sub-dictionary containing only the requested keys.
+            (Dict[str, Any]):
+                out (Dict[str, Any]):
+                    Sub-dictionary containing only the requested keys.
         """
         out = {}
         for key in keys:
@@ -104,27 +115,31 @@ def make_distance_grid(
     idx_center: Optional[Tuple[int, int]] = None,
     use_fftshift_center: bool = False,
 ) -> np.ndarray:
-    """Create an (H, W) array of Minkowski-p distances to a reference index.
-
-    Ported from ROICaT helpers.make_distance_grid.
+    """
+    Creates an *(H, W)* array of Minkowski-p distances to a reference index.
+    Ported from ``roicat.helpers.make_distance_grid``.
 
     Args:
         shape (Tuple[int, int]):
-            Grid shape (H, W).
+            Grid shape *(H, W)*. (Default is ``(512, 512)``)
         p (int):
-            Minkowski order (``1``: Manhattan, ``2``: Euclidean, ``inf``:
-            Chebyshev). Values above 2 approximate the max-norm.
+            Minkowski order. Use ``1`` for Manhattan, ``2`` for Euclidean,
+            and ``inf`` for Chebyshev. Values above ``2`` approximate the
+            max-norm. (Default is ``2``)
         idx_center (Optional[Tuple[int, int]]):
             Center index for the distances. If ``None``, uses the geometric
             middle of the array (between two pixels on even shapes).
+            (Default is ``None``)
         use_fftshift_center (bool):
-            If ``True``, uses the index where ``np.fft.fftshift(np.fft.fftfreq(N))``
-            is zero as the center (correct reference for fftshifted 2-D FFTs).
+            If ``True``, uses the index where
+            ``np.fft.fftshift(np.fft.fftfreq(N))`` is zero as the center
+            (the correct reference for fftshifted 2-D FFTs).
+            (Default is ``False``)
 
     Returns:
         (np.ndarray):
-            grid_dist (np.ndarray): Array of shape ``shape`` with Minkowski-p
-            distances to the center.
+            grid_dist (np.ndarray):
+                Minkowski-p distances to the center. shape: *shape*.
     """
     if use_fftshift_center:
         freqs_h = np.fft.fftshift(np.fft.fftfreq(shape[0]))
@@ -147,19 +162,27 @@ def design_butter_bandpass(
     fs: float,
     order: int = 5,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Design a Butterworth bandpass filter (with low/highpass edge cases).
-
-    Ported from ROICaT helpers.design_butter_bandpass.
+    """
+    Designs a Butterworth bandpass filter, with low/highpass edge cases.
+    Ported from ``roicat.helpers.design_butter_bandpass``.
 
     Args:
-        lowcut (float): Low-cutoff frequency. If ``<= 0``, a lowpass is used.
-        highcut (float): High-cutoff frequency. If ``>= fs/2``, a highpass is used.
-        fs (float): Sample rate.
-        order (int): Butterworth filter order.
+        lowcut (float):
+            Low-cutoff frequency. If ``<= 0``, a lowpass is used instead.
+        highcut (float):
+            High-cutoff frequency. If ``>= fs / 2``, a highpass is used
+            instead.
+        fs (float):
+            Sample rate.
+        order (int):
+            Butterworth filter order. (Default is ``5``)
 
     Returns:
-        (Tuple[np.ndarray, np.ndarray]):
-            b, a — Numerator and denominator polynomials of the IIR filter.
+        (Tuple[np.ndarray, np.ndarray]): tuple containing:
+            b (np.ndarray):
+                Numerator polynomial of the IIR filter.
+            a (np.ndarray):
+                Denominator polynomial of the IIR filter.
     """
     nyq = 0.5 * fs
     low = lowcut / nyq
@@ -180,22 +203,30 @@ def make_2D_frequency_filter(
     order: int = 3,
     distance_p: int = 100,
 ) -> np.ndarray:
-    """Build a 2-D fftshifted bandpass mask for phase-correlation scoring.
-
-    Ported from ROICaT helpers.make_2D_frequency_filter. The filter is the
-    1-D Butterworth magnitude response (from :func:`design_butter_bandpass`)
-    evaluated on a Minkowski-``distance_p`` distance grid
-    (:func:`make_distance_grid`).
+    """
+    Builds a 2-D fftshifted bandpass mask for phase-correlation scoring.
+    Ported from ``roicat.helpers.make_2D_frequency_filter``. The filter is
+    the 1-D Butterworth magnitude response from
+    :func:`design_butter_bandpass` evaluated on a Minkowski-``distance_p``
+    distance grid produced by :func:`make_distance_grid`.
 
     Args:
-        hw (Tuple[int, int]): Output height and width.
-        low (float): Low cutoff in pixel units.
-        high (float): High cutoff in pixel units.
-        order (int): Butterworth order.
-        distance_p (int): Minkowski norm for the distance grid (``100`` ~ Chebyshev).
+        hw (Tuple[int, int]):
+            Output height and width.
+        low (float):
+            Low cutoff in pixel units. (Default is ``5.0``)
+        high (float):
+            High cutoff in pixel units. (Default is ``6.0``)
+        order (int):
+            Butterworth filter order. (Default is ``3``)
+        distance_p (int):
+            Minkowski norm for the distance grid (``100`` is approximately
+            Chebyshev). (Default is ``100``)
 
     Returns:
-        (np.ndarray): 2-D filter of shape ``hw`` with values in ``[0, 1]``.
+        (np.ndarray):
+            filt (np.ndarray):
+                2-D bandpass mask with values in ``[0, 1]``. shape: *hw*.
     """
     ## Distance grid starting from the fftshifted center.
     grid = make_distance_grid(shape=hw, p=distance_p, use_fftshift_center=True)
@@ -221,32 +252,37 @@ def phase_correlation(
     return_filtered_images: bool = False,
     eps: float = 1e-8,
 ) -> Union[np.ndarray, torch.Tensor, Tuple]:
-    """Phase-correlation of two images along the last two axes.
-
-    Ported from ROICaT helpers.phase_correlation.
+    """
+    Computes the phase-correlation of two images along the last two axes.
+    Ported from ``roicat.helpers.phase_correlation``.
 
     Args:
         im_template (Union[np.ndarray, torch.Tensor]):
-            Template image(s). Shape ``(..., H, W)``; leading dims broadcast.
+            Template image(s). shape: *(..., H, W)*. Leading dims broadcast.
         im_moving (Union[np.ndarray, torch.Tensor]):
-            Moving image(s). Shape ``(..., H, W)``; broadcasts against template.
+            Moving image(s). shape: *(..., H, W)*. Broadcasts against the
+            template.
         mask_fft (Optional[Union[np.ndarray, torch.Tensor]]):
-            Optional 2-D bandpass mask. Assumed to already be fftshifted (this
-            function un-shifts it so it lines up with the raw fft output).
+            Optional 2-D bandpass mask. Assumed to already be fftshifted;
+            this function un-shifts it so that it lines up with the raw FFT
+            output. (Default is ``None``)
         return_filtered_images (bool):
             If ``True``, additionally returns the mask-filtered template and
-            moving images in the image domain.
+            moving images in the image domain. (Default is ``False``)
         eps (float):
-            Floor to avoid division by zero in the phase-correlation
-            normalization.
+            Floor used to avoid division by zero in the phase-correlation
+            normalization. (Default is ``1e-8``)
 
     Returns:
         (Union[np.ndarray, torch.Tensor, Tuple]):
-            cc (np.ndarray | torch.Tensor): Phase-correlation response. Shape
-                matches the broadcast of inputs. Returned as numpy if the
-                template was numpy, else torch.
-            (optionally) filtered template and moving images in the image
-            domain — only returned when ``return_filtered_images=True``.
+            cc (Union[np.ndarray, torch.Tensor]):
+                Phase-correlation response with a shape that matches the
+                broadcast of the inputs. Returned as :class:`np.ndarray`
+                when ``im_template`` is numpy, otherwise as
+                :class:`torch.Tensor`. When ``return_filtered_images`` is
+                ``True``, a 3-tuple ``(cc, filtered_template,
+                filtered_moving)`` is returned instead, with the filtered
+                images in the image domain.
     """
     fft2, fftshift, ifft2 = torch.fft.fft2, torch.fft.fftshift, torch.fft.ifft2
     axes = (-2, -1)
@@ -288,26 +324,38 @@ def get_path_between_nodes(
     predecessors: np.ndarray,
     max_length: int = 9999,
 ) -> List[int]:
-    """Reconstruct a shortest path from a predecessor matrix.
-
-    Ported from ROICaT helpers.get_path_between_nodes. The predecessor matrix
-    is the one returned by :func:`scipy.sparse.csgraph.shortest_path` (so
+    """
+    Reconstructs a shortest path from a predecessor matrix.
+    Ported from ``roicat.helpers.get_path_between_nodes``. The predecessor
+    matrix is the one returned by
+    :func:`scipy.sparse.csgraph.shortest_path`, so
     ``predecessors[idx_end, idx_current]`` gives the previous node on the
-    shortest path from ``idx_current`` to ``idx_end``).
+    shortest path from ``idx_current`` to ``idx_end``.
 
     Args:
-        idx_start (int): First node.
-        idx_end (int): Destination node.
-        predecessors (np.ndarray): Square predecessor matrix.
-        max_length (int): Safety cap to avoid infinite loops.
+        idx_start (int):
+            Index of the first node on the path.
+        idx_end (int):
+            Index of the destination node.
+        predecessors (np.ndarray):
+            Square predecessor matrix returned by
+            :func:`scipy.sparse.csgraph.shortest_path`.
+        max_length (int):
+            Safety cap on path length to avoid infinite loops.
+            (Default is ``9999``)
 
     Returns:
-        (List[int]): Node indices along the shortest path,
-        ``[idx_start, ..., idx_end]``.
+        (List[int]):
+            path (List[int]):
+                Node indices along the shortest path, in the form
+                ``[idx_start, ..., idx_end]``.
 
     Raises:
-        AssertionError: Input validation (shapes, integer types, no-path placeholder).
-        ValueError: Path length exceeds ``max_length``.
+        AssertionError:
+            Input validation failed (shapes, integer types, or the
+            no-path placeholder ``-9999``).
+        ValueError:
+            Reconstructed path length exceeds ``max_length``.
     """
     assert idx_start < predecessors.shape[0], "idx_start is out of range"
     assert idx_end < predecessors.shape[0], "idx_end is out of range"
@@ -336,26 +384,46 @@ def get_path_between_nodes(
 ## ---------------------------------------------------------------------------
 
 class ImageAlignmentChecker:
-    """Score whether a set of images is spatially aligned via phase correlation.
+    """
+    Scores whether a set of images is spatially aligned via phase
+    correlation. Ported from ``roicat.helpers.ImageAlignmentChecker``.
 
-    Ported from ROICaT helpers.ImageAlignmentChecker.
-
-    The class constructs two band-selectable 2-D filters in the phase-correlation
-    domain — an "in" filter over the center (within ``radius_in``) and an
-    "out" filter away from the center — and compares statistics of the
-    phase-correlation peak under each filter to get an alignment z-score.
+    The class constructs two band-selectable 2-D filters in the
+    phase-correlation domain: an "in" filter over the center (within
+    ``radius_in``) and an "out" filter away from the center. Statistics of
+    the phase-correlation peak under each filter are compared to produce an
+    alignment z-score.
 
     Args:
-        hw (Tuple[int, int]): Image height and width (all inputs must match).
-        radius_in (Union[float, Tuple[float, float]]): Either the upper bound
-            of the "in" bandpass (lower bound is 0) or an explicit
-            ``(low, high)`` tuple.
-        radius_out (Union[float, Tuple[float, float]]): Either the lower bound
-            of the "out" bandpass (upper bound is ``min(H, W) / 2``) or an
-            explicit ``(low, high)`` tuple.
-        order (int): Butterworth order for both filters. Values > 5 may make
-            the filters collapse numerically.
-        device (str): Torch device string (``'cpu'``, ``'cuda:0'``, ...).
+        hw (Tuple[int, int]):
+            Image height and width. All scored images must match this shape.
+        radius_in (Union[float, Tuple[float, float]]):
+            Either the upper bound of the "in" bandpass (lower bound is
+            ``0``) or an explicit ``(low, high)`` tuple.
+        radius_out (Union[float, Tuple[float, float]]):
+            Either the lower bound of the "out" bandpass (upper bound is
+            ``min(H, W) / 2``) or an explicit ``(low, high)`` tuple.
+        order (int):
+            Butterworth order shared by both filters. Values above ``5``
+            may cause the filters to collapse numerically.
+            (Default is ``5``)
+        device (str):
+            Torch device string (e.g. ``'cpu'`` or ``'cuda:0'``) on which
+            the precomputed filters live. (Default is ``'cpu'``)
+
+    Attributes:
+        hw (Tuple[int, int]):
+            Image height and width.
+        order (int):
+            Butterworth order used for both filters.
+        device (str):
+            Torch device string the filters were placed on.
+        filt_in (torch.Tensor):
+            Precomputed in-band 2-D bandpass filter. shape: *hw*,
+            dtype: *float32*.
+        filt_out (torch.Tensor):
+            Precomputed out-band 2-D bandpass filter. shape: *hw*,
+            dtype: *float32*.
     """
 
     def __init__(
@@ -366,6 +434,7 @@ class ImageAlignmentChecker:
         order: int = 5,
         device: str = 'cpu',
     ):
+        """Initializes the checker and precomputes the in/out bandpass filters."""
         self.hw = tuple(hw)
         self.order = int(order)
         self.device = str(device)
@@ -399,19 +468,26 @@ class ImageAlignmentChecker:
         images: Union[np.ndarray, torch.Tensor, List, Tuple],
         images_ref: Optional[Union[np.ndarray, torch.Tensor, List, Tuple]] = None,
     ) -> Dict[str, Any]:
-        """Compute per-pair alignment statistics.
+        """
+        Computes per-pair alignment statistics for a stack of images.
 
         Args:
-            images (Union[np.ndarray, torch.Tensor, list, tuple]): Stack of
-                images, shape ``(N, H, W)`` (or ``(H, W)`` for a single).
-            images_ref (Optional[...]): Reference images. If ``None``, ``images``
-                is compared against itself (N×N scoring).
+            images (Union[np.ndarray, torch.Tensor, List, Tuple]):
+                Stack of images. shape: *(N, H, W)*, or *(H, W)* for a
+                single image (which is broadcast).
+            images_ref (Optional[Union[np.ndarray, torch.Tensor, List, Tuple]]):
+                Reference images. If ``None``, ``images`` is compared
+                against itself (``N x N`` scoring). (Default is ``None``)
 
         Returns:
-            (Dict[str, Any]): Per-pair statistics — ``'mean_in'``, ``'mean_out'``,
-            ``'ptile95_out'``, ``'max_in'``, ``'std_in'``, ``'std_out'``,
-            ``'max_diff'``, ``'z_in'`` (the primary score),
-            ``'r_in'``, and the phase-correlation ``'pc'`` array.
+            (Dict[str, Any]):
+                stats (Dict[str, Any]):
+                    Per-pair statistics keyed by name. Contains
+                    ``'pc'`` (the phase-correlation array), ``'mean_in'``,
+                    ``'mean_out'``, ``'ptile95_out'``, ``'max_in'``,
+                    ``'std_in'``, ``'std_out'``, ``'max_diff'``,
+                    ``'z_in'`` (the primary alignment score), and
+                    ``'r_in'``.
         """
         def _fix_images(ims):
             assert isinstance(ims, (np.ndarray, torch.Tensor, list, tuple)), (
@@ -477,6 +553,20 @@ class ImageAlignmentChecker:
         return {k: v.cpu().numpy() if isinstance(v, torch.Tensor) else v for k, v in outs.items()}
 
     def __call__(self, images):
+        """
+        Convenience alias that forwards ``images`` to :meth:`score_alignment`.
+
+        Args:
+            images (Union[np.ndarray, torch.Tensor, List, Tuple]):
+                Stack of images to score against itself.
+                shape: *(N, H, W)* or *(H, W)*.
+
+        Returns:
+            (Dict[str, Any]):
+                stats (Dict[str, Any]):
+                    Per-pair statistics, as returned by
+                    :meth:`score_alignment`.
+        """
         return self.score_alignment(images)
 
 
@@ -485,14 +575,27 @@ class ImageAlignmentChecker:
 ## ---------------------------------------------------------------------------
 
 class ImageRegistrationMethod:
-    """Base class for image-to-image registration backends.
+    """
+    Base class for image-to-image registration backends. Subclasses either
+    implement :meth:`_forward_rigid` (to emit keypoint pairs for the RANSAC
+    pipeline in :meth:`fit_rigid`) or override :meth:`fit_rigid` directly.
 
-    Subclasses implement either :meth:`_forward_rigid` (to emit keypoint pairs
-    for the RANSAC pipeline in :meth:`fit_rigid`) or override
-    :meth:`fit_rigid` directly.
+    Args:
+        device (str):
+            Torch device string used by the backend (e.g. ``'cpu'`` or
+            ``'cuda:0'``). (Default is ``'cpu'``)
+        verbose (Union[bool, int]):
+            Verbosity flag or integer level. (Default is ``False``)
+
+    Attributes:
+        device (str):
+            Torch device string used by the backend.
+        verbose (Union[bool, int]):
+            Verbosity flag or integer level.
     """
 
     def __init__(self, device: str = 'cpu', verbose: Union[bool, int] = False):
+        """Initializes the base class with a device and verbosity setting."""
         self.device = device
         self.verbose = verbose
 
@@ -501,14 +604,22 @@ class ImageRegistrationMethod:
         src_pts: np.ndarray,
         dst_pts: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Orthogonal-Procrustes pure-rotation+translation estimate.
+        """
+        Computes a pure rotation-plus-translation estimate via orthogonal
+        Procrustes.
 
         Args:
-            src_pts (np.ndarray): ``(N, 2)`` source points.
-            dst_pts (np.ndarray): ``(N, 2)`` destination points.
+            src_pts (np.ndarray):
+                Source points. shape: *(N, 2)*.
+            dst_pts (np.ndarray):
+                Destination points. shape: *(N, 2)*.
 
         Returns:
-            (Tuple[np.ndarray, np.ndarray]): ``R`` (2x2 rotation) and ``t`` (2,).
+            (Tuple[np.ndarray, np.ndarray]): tuple containing:
+                R (np.ndarray):
+                    Rotation matrix. shape: *(2, 2)*.
+                t (np.ndarray):
+                    Translation vector. shape: *(2,)*.
         """
         src_center = src_pts.mean(axis=0)
         dst_center = dst_pts.mean(axis=0)
@@ -534,31 +645,46 @@ class ImageRegistrationMethod:
         constraint: str = 'homography',
         **kwargs,
     ) -> np.ndarray:
-        """Estimate a constrained warp (3x3) between two images via RANSAC.
-
-        Subclasses that emit keypoint pairs use this default implementation.
-        The estimator branches on ``constraint``:
-            - ``'rigid'``: Procrustes (rotation + translation).
-            - ``'euclidean'``: :func:`skimage.measure.ransac` with :class:`skimage.transform.EuclideanTransform`.
-            - ``'similarity'``: :func:`cv2.estimateAffinePartial2D`.
-            - ``'affine'``: :func:`cv2.estimateAffine2D`.
-            - ``'homography'``: :func:`cv2.findHomography` with MAGSAC.
+        """
+        Estimates a constrained 3x3 warp between two images via RANSAC.
+        Subclasses that emit keypoint pairs use this default implementation;
+        the estimator branches on ``constraint``.
 
         Args:
-            im_template (Union[np.ndarray, torch.Tensor]): Template image.
-            im_moving (Union[np.ndarray, torch.Tensor]): Moving image.
-            inl_thresh (float): RANSAC inlier threshold.
-            max_iter (int): RANSAC max iterations.
-            confidence (float): RANSAC confidence.
-            constraint (str): Warp family.
+            im_template (Union[np.ndarray, torch.Tensor]):
+                Template image. shape: *(H, W)*.
+            im_moving (Union[np.ndarray, torch.Tensor]):
+                Moving image. shape: *(H, W)*.
+            inl_thresh (float):
+                RANSAC inlier threshold in pixels. (Default is ``2.0``)
+            max_iter (int):
+                Maximum RANSAC iterations. (Default is ``10``)
+            confidence (float):
+                RANSAC confidence level. (Default is ``0.99``)
+            constraint (str):
+                Warp family to fit. Either \n
+                * ``'rigid'``: Procrustes (rotation + translation).
+                * ``'euclidean'``: :func:`skimage.measure.ransac` with
+                  :class:`skimage.transform.EuclideanTransform`.
+                * ``'similarity'``: :func:`cv2.estimateAffinePartial2D`.
+                * ``'affine'``: :func:`cv2.estimateAffine2D`.
+                * ``'homography'``: :func:`cv2.findHomography` with MAGSAC. \n
+                (Default is ``'homography'``)
+            **kwargs:
+                Additional keyword arguments forwarded to
+                :meth:`_forward_rigid` for keypoint detection.
 
         Returns:
-            (np.ndarray): 3x3 warp matrix (affine rows padded with ``[0, 0, 1]``
-            where appropriate).
+            (np.ndarray):
+                warp_matrix (np.ndarray):
+                    3x3 warp matrix. Affine rows are padded with
+                    ``[0, 0, 1]`` where appropriate. dtype: *float32*.
 
         Raises:
-            RuntimeError: A fitting branch fails (e.g. RANSAC returns None).
-            ValueError: Unknown ``constraint``.
+            RuntimeError:
+                A fitting branch failed (e.g. RANSAC returned ``None``).
+            ValueError:
+                ``constraint`` is not one of the supported values.
         """
         ## 1. Detect & match keypoints (subclass).
         kptsA, kptsB = self._forward_rigid(im_template, im_moving, **kwargs)
@@ -639,15 +765,40 @@ class ImageRegistrationMethod:
         im_moving: Union[np.ndarray, torch.Tensor],
         **kwargs,
     ):
+        """
+        Returns matched keypoint pairs between two images. Subclasses that
+        rely on the default :meth:`fit_rigid` RANSAC pipeline must override
+        this method.
+
+        Args:
+            im_template (Union[np.ndarray, torch.Tensor]):
+                Template image. shape: *(H, W)*.
+            im_moving (Union[np.ndarray, torch.Tensor]):
+                Moving image. shape: *(H, W)*.
+            **kwargs:
+                Backend-specific keyword arguments.
+
+        Returns:
+            (Tuple[torch.Tensor, torch.Tensor]): tuple containing:
+                kptsA (torch.Tensor):
+                    Keypoints in the template image. shape: *(N, 2)*.
+                kptsB (torch.Tensor):
+                    Matched keypoints in the moving image. shape: *(N, 2)*.
+
+        Raises:
+            NotImplementedError:
+                The subclass has not implemented this method.
+        """
         raise NotImplementedError(f"_forward_rigid not implemented for {self.__class__.__name__}")
 
 
 class RoMa(ImageRegistrationMethod):
-    """Feature-matching registration backend using the RoMa model.
+    """
+    Feature-matching registration backend that uses the RoMa model.
 
-    Requires the optional dependency ``romatch-roicat`` (install via
-    ``pip install face-rhythm[multisession]``). The package imports as
-    ``romatch`` regardless of which PyPI distribution you pulled it from.
+    Requires the optional dependency ``romatch-roicat``, installed via
+    ``pip install face-rhythm[multisession]``. The package imports as
+    ``romatch`` regardless of which PyPI distribution was installed.
 
     On first use the constructor downloads ~1.5 GB of weights via
     :func:`torch.hub.load_state_dict_from_url` into
@@ -655,13 +806,43 @@ class RoMa(ImageRegistrationMethod):
     environment variable before import to redirect the cache.
 
     Args:
-        model_type (str): ``'outdoor'`` or ``'indoor'``.
-        n_points (int): Number of matched points to sample per pair.
-        batch_size (int): Sub-batch size for the matching sampler.
-        device (str): Torch device string.
-        weight_urls (Dict): Primary download URLs + MD5 hashes.
-        fallback_weight_urls (Dict): OSF mirror URLs + matching hashes.
-        verbose (bool): Verbosity.
+        model_type (str):
+            RoMa model variant. Either \n
+            * ``'outdoor'``: Outdoor-trained RoMa weights.
+            * ``'indoor'``: Indoor-trained RoMa weights. \n
+            (Default is ``'outdoor'``)
+        n_points (int):
+            Number of matched points to sample per image pair.
+            (Default is ``10000``)
+        batch_size (int):
+            Sub-batch size used by the matching sampler.
+            (Default is ``1000``)
+        device (str):
+            Torch device string for the RoMa model. (Default is ``'cpu'``)
+        weight_urls (Optional[Dict]):
+            Primary download URLs and MD5 hashes for the RoMa and DINOv2
+            weights. If ``None``, uses ``DEFAULT_WEIGHT_URLS``.
+            (Default is ``None``)
+        fallback_weight_urls (Optional[Dict]):
+            OSF mirror URLs and matching hashes used if the primary
+            downloads fail. If ``None``, uses
+            ``DEFAULT_FALLBACK_WEIGHT_URLS``. (Default is ``None``)
+        verbose (bool):
+            Verbosity flag. (Default is ``False``)
+
+    Attributes:
+        roma_model_type (str):
+            RoMa variant in use (``'outdoor'`` or ``'indoor'``).
+        n_points (int):
+            Number of matched points to sample per pair.
+        batch_size (int):
+            Sub-batch size for the matching sampler.
+        weight_urls (Dict):
+            Primary URLs and hashes for the model weights.
+        fallback_weight_urls (Dict):
+            Fallback (mirror) URLs and hashes for the model weights.
+        model (object):
+            Initialized RoMa model instance.
     """
 
     ## Primary URL + MD5 hash. Hashes are load-bearing for the download check.
@@ -714,6 +895,7 @@ class RoMa(ImageRegistrationMethod):
         fallback_weight_urls: Optional[Dict] = None,
         verbose: bool = False,
     ):
+        """Initializes the RoMa backend, downloads weights, and loads the model."""
         ## Lazy import: surface a clean error at call time, not at module import.
         try:
             import PIL  ## noqa: F401  (imported for class-level side-effect checks)
@@ -775,6 +957,26 @@ class RoMa(ImageRegistrationMethod):
         im2: Union[np.ndarray, torch.Tensor],
         device: Optional[str] = None,
     ):
+        """
+        Runs RoMa's dense matcher on two images and returns the raw flow
+        field and per-pixel certainty.
+
+        Args:
+            im1 (Union[np.ndarray, torch.Tensor]):
+                First (template) image. shape: *(H, W)*.
+            im2 (Union[np.ndarray, torch.Tensor]):
+                Second (moving) image. shape: *(H, W)*.
+            device (Optional[str]):
+                Torch device string to run the match on. If ``None``,
+                uses ``self.device``. (Default is ``None``)
+
+        Returns:
+            (Tuple[torch.Tensor, torch.Tensor]): tuple containing:
+                ff (torch.Tensor):
+                    Flow field returned by the RoMa model.
+                certainty (torch.Tensor):
+                    Per-pixel matching certainty.
+        """
         ff, certainty = self.model.match(
             self._prepare_image(im1),
             self._prepare_image(im2),
@@ -788,6 +990,25 @@ class RoMa(ImageRegistrationMethod):
         im_moving: Union[np.ndarray, torch.Tensor],
         **kwargs,
     ):
+        """
+        Computes matched keypoints between two images for the RANSAC pipeline.
+
+        Args:
+            im_template (Union[np.ndarray, torch.Tensor]):
+                Template image. shape: *(H, W)*.
+            im_moving (Union[np.ndarray, torch.Tensor]):
+                Moving image. shape: *(H, W)*.
+            **kwargs:
+                Unused; accepted for interface compatibility with
+                :meth:`ImageRegistrationMethod._forward_rigid`.
+
+        Returns:
+            (Tuple[torch.Tensor, torch.Tensor]): tuple containing:
+                kptsA (torch.Tensor):
+                    Keypoints in the template image. shape: *(N, 2)*.
+                kptsB (torch.Tensor):
+                    Matched keypoints in the moving image. shape: *(N, 2)*.
+        """
         h, w = im_moving.shape[0], im_moving.shape[1]
 
         ff, certainty = self._match(im_template, im_moving, device=self.device)
@@ -807,7 +1028,20 @@ class RoMa(ImageRegistrationMethod):
         return kptsA, kptsB
 
     def _prepare_image(self, image: Union[np.ndarray, torch.Tensor]):
-        """Convert a float image in [0, 1] to a PIL.Image RGB for RoMa."""
+        """
+        Converts a float image in ``[0, 1]`` to an RGB :class:`PIL.Image`
+        for ingestion by RoMa.
+
+        Args:
+            image (Union[np.ndarray, torch.Tensor]):
+                Source image with values in ``[0, 1]``. shape: *(H, W)*
+                or *(H, W, C)*.
+
+        Returns:
+            (object):
+                im_pil (object):
+                    RGB :class:`PIL.Image.Image` instance.
+        """
         import PIL.Image
         if isinstance(image, torch.Tensor):
             image = image.cpu().numpy()
@@ -815,24 +1049,48 @@ class RoMa(ImageRegistrationMethod):
 
 
 class ECC_cv2(ImageRegistrationMethod):
-    """OpenCV Enhanced Correlation Coefficient (ECC) registration.
-
-    Wraps :func:`face_rhythm.helpers.find_geometric_transformation`
-    (which itself wraps :func:`cv2.findTransformECC`). On failure, retries
-    with a larger Gaussian filter size.
+    """
+    OpenCV Enhanced Correlation Coefficient (ECC) registration backend.
+    Wraps :func:`face_rhythm.helpers.find_geometric_transformation`, which
+    in turn wraps :func:`cv2.findTransformECC`. On failure, the call is
+    retried with a larger Gaussian filter size.
 
     Args:
-        mode_transform (str): One of ``'translation'``, ``'euclidean'``,
-            ``'affine'``, ``'homography'``.
-        n_iter (int): Max ECC iterations.
-        termination_eps (float): Convergence tolerance.
-        gaussFiltSize (Union[float, int]): Gaussian-filter kernel size used
-            as a smoothing pre-pass before the ECC iteration.
-        auto_fix_gaussFilt_step (Optional[int]): If set, on ECC failure the
-            kernel size is incremented by this value and ECC is retried
-            recursively. ``None`` disables the retry.
-        device (str): Ignored (ECC runs on CPU).
-        verbose (Union[bool, int]): Verbosity.
+        mode_transform (str):
+            Warp family for ECC. Either \n
+            * ``'translation'``: Translation-only warp.
+            * ``'euclidean'``: Rotation + translation.
+            * ``'affine'``: Affine warp.
+            * ``'homography'``: 3x3 homography. \n
+            (Default is ``'euclidean'``)
+        n_iter (int):
+            Maximum ECC iterations. (Default is ``200``)
+        termination_eps (float):
+            ECC convergence tolerance. (Default is ``1e-09``)
+        gaussFiltSize (Union[float, int]):
+            Gaussian-filter kernel size used as a smoothing pre-pass before
+            the ECC iteration. Cast to int via ``np.round``.
+            (Default is ``1``)
+        auto_fix_gaussFilt_step (Optional[int]):
+            If set, on ECC failure the kernel size is incremented by this
+            value and ECC is retried recursively. ``None`` disables the
+            retry. (Default is ``10``)
+        device (str):
+            Ignored; ECC always runs on CPU. (Default is ``'cpu'``)
+        verbose (Union[bool, int]):
+            Verbosity flag or integer level. (Default is ``False``)
+
+    Attributes:
+        mode_transform (str):
+            Warp family selected for ECC.
+        n_iter (int):
+            Maximum ECC iterations.
+        termination_eps (float):
+            ECC convergence tolerance.
+        gaussFiltSize (int):
+            Effective Gaussian-filter kernel size used by ECC.
+        auto_fix_gaussFilt_step (Optional[int]):
+            Increment applied to ``gaussFiltSize`` after each ECC failure.
     """
 
     def __init__(
@@ -845,6 +1103,7 @@ class ECC_cv2(ImageRegistrationMethod):
         device: str = 'cpu',
         verbose: Union[bool, int] = False,
     ):
+        """Initializes the ECC backend and validates ``mode_transform``."""
         super().__init__(device=device, verbose=verbose)
 
         valid_modes = {'translation', 'euclidean', 'affine', 'homography'}
@@ -863,14 +1122,24 @@ class ECC_cv2(ImageRegistrationMethod):
         im_moving: Union[np.ndarray, torch.Tensor],
         **kwargs,
     ) -> np.ndarray:
-        """Estimate a 3x3 warp matrix via ECC with recursive gauss-filt fallback.
+        """
+        Estimates a 3x3 warp matrix via ECC, retrying with a larger
+        Gaussian filter on failure.
 
         Args:
-            im_template (Union[np.ndarray, torch.Tensor]): Template image.
-            im_moving (Union[np.ndarray, torch.Tensor]): Moving image.
+            im_template (Union[np.ndarray, torch.Tensor]):
+                Template image. shape: *(H, W)*.
+            im_moving (Union[np.ndarray, torch.Tensor]):
+                Moving image. shape: *(H, W)*.
+            **kwargs:
+                Unused; accepted for interface compatibility with
+                :meth:`ImageRegistrationMethod.fit_rigid`.
 
         Returns:
-            (np.ndarray): 3x3 warp matrix (with ``[0, 0, 1]`` row for affine).
+            (np.ndarray):
+                warp_matrix (np.ndarray):
+                    Homogeneous warp matrix. shape: *(3, 3)*. Affine warps
+                    are padded with ``[0, 0, 1]``.
         """
         def _recursive_closure(im_template, im_moving, gaussFiltSize, depth=0, max_depth=100):
             depth += 1
@@ -913,17 +1182,27 @@ class ECC_cv2(ImageRegistrationMethod):
 
 
 class PhaseCorrelationRegistration(ImageRegistrationMethod):
-    """Translation-only registration via :func:`phase_correlation` peak detection.
-
-    Supports an optional bandpass (lowcut, highcut) on the phase-correlation
-    mask for robustness against low/high-frequency noise.
+    """
+    Translation-only registration via :func:`phase_correlation` peak
+    detection. Supports an optional bandpass on the phase-correlation mask
+    for robustness against low- and high-frequency noise.
 
     Args:
-        device (str): Torch device for the FFT.
-        bandpass_freqs (Optional[List[float]]): ``[low, high]`` cutoffs.
-            ``None`` skips the bandpass.
-        order (int): Butterworth order for the bandpass.
-        verbose (bool): Verbosity.
+        device (str):
+            Torch device used for the FFT. (Default is ``'cpu'``)
+        bandpass_freqs (Optional[List[float]]):
+            ``[low, high]`` cutoffs for the bandpass filter. ``None``
+            skips the bandpass. (Default is ``None``)
+        order (int):
+            Butterworth order for the bandpass filter. (Default is ``5``)
+        verbose (bool):
+            Verbosity flag. (Default is ``False``)
+
+    Attributes:
+        bandpass_freqs (Optional[List[float]]):
+            Cutoffs used to construct the bandpass mask, if any.
+        order (int):
+            Butterworth order for the bandpass filter.
     """
 
     def __init__(
@@ -933,6 +1212,7 @@ class PhaseCorrelationRegistration(ImageRegistrationMethod):
         order: int = 5,
         verbose: bool = False,
     ):
+        """Initializes the phase-correlation backend with an optional bandpass."""
         super().__init__(device=device, verbose=verbose)
         self.bandpass_freqs = bandpass_freqs
         self.order = order
@@ -943,6 +1223,25 @@ class PhaseCorrelationRegistration(ImageRegistrationMethod):
         im_moving: Union[np.ndarray, torch.Tensor],
         **kwargs,
     ) -> np.ndarray:
+        """
+        Estimates a translation-only 3x3 warp via phase-correlation peak
+        detection.
+
+        Args:
+            im_template (Union[np.ndarray, torch.Tensor]):
+                Template image. shape: *(..., H, W)*.
+            im_moving (Union[np.ndarray, torch.Tensor]):
+                Moving image. shape: *(..., H, W)*.
+            **kwargs:
+                Unused; accepted for interface compatibility with
+                :meth:`ImageRegistrationMethod.fit_rigid`.
+
+        Returns:
+            (np.ndarray):
+                warp_matrix (np.ndarray):
+                    Translation-only homogeneous warp matrix.
+                    shape: *(3, 3)*, dtype: *float32*.
+        """
         filt = None
         if self.bandpass_freqs is not None:
             filt = make_2D_frequency_filter(
@@ -973,13 +1272,22 @@ class PhaseCorrelationRegistration(ImageRegistrationMethod):
 
 
 class NullRegistration(ImageRegistrationMethod):
-    """Identity registration — returns an identity warp for every pair.
+    """
+    Identity registration backend that returns an identity warp for every
+    pair. Useful for debugging the :meth:`Aligner.fit_geometric` pipeline,
+    evaluating pre-registered images, and as a zero-cost ``method``
+    baseline.
 
-    Useful for (a) debugging the fit_geometric pipeline, (b) evaluating
-    pre-registered images, and (c) a zero-cost ``method`` baseline.
+    Args:
+        device (Optional[str]):
+            Torch device string. ``None`` falls back to ``'cpu'``.
+            (Default is ``None``)
+        verbose (bool):
+            Verbosity flag. (Default is ``False``)
     """
 
     def __init__(self, device: Optional[str] = None, verbose: bool = False):
+        """Initializes the null backend, defaulting ``device`` to ``'cpu'``."""
         super().__init__(device=device if device is not None else 'cpu', verbose=verbose)
 
     def fit_rigid(
@@ -988,6 +1296,25 @@ class NullRegistration(ImageRegistrationMethod):
         im_moving: Union[np.ndarray, torch.Tensor],
         **kwargs,
     ) -> np.ndarray:
+        """
+        Returns an identity 2x3 affine warp regardless of the input images.
+
+        Args:
+            im_template (Union[np.ndarray, torch.Tensor]):
+                Template image. Ignored.
+            im_moving (Union[np.ndarray, torch.Tensor]):
+                Moving image. Ignored.
+            **kwargs:
+                Unused; accepted for interface compatibility with
+                :meth:`ImageRegistrationMethod.fit_rigid`.
+
+        Returns:
+            (np.ndarray):
+                warp_matrix (np.ndarray):
+                    Identity affine warp. shape: *(2, 3)*,
+                    dtype: *float32*. :meth:`Aligner.fit_geometric` pads
+                    this to *(3, 3)*.
+        """
         ## Identity affine (2x3); fit_geometric pads to 3x3.
         return np.eye(3, dtype=np.float32)[:2, :]
 
@@ -1029,40 +1356,95 @@ _DEFAULT_KWARGS_METHOD: Dict[str, Dict[str, Any]] = {
 
 
 class Aligner(_AlignerModuleStub):
-    """Register a list of FOV images to a template via a chosen backend.
-
-    Public API mirrors ROICaT's ``tracking.alignment.Aligner`` so existing
-    notebooks can swap the import path without further changes.
+    """
+    Registers a list of FOV images to a template using a chosen backend.
+    The public API mirrors ROICaT's ``tracking.alignment.Aligner`` so that
+    existing notebooks can swap the import path without further changes.
 
     Workflow:
         1. ``aligner = Aligner(...)``.
         2. ``aligner.fit_geometric(template=..., ims_moving=[...],
-           method='RoMa' | 'ECC_cv2' | 'PhaseCorrelation' | 'NullRegistration',
-           ...)``.
-        3. Use ``aligner.remappingIdx_geo`` (list of ``(H, W, 2)`` float32
-           arrays) to warp points / images, or ``aligner.transform_images(
-           ims_moving, remappingIdx=aligner.remappingIdx_geo)``.
-        4. Inspect alignment quality via ``aligner.plot_alignment_results_geometric()``.
+           method='RoMa' | 'ECC_cv2' | 'PhaseCorrelation' |
+           'NullRegistration', ...)``.
+        3. Use ``aligner.remappingIdx_geo`` (a list of *(H, W, 2)*
+           ``float32`` arrays) to warp points or images, or call
+           ``aligner.transform_images(ims_moving,
+           remappingIdx=aligner.remappingIdx_geo)``.
+        4. Inspect alignment quality with
+           ``aligner.plot_alignment_results_geometric()``.
 
     Args:
-        use_match_search (bool): If any image has score <= ``z_threshold``
-            against the template, run the Dijkstra match-search step to find
-            a pairwise path through other images.
-        all_to_all (bool): Always run the all-to-all match search, even when
+        use_match_search (bool):
+            If any image scores ``<= z_threshold`` against the template,
+            run the Dijkstra match-search step to find a pairwise path
+            through other images. (Default is ``True``)
+        all_to_all (bool):
+            If ``True``, always run the all-to-all match search even when
             direct registrations all pass ``z_threshold``. Much slower
-            (``O(N^2)``).
-        radius_in (float): ``ImageAlignmentChecker`` inner radius (pixels * ``um_per_pixel``).
-        radius_out (float): ``ImageAlignmentChecker`` outer radius.
-        order (int): Butterworth order for the in/out filters.
-        z_threshold (float): z-score cutoff below which a pair is considered
-            mis-aligned. Default is ``4.0``; the multi-session notebook sets
-            ``50`` to always trigger the match-search.
-        um_per_pixel (float): Pixel scale (must match across all images).
-        device (str): Torch device string for the backends (e.g. ``'cuda:0'``).
-            Note that :class:`ECC_cv2` and :class:`PhaseCorrelationRegistration`
-            ignore this and run on CPU; RoMa on CPU is prohibitively slow.
-        verbose (Union[bool, int]): Verbosity (``True``, ``False``, or
-            integer levels).
+            (``O(N^2)``). (Default is ``False``)
+        radius_in (float):
+            Inner radius for the :class:`ImageAlignmentChecker`, scaled
+            by ``um_per_pixel``. (Default is ``4``)
+        radius_out (float):
+            Outer radius for the :class:`ImageAlignmentChecker`, scaled
+            by ``um_per_pixel``. (Default is ``20``)
+        order (int):
+            Butterworth order for the in- and out-band filters used by
+            :class:`ImageAlignmentChecker`. (Default is ``5``)
+        z_threshold (float):
+            z-score cutoff below which a pair is considered mis-aligned.
+            The multi-session notebook sets ``50`` to always trigger the
+            match-search. (Default is ``4.0``)
+        um_per_pixel (float):
+            Pixel scale, which must match across all images.
+            (Default is ``1.0``)
+        device (str):
+            Torch device string for the backends (e.g. ``'cuda:0'``).
+            :class:`ECC_cv2` and :class:`PhaseCorrelationRegistration`
+            ignore this and run on CPU; :class:`RoMa` on CPU is
+            prohibitively slow. (Default is ``'cpu'``)
+        verbose (Union[bool, int]):
+            Verbosity flag or integer level. (Default is ``True``)
+
+    Attributes:
+        use_match_search (bool):
+            Whether the Dijkstra match-search runs on bad alignments.
+        all_to_all (bool):
+            Whether the all-to-all match-search runs unconditionally.
+        radius_in (float):
+            Inner radius parameter for :class:`ImageAlignmentChecker`.
+        radius_out (float):
+            Outer radius parameter for :class:`ImageAlignmentChecker`.
+        order (int):
+            Butterworth order parameter for :class:`ImageAlignmentChecker`.
+        z_threshold (float):
+            z-score cutoff for the alignment check.
+        device (str):
+            Torch device string passed to the backends.
+        um_per_pixel (float):
+            Pixel scale used to scale the in/out radii.
+        remappingIdx_geo (Optional[List[np.ndarray]]):
+            Per-image remapping arrays produced by
+            :meth:`fit_geometric`, each with shape *(H, W, 2)* and
+            dtype *float32*. ``None`` until :meth:`fit_geometric` runs.
+        warp_matrices:
+            Composed warp matrices set by :meth:`fit_geometric`.
+            ``None`` until :meth:`fit_geometric` runs.
+
+    Example:
+        .. highlight:: python
+        .. code-block:: python
+
+            aligner = Aligner(z_threshold=50, device='cuda:0')
+            aligner.fit_geometric(
+                template=0,
+                ims_moving=images,
+                method='RoMa',
+            )
+            warped = aligner.transform_images(
+                ims_moving=images,
+                remappingIdx=aligner.remappingIdx_geo,
+            )
     """
 
     def __init__(
@@ -1077,6 +1459,7 @@ class Aligner(_AlignerModuleStub):
         device: str = 'cpu',
         verbose: Union[bool, int] = True,
     ):
+        """Initializes the aligner and stores its constructor kwargs in ``self.params``."""
         super().__init__()
 
         self.params['__init__'] = self._locals_to_params(
@@ -1111,7 +1494,21 @@ class Aligner(_AlignerModuleStub):
         image: np.ndarray,
         borders: Tuple[int, int, int, int],
     ) -> np.ndarray:
-        """Crop ``(top, bottom, left, right)`` borders from ``image``."""
+        """
+        Crops ``(top, bottom, left, right)`` borders from a 2-D image.
+
+        Args:
+            image (np.ndarray):
+                Input image. shape: *(H, W)*.
+            borders (Tuple[int, int, int, int]):
+                Number of pixels to crop from the ``(top, bottom, left,
+                right)`` edges.
+
+        Returns:
+            (np.ndarray):
+                cropped (np.ndarray):
+                    Cropped image with the requested borders removed.
+        """
         return image[borders[0]:image.shape[0] - borders[1], borders[2]:image.shape[1] - borders[3]]
 
     def _compose_warps(
@@ -1120,13 +1517,38 @@ class Aligner(_AlignerModuleStub):
         warps_to_add: List[np.ndarray],
         warpMat_or_remapIdx: str = 'warpMat',
     ) -> np.ndarray:
-        """Compose a list of warps into a single warp.
+        """
+        Composes a list of warps into a single warp.
 
         Only the ``'warpMat'`` branch (matrix composition via
-        :func:`face_rhythm.helpers.compose_transform_matrices`) is implemented
-        — that's the only branch ``fit_geometric`` ever calls. The
-        ``'remapIdx'`` branch exists in ROICaT for nonrigid path composition
-        and raises :class:`NotImplementedError` here.
+        :func:`face_rhythm.helpers.compose_transform_matrices`) is
+        implemented; that is the only branch :meth:`fit_geometric`
+        ever calls. The ``'remapIdx'`` branch exists in ROICaT for
+        nonrigid flow composition and raises :class:`NotImplementedError`
+        here.
+
+        Args:
+            warp_0 (np.ndarray):
+                Base warp matrix to start composition from.
+                shape: *(3, 3)*.
+            warps_to_add (List[np.ndarray]):
+                Warp matrices applied in order on top of ``warp_0``.
+            warpMat_or_remapIdx (str):
+                Composition mode. Either \n
+                * ``'warpMat'``: Matrix composition.
+                * ``'remapIdx'``: Not implemented in this port. \n
+                (Default is ``'warpMat'``)
+
+        Returns:
+            (np.ndarray):
+                warp_out (np.ndarray):
+                    Composed warp matrix. shape: *(3, 3)*.
+
+        Raises:
+            NotImplementedError:
+                ``warpMat_or_remapIdx`` is ``'remapIdx'``.
+            ValueError:
+                ``warpMat_or_remapIdx`` is not one of the supported values.
         """
         if warpMat_or_remapIdx == 'warpMat':
             fn_compose = helpers.compose_transform_matrices
@@ -1151,7 +1573,30 @@ class Aligner(_AlignerModuleStub):
         template: Union[int, float, np.ndarray],
         template_method: str,
     ) -> Tuple[List[np.ndarray], Union[int, np.ndarray]]:
-        """Coerce all inputs to ``float32`` and resolve ``template`` to int/ndarray."""
+        """
+        Coerces all input images to ``float32`` and resolves ``template``
+        to either an integer index or an :class:`np.ndarray`, depending on
+        ``template_method``.
+
+        Args:
+            ims_moving (List[np.ndarray]):
+                Images to register. Each entry has shape *(H, W)*.
+            template (Union[int, float, np.ndarray]):
+                Template specification. May be an integer index into
+                ``ims_moving``, a fractional index in ``[0, 1]``, or an
+                explicit 2-D image.
+            template_method (str):
+                One of ``'image'`` or ``'sequential'``.
+
+        Returns:
+            (Tuple[List[np.ndarray], Union[int, np.ndarray]]): tuple containing:
+                ims_moving (List[np.ndarray]):
+                    Input images cast to *float32*.
+                template (Union[int, np.ndarray]):
+                    Resolved template (an integer index when
+                    ``template_method == 'sequential'``, otherwise a
+                    *float32* image).
+        """
         if any(im.dtype != np.float32 for im in ims_moving):
             print(f"WARNING: ims_moving are not all dtype np.float32, found "
                   f"{np.unique([im.dtype for im in ims_moving])}, converting...")
@@ -1197,35 +1642,61 @@ class Aligner(_AlignerModuleStub):
         kwargs_RANSAC: Optional[Dict[str, Any]] = None,
         verbose: Optional[bool] = None,
     ) -> List[np.ndarray]:
-        """Fit geometric (rigid-ish) warps from ``ims_moving`` to ``template``.
+        """
+        Fits geometric warps from ``ims_moving`` to ``template`` and
+        scores their alignment.
 
         Calls the backend identified by ``method`` once per pair, composes
-        warps across sequential templates (if any), then scores alignment via
-        :class:`ImageAlignmentChecker`. If any pair fails the ``z_threshold``
-        gate (and ``use_match_search=True``), runs a Dijkstra search through
-        all intermediate images to reconstruct better paths.
+        warps across sequential templates (if any), then scores alignment
+        via :class:`ImageAlignmentChecker`. If any pair fails the
+        ``z_threshold`` gate and ``use_match_search`` is ``True``, a
+        Dijkstra search through all intermediate images is run to
+        reconstruct better paths.
 
         Args:
-            template (Union[int, float, np.ndarray]): Template image or index
-                (fractional indices in ``[0, 1]`` are mapped to ``int(N * f)``).
-            ims_moving (List[np.ndarray]): Same-shape images to register.
-            template_method (str): ``'image'`` (template is a concrete image
-                or pinned index) or ``'sequential'`` (each image is registered
-                to its neighbor along a chain to the template index).
-            mask_borders (Tuple[int, int, int, int]): Pre-crop borders
-                ``(top, bottom, left, right)``.
-            method (str): One of the backend keys in ``_METHODS_LUT``.
-            kwargs_method (Optional[Dict]): Per-backend kwargs. The dict is
-                keyed by backend name so the same dict can be passed for any
-                ``method`` choice. If ``None``, uses :data:`_DEFAULT_KWARGS_METHOD`.
-            constraint (str): Warp family passed through to
+            template (Union[int, float, np.ndarray]):
+                Template image or index. Fractional indices in
+                ``[0, 1]`` are mapped to ``int(N * f)``.
+            ims_moving (List[np.ndarray]):
+                Same-shape images to register. shape: *(H, W)* each.
+            template_method (str):
+                Template-resolution mode. Either \n
+                * ``'image'``: ``template`` is a concrete image (or
+                  pinned index resolved to one).
+                * ``'sequential'``: Each image is registered to its
+                  neighbor along a chain that ends at the template
+                  index. \n
+                (Default is ``'sequential'``)
+            mask_borders (Tuple[int, int, int, int]):
+                Pre-crop borders ``(top, bottom, left, right)`` removed
+                from every image before registration.
+                (Default is ``(0, 0, 0, 0)``)
+            method (str):
+                Backend key into ``_METHODS_LUT``. One of ``'RoMa'``,
+                ``'ECC_cv2'``, ``'PhaseCorrelation'``, or
+                ``'NullRegistration'``. (Default is ``'RoMa'``)
+            kwargs_method (Optional[Dict[str, Dict[str, Any]]]):
+                Per-backend kwargs keyed by backend name, so the same
+                dict can be passed for any ``method`` choice. If ``None``,
+                uses :data:`_DEFAULT_KWARGS_METHOD`. (Default is ``None``)
+            constraint (str):
+                Warp family passed through to
                 :meth:`ImageRegistrationMethod.fit_rigid`.
-            kwargs_RANSAC (Optional[Dict]): RANSAC kwargs for ``fit_rigid``.
-            verbose (Optional[bool]): Overrides ``self._verbose`` if not ``None``.
+                (Default is ``'affine'``)
+            kwargs_RANSAC (Optional[Dict[str, Any]]):
+                RANSAC kwargs for ``fit_rigid``. If ``None``, uses
+                ``{'inl_thresh': 2.0, 'max_iter': 10, 'confidence': 0.99}``.
+                (Default is ``None``)
+            verbose (Optional[bool]):
+                Overrides ``self._verbose`` when not ``None``.
+                (Default is ``None``)
 
         Returns:
-            (List[np.ndarray]): ``self.remappingIdx_geo`` — one
-            ``(H, W, 2) float32`` array per input image.
+            (List[np.ndarray]):
+                remappingIdx_geo (List[np.ndarray]):
+                    One remapping array per input image.
+                    shape: *(H, W, 2)* each, dtype: *float32*. Also
+                    stored on ``self.remappingIdx_geo``.
         """
         if kwargs_method is None:
             kwargs_method = _DEFAULT_KWARGS_METHOD
@@ -1550,18 +2021,27 @@ class Aligner(_AlignerModuleStub):
         ims_moving: Union[List[np.ndarray], np.ndarray],
         remappingIdx: Union[List[np.ndarray], np.ndarray],
     ) -> Union[List[np.ndarray], np.ndarray]:
-        """Apply per-image remapping indices via :func:`face_rhythm.helpers.remap_images`.
+        """
+        Applies per-image remapping indices via
+        :func:`face_rhythm.helpers.remap_images`.
 
         Args:
-            ims_moving (Union[List[np.ndarray], np.ndarray]): Images to warp
-                (list) or a single ndarray (returned as a bare array).
-            remappingIdx (Union[List[np.ndarray], np.ndarray]): Matching
-                remap arrays, shape ``(H, W, 2)`` each. ``cv2`` backend is used
-                with a per-image ``border_value = im_moving.mean()`` so the
-                cropped border matches the image statistics.
+            ims_moving (Union[List[np.ndarray], np.ndarray]):
+                Images to warp. May be a list of *(H, W)* or
+                *(H, W, C)* arrays, or a single :class:`np.ndarray`
+                (returned as a bare array).
+            remappingIdx (Union[List[np.ndarray], np.ndarray]):
+                Matching remap arrays. shape: *(H, W, 2)* each. The
+                ``cv2`` backend is used with a per-image
+                ``border_value = im_moving.mean()`` so that the cropped
+                border matches the image statistics.
 
         Returns:
-            (Union[List[np.ndarray], np.ndarray]): Registered images.
+            (Union[List[np.ndarray], np.ndarray]):
+                ims_registered (Union[List[np.ndarray], np.ndarray]):
+                    Registered images. Returned as a single
+                    :class:`np.ndarray` when ``ims_moving`` was a bare
+                    ndarray, otherwise as a list.
         """
         squeeze_output = False
         if not isinstance(ims_moving, (list, tuple)):
@@ -1604,18 +2084,24 @@ class Aligner(_AlignerModuleStub):
         self,
         plot_direct: bool = True,
     ) -> Tuple[plt.Figure, Optional[plt.Figure]]:
-        """Render two 2-panel heatmaps (score + alignment) per stage.
+        """
+        Renders two-panel score + alignment heatmaps per registration
+        stage.
 
         Args:
-            plot_direct (bool): If ``True`` and a direct all-to-all matrix was
-                produced (i.e. match-search ran), also render the "direct"
+            plot_direct (bool):
+                If ``True`` and a direct all-to-all matrix was produced
+                (i.e. the match-search ran), also render the "direct"
                 stage. Otherwise only the "final" stage is drawn.
+                (Default is ``True``)
 
         Returns:
-            (Tuple[plt.Figure, Optional[plt.Figure]]):
-                fig_final — figure for the post-registration results.
-                fig_direct — figure for the direct (pre-match-search) results,
-                or ``None`` if the match-search didn't run.
+            (Tuple[matplotlib.figure.Figure, Optional[matplotlib.figure.Figure]]): tuple containing:
+                fig_final (matplotlib.figure.Figure):
+                    Figure for the post-registration results.
+                fig_direct (Optional[matplotlib.figure.Figure]):
+                    Figure for the direct (pre-match-search) results, or
+                    ``None`` if the match-search did not run.
         """
         assert hasattr(self, 'results_geometric'), (
             "Missing results_geometric attribute. Run fit_geometric first."
@@ -1635,7 +2121,25 @@ class Aligner(_AlignerModuleStub):
         return fig_final, fig_direct
 
     def _plot_results(self, results: Dict[str, Any], name: str) -> plt.Figure:
-        """Two-panel score/alignment heatmap. Diagonal is zeroed out for readability."""
+        """
+        Renders a two-panel score and alignment heatmap. The diagonal is
+        zeroed out for readability.
+
+        Args:
+            results (Dict[str, Any]):
+                Dictionary with keys ``'score_all_to_all'`` and
+                ``'alignment_all_to_all'``, each holding a square
+                :class:`np.ndarray`.
+            name (str):
+                Stage label used in the panel titles
+                (e.g. ``'final'`` or ``'direct'``).
+
+        Returns:
+            (matplotlib.figure.Figure):
+                fig (matplotlib.figure.Figure):
+                    Two-panel figure with the score and alignment
+                    heatmaps.
+        """
         inv_eye = 1 - np.eye(results['alignment_all_to_all'].shape[0])
         cmap = 'viridis'
         fig, axs = plt.subplots(1, 2, figsize=(6, 3))

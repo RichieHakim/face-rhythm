@@ -22,43 +22,47 @@ def prepare_project(
     verbose=1,
 ):
     """
-    Prepares the project folder and data folder (if they don't exist)
-    Creates the config file (if it doesn't exist or overwrite requested)
-    Returns path to the config file
+    Prepares the project folder and creates ``config.yaml`` and
+    ``run_info.json`` (if they do not already exist or an overwrite is
+    requested).
 
     Args:
-        directory_project (str): 
-            Path to the project. 
-            If './' is passed, the current working directory is used
-        overwrite_config (bool): 
-            Whether to overwrite the ENTIRE config file with a brand
-             new config file.
-            If False, update_project_paths can still be set to True.
+        directory_project (str):
+            Path to the project directory. If ``'./'`` is passed, the current
+            working directory is used. (Default is ``'./'``)
+        overwrite_config (bool):
+            Whether to overwrite the **entire** ``config.yaml`` file with a
+            brand-new config. If ``False``, ``update_project_paths`` can still
+            be set to ``True``. (Default is ``False``)
         update_project_paths (bool):
-            If True, then will update the following within the config.yaml
-             file to reflect the current project directory (directory_project):
-                - paths > project: directory_project/
-                - paths > config: directory_project/config.yaml
-                - paths > run_info: directory_project/run_info.json
-            If overwrite_config is True, then this is ignored.
+            If ``True``, updates the following entries within the existing
+            ``config.yaml`` to reflect the current ``directory_project``: \n
+            * ``paths > project``: ``directory_project/``
+            * ``paths > config``: ``directory_project/config.yaml``
+            * ``paths > run_info``: ``directory_project/run_info.json`` \n
+            If ``overwrite_config`` is ``True``, this argument is ignored.
+            (Default is ``False``)
         mkdir (bool):
-            Whether to create the project directory if it doesn't exist
+            Whether to create the project directory if it does not exist.
+            (Default is ``True``)
         initialize_visualization (bool):
-            Whether to initialize cv2.imshow visualization. If on a server,
-             this should be set to False.
+            Whether to initialize ``cv2.imshow`` visualization. On a headless
+            server this should be set to ``False``. (Default is ``True``)
         verbose (int):
-            Verbosity level.
-            0: No output
-            1: Warnings
-            2: Info
+            Verbosity level. One of \n
+            * ``0``: No output.
+            * ``1``: Warnings.
+            * ``2``: Info. \n
+            (Default is ``1``)
 
     Returns:
-        path_config (str):
-            path to the config file
-        path_run_info (str):
-            path to the run info file
-        directory_project (str):
-            path to the project directory
+        (tuple): tuple containing:
+            path_config (str):
+                Path to the ``config.yaml`` file.
+            path_run_info (str):
+                Path to the ``run_info.json`` file.
+            directory_project (str):
+                Path to the project directory.
     """
     ## initialize cv2.imshow
     if initialize_visualization:
@@ -66,9 +70,7 @@ def prepare_project(
         helpers.prepare_cv2_imshow()
 
     def _create_config_file():
-        """
-        Creates a config.yaml file.
-        """
+        """Writes a fresh ``config.yaml`` file at ``path_config``."""
         contents_basic = {
             'general': {
                 'date_created': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

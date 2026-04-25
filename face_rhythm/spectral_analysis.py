@@ -19,24 +19,56 @@ from . import helpers
 
 class VQT_Analyzer(FR_Module):
     """
-    A class for generating normalized spectrograms for point
-     displacement traces. The spectrograms are generated using
-     the Variable Q-Transform (VQT) algorithm.
-    RH 2022
+    Computes normalized Variable-Q Transform (VQT) spectrograms for point
+    displacement traces. RH 2022
 
     Args:
         params_VQT (dict):
-            A dictionary of parameters to pass to the VQT class (Variable
-            Q-Transform) in helpers.py.
+            Keyword arguments forwarded to ``vqt.VQT`` (the Variable Q-Transform
+            implementation in :mod:`vqt`). Notable keys include ``Fs_sample``
+            (sampling rate in Hz), ``Q_lowF`` and ``Q_highF`` (Q-factors at the
+            low and high frequency bounds), ``F_min`` and ``F_max`` (frequency
+            range in Hz), ``n_freq_bins``, ``window_type``, ``downsample_factor``,
+            and ``take_abs``. (Default is the dict shown in the signature)
+        batch_size (int):
+            Number of points processed per VQT batch. (Default is ``10``)
+        device (str):
+            Torch device on which the VQT model is run (e.g. ``'cpu'`` or
+            ``'cuda'``). (Default is ``'cpu'``)
         normalization_factor (float):
-            A float between 0 and 1 to normalize the spectrograms. 0 means no
-            normalization. 1 means every time point has the same power.
+            Strength of the per-timepoint power normalization, in the range
+            ``[0, 1]``. ``0`` disables normalization; ``1`` forces every time
+            point to have equal total power. (Default is ``0.99``)
         spectrogram_exponent (float):
-            A float to raise the spectrogram to before normalizing.
+            Exponent applied to the spectrogram magnitudes prior to
+            normalization. (Default is ``1.0``)
         one_over_f_exponent (float):
-            A float to raise the frequency axis to before doing 1/f correction.
+            Exponent for the 1/f correction; the spectrogram is multiplied by
+            ``freqs ** one_over_f_exponent``. ``0`` disables the correction.
+            (Default is ``1.0``)
         verbose (int):
-            An integer to control the verbosity of the class.
+            Verbosity level. ``0`` is silent, higher values print and show
+            progress bars. (Default is ``1``)
+
+    Attributes:
+        spectrograms (dict):
+            Dict mapping each input key to its normalized spectrogram array.
+            Populated by :meth:`transform_all`.
+        x_axis (dict):
+            Dict mapping each input key to the time axis (in samples) of its
+            spectrogram. Populated by :meth:`transform_all`.
+        freqs (dict):
+            Dict mapping each input key to the frequency bin centers (in Hz).
+            Populated by :meth:`transform_all`.
+        point_positions (torch.Tensor):
+            Reshaped reference positions used to subtract offsets from traces.
+        vqt_model (vqt.VQT):
+            The underlying VQT filter-bank model.
+        config (dict):
+            Constructor arguments echoed for ``FR_Module`` serialization.
+        run_data (dict):
+            Output payload (filters, frequencies, spectrograms, axes) used by
+            ``FR_Module`` for export.
     """
     def __init__(
         self,
@@ -55,7 +87,7 @@ class VQT_Analyzer(FR_Module):
             'fft_conv': True,
             'fast_length': True,
             'take_abs': True,
-            'filters': None, 
+            'filters': None,
             'plot_pref': False,
         },
         batch_size: int=10,
@@ -65,6 +97,8 @@ class VQT_Analyzer(FR_Module):
         one_over_f_exponent: float=1.0,
         verbose: int=1,
     ):
+        """Initializes the analyzer, builds the VQT filter bank, and stores
+        config metadata for ``FR_Module`` serialization."""
         super().__init__()
 
         ## Set attributes
@@ -109,7 +143,8 @@ class VQT_Analyzer(FR_Module):
 
     def cleanup(self):
         """
-        Delete the large data objects that are no longer needed.
+        Deletes every attribute on the instance and triggers garbage collection
+        to free large tensors held by the analyzer.
         """
         import gc
         print(f"FR: Deleting all attributes")
@@ -122,18 +157,27 @@ class VQT_Analyzer(FR_Module):
 
     def transform(self, points_tracked: np.ndarray, point_positions: np.ndarray):
         """
-        Transform a single batch of points into spectrograms.
+        Transforms a single batch of tracked points into a normalized VQT
+        spectrogram.
 
         Args:
             points_tracked (np.ndarray):
-                A 3D numpy array of shape(n_frames, n_points, 2)
-                 containing the tracked points.
+                Tracked point coordinates. shape: *(n_frames, n_points, 2)*.
             point_positions (np.ndarray):
-                A 2D numpy array of shape(n_points, 2) containing the positions
+                Reference positions of the tracked points used to compute
+                displacements. shape: *(n_points, 2)*.
 
         Returns:
-            spectrograms (np.ndarray):
-                A 4D numpy array of shape(n_points, n_freq_bins, n_frames, 2)
+            (tuple): tuple containing:
+                spectrograms (np.ndarray):
+                    Normalized spectrograms for the x and y displacement
+                    components. shape: *(2, n_points, n_freq_bins, n_frames_ds)*,
+                    where ``n_frames_ds`` is the downsampled frame count.
+                x_axis (np.ndarray):
+                    Time axis of the spectrogram, in samples at the original
+                    ``Fs_sample`` rate. shape: *(n_frames_ds,)*.
+                freqs (np.ndarray):
+                    Frequency bin centers in Hz. shape: *(n_freq_bins,)*.
         """
         ## Prepare traces
         point_positions = self._prepare_pointPositions(point_positions)
@@ -155,22 +199,27 @@ class VQT_Analyzer(FR_Module):
 
     def transform_all(self, points_tracked: dict, point_positions: np.ndarray):
         """
-        Generate spectrograms from the tracked points.
-        Reshape the inputs, run the VQT, and normalize the spectrograms.
+        Generates spectrograms for every entry in a dict of tracked-point
+        arrays and stores the results on the instance.
 
         Args:
             points_tracked (dict):
-                A dictionary of 3D numpy arrays of shape(n_frames, n_points, 2)
-                 containing the tracked points.
+                Mapping from a name to a tracked-points array of shape
+                *(n_frames, n_points, 2)*.
             point_positions (np.ndarray):
-                A 2D numpy array of shape(n_points, 2) containing the positions
-                 of the tracked points.
+                Reference positions of the tracked points used to compute
+                displacements. shape: *(n_points, 2)*.
 
         Set Attributes:
-            self.spectrograms (dict):
-                A list of spectrograms for each element in idx_points.
-            self.run_data (dict):
-                Updates with self.spectrograms and self.point_positions.
+            spectrograms (dict):
+                Dict mapping each input key to its normalized spectrogram.
+            x_axis (dict):
+                Dict mapping each input key to the spectrogram time axis.
+            freqs (dict):
+                Dict mapping each input key to the frequency bin centers in Hz.
+            run_data (dict):
+                Updated with ``spectrograms``, ``x_axis``, and
+                ``point_positions`` for ``FR_Module`` export.
         """
         ## Check inputs
         self._check_inputs(points_tracked, point_positions)
@@ -190,18 +239,19 @@ class VQT_Analyzer(FR_Module):
             'x_axis': self.x_axis,
             'point_positions': self.point_positions,
         })
-        
+
     def _check_inputs(self, points_tracked: dict, point_positions: np.ndarray):
         """
-        Check the inputs to the transform function.
+        Validates the structure, dtype, and shape of the inputs to
+        :meth:`transform_all` and :meth:`demo_transform`.
 
         Args:
             points_tracked (dict):
-                A dictionary of 3D numpy arrays of shape(n_frames, n_points, 2)
-                 containing the tracked points.
+                Mapping from a name to a tracked-points array of shape
+                *(n_frames, n_points, 2)*.
             point_positions (np.ndarray):
-                A 2D numpy array of shape(n_points, 2) containing the positions
-                 of the tracked points.
+                Reference positions of the tracked points. shape:
+                *(n_points, 2)*.
         """
         ## Assertions
         ### Assert that the points_tracked dict is valid
@@ -219,17 +269,20 @@ class VQT_Analyzer(FR_Module):
     ## Prepare normalization function
     def _normalize_spectrogram(self, spectrogram):
         """
-        Normalize spectrogram by dividing by the total power
-            across all frequencies at each time point.
+        Normalizes a spectrogram by dividing each time point by the mean total
+        power across frequencies and points, then applies a 1/f correction.
 
         Args:
             spectrogram (torch.Tensor):
-                A single spectrogram
-                Spectrogram should be of shape: (n_points, n_freq_bins, n_frames)  
+                Raw VQT output. shape: *(n_points * 2, n_freq_bins, n_frames)*.
+                May be real (when ``take_abs=True``) or complex.
 
         Returns:
-            spectrogram (tuple or torch.Tensor):
-                A single normalized spectrogram of same shape as input.
+            (torch.Tensor):
+                spectrogram (torch.Tensor):
+                    Normalized spectrogram split into x/y components. shape:
+                    *(2, n_points, n_freq_bins, n_frames)*. Same dtype family as
+                    the input (real or complex).
         """
         ## Check inputs
         s = spectrogram
@@ -238,7 +291,7 @@ class VQT_Analyzer(FR_Module):
             s_exp = s ** self._spectrogram_exponent
             s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
             s_norm =  s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
-        
+
         elif torch.is_complex(s) == True:
             s_mag = torch.abs(s)
             s_phase = torch.angle(s)
@@ -246,7 +299,7 @@ class VQT_Analyzer(FR_Module):
             s_mean = torch.mean(torch.sum(s_exp , dim=1) , dim=0)  ## Mean of the summed power across all frequencies and points. Shape (n_frames,)
             s_mag_norm = s_exp / ((self._normalization_factor * s_mean[None,None,:]) + (1-self._normalization_factor))  ## Normalize the spectrogram by the mean power across all frequencies and points. Shape (n_points, n_freq_bins, n_frames)
             s_norm = torch.polar(s_mag_norm, s_phase)
-        
+
         ## Do 1/f correction
         s_norm = s_norm * torch.as_tensor(self.vqt_model.freqs[None,:,None] ** self._one_over_f_exponent, dtype=torch.float32) if self._one_over_f_exponent != 0 else s_norm
         s_norm_rs = s_norm.reshape(2, int(s_norm.shape[0]/2), s_norm.shape[1], s_norm.shape[2])
@@ -254,63 +307,82 @@ class VQT_Analyzer(FR_Module):
 
     def _prepare_displacements(self, traces, point_positions):
         """
-        A function to reshape and subtract offsets from traces.
-        Reshape from (n_frames, n_points, 2) to (n_points * 2, n_frames)
-        Subtract the point_positions from the traces.
+        Reshapes tracked-point traces from *(n_frames, n_points, 2)* to
+        *(n_points * 2, n_frames)* (Fortran order) and subtracts the reference
+        positions to yield displacement traces.
 
         Args:
             traces (np.ndarray):
-                A 3D numpy array of shape(n_frames, n_points, 2) containing the
-                 tracked points.
-            point_positions (np.ndarray):
-                A 2D numpy array of shape(n_points * 2) containing the positions
-                 of the tracked points.
+                Tracked point coordinates. shape: *(n_frames, n_points, 2)*.
+            point_positions (torch.Tensor):
+                Flattened reference positions. shape: *(n_points * 2,)*.
 
         Returns:
-            displacements (np.ndarray):
-                A 2D numpy array of shape(n_points * 2, n_frames) containing the
-                 displacements of the tracked points.
+            (torch.Tensor):
+                displacements (torch.Tensor):
+                    Per-component displacement traces. shape:
+                    *(n_points * 2, n_frames)*, dtype: *float32*.
         """
         out = torch.as_tensor(traces.reshape((traces.shape[0], -1), order='F').T, dtype=torch.float32) - point_positions[:, None]
         return out
 
     def _prepare_pointPositions(self, point_positions):
         """
-        A function to reshape point_positions from (n_points, 2) to (n_points * 2)
+        Flattens reference point positions from *(n_points, 2)* to
+        *(n_points * 2,)* using Fortran order.
+
+        Args:
+            point_positions (np.ndarray):
+                Reference positions. shape: *(n_points, 2)*.
+
+        Returns:
+            (torch.Tensor):
+                point_positions (torch.Tensor):
+                    Flattened reference positions. shape: *(n_points * 2,)*,
+                    dtype: *float32*.
         """
         return torch.as_tensor(point_positions.reshape((-1,), order='F').T, dtype=torch.float32)
 
 
     def demo_transform(
-        self, 
-        points_tracked: dict, 
-        point_positions: np.ndarray, 
-        idx_point: list=[0,], 
-        name_points: str='0', 
+        self,
+        points_tracked: dict,
+        point_positions: np.ndarray,
+        idx_point: list=[0,],
+        name_points: str='0',
         plot: bool=True,
     ):
         """
-        Do a test transform to check that the spectrograms are being
-         computed correctly and look good.
-        Use the plot to check it out visually.
+        Runs a single-point demo transform for visual sanity checking and
+        prints the projected memory footprint of the full spectrogram set.
 
         Args:
             points_tracked (dict):
-                A dictionary of 3D numpy arrays of shape(n_frames, n_points, 2)
-                 containing the tracked points.
+                Mapping from a name to a tracked-points array of shape
+                *(n_frames, n_points, 2)*.
             point_positions (np.ndarray):
-                A 2D numpy array of shape(n_points, 2) containing the positions
-                 of the tracked points.
-            name_pointsTracked (str):
-                A string to use to index the points_tracked dict.
+                Reference positions of the tracked points. shape:
+                *(n_points, 2)*.
             idx_point (list):
-                Index of point to transform and return or plot.
+                Indices of points within the selected entry to transform and
+                plot. (Default is ``[0,]``)
+            name_points (str):
+                Key into ``points_tracked`` selecting which array to use.
+                (Default is ``'0'``)
             plot (bool):
-                Whether to plot the spectrograms.
+                If ``True``, displays a matplotlib figure with the x and y
+                spectrograms. (Default is ``True``)
 
         Returns:
-            spectrograms (dict):
-                A list of spectrograms for each element in idx_points.
+            (tuple): tuple containing:
+                spec (np.ndarray):
+                    Demo spectrogram. shape:
+                    *(2, n_freq_bins, n_frames_ds)*.
+                x_axis (np.ndarray):
+                    Time axis of the spectrogram, in samples at the original
+                    ``Fs_sample`` rate. shape: *(n_frames_ds,)*.
+                freqs (np.ndarray):
+                    Frequency bin centers in Hz. shape: *(n_freq_bins,)*.
         """
         ## Check inputs
         self._check_inputs(points_tracked, point_positions)
@@ -346,24 +418,44 @@ class VQT_Analyzer(FR_Module):
         ## Compute size of all output spectrograms
         ### Get the output shape for each spectrogram
         def _get_avgpool1d_downsample_length(length, kernel_size, stride, padding):
+            """Returns the output length of a 1D average pool with the given
+            kernel, stride, and padding."""
             return int((length + 2 * padding - kernel_size) / stride + 1)
         shapes_pt = [p.shape for p in points_tracked.values()]
         shapes_spec = [(s[2], len(self.vqt_model.freqs), s[1], _get_avgpool1d_downsample_length(s[0], kernel_size=int(self.vqt_model.downsample_factor), stride=self.vqt_model.downsample_factor, padding=0)) for s in shapes_pt]
         sizes_spec = [np.prod(s) * spec.itemsize / 1e9 for s in shapes_spec]
         print(f'Total size of all spectrograms: {np.sum(sizes_spec):.8f} GB') if self._verbose > 1 else None
-        print(f'Individual spectrogram sizes (in GB): {sizes_spec}') if self._verbose > 1 else None            
+        print(f'Individual spectrogram sizes (in GB): {sizes_spec}') if self._verbose > 1 else None
 
         return spec, x_axis, freqs
 
-    
-    def __repr__(self): return f"{self.__class__.__name__}( normalization_factor={self._normalization_factor}, spectrogram_exponent={self._spectrogram_exponent}, VQT={self.vqt_model}, verbose={self._verbose} )"
-    def __getitem__(self, index): return self.spectrograms(index)
-    def __len__(self): return len(self.spectrograms)
-    def __iter__(self): return iter(self.spectrograms.items())    
-    def __call__(self, points_tracked: dict, point_positions: np.ndarray, name_points: str='0'): 
+
+    def __repr__(self):
+        """Returns a concise string representation of the analyzer."""
+        return f"{self.__class__.__name__}( normalization_factor={self._normalization_factor}, spectrogram_exponent={self._spectrogram_exponent}, VQT={self.vqt_model}, verbose={self._verbose} )"
+    def __getitem__(self, index):
+        """Indexes into ``self.spectrograms`` by key."""
+        return self.spectrograms(index)
+    def __len__(self):
+        """Returns the number of stored spectrogram entries."""
+        return len(self.spectrograms)
+    def __iter__(self):
+        """Iterates over ``(key, spectrogram)`` pairs in ``self.spectrograms``."""
+        return iter(self.spectrograms.items())
+    def __call__(self, points_tracked: dict, point_positions: np.ndarray, name_points: str='0'):
         """
-        Compute spectrograms for each point in points_tracked.
-        Wrapper for self.transform()
-        See self.transform() for details.
+        Computes spectrograms for ``points_tracked``. Thin wrapper around
+        :meth:`transform`; see that method for details.
+
+        Args:
+            points_tracked (dict):
+                Mapping from a name to a tracked-points array of shape
+                *(n_frames, n_points, 2)*.
+            point_positions (np.ndarray):
+                Reference positions of the tracked points. shape:
+                *(n_points, 2)*.
+            name_points (str):
+                Key into ``points_tracked`` selecting which array to transform.
+                (Default is ``'0'``)
         """
         return self.transform(points_tracked, point_positions, name_points)
