@@ -81,10 +81,16 @@ dependencies = [
 
 [project.optional-dependencies]
 ## Notebook / interactive widget stack.
+## ipywidgets>=8 + jupyterlab_widgets>=3 are required for anywidget
+## (pulled transitively by plotly's FigureWidget) to render in VSCode
+## and JupyterLab. ipykernel is the kernel itself; needed when the env
+## is used as a notebook kernel.
 gui = [
     "jupyter",
     "notebook<7",
-    "ipywidgets",
+    "ipykernel",
+    "ipywidgets>=8",
+    "jupyterlab_widgets>=3",
     "ipympl",
 ]
 ## Extra packages used by the demo notebooks (not by the core package).
@@ -118,7 +124,9 @@ multisession = [
 all = [
     "jupyter",
     "notebook<7",
-    "ipywidgets",
+    "ipykernel",
+    "ipywidgets>=8",
+    "jupyterlab_widgets>=3",
     "ipympl",
     "pytest",
     "pytest-cov",
