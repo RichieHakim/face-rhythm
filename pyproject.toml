@@ -43,7 +43,6 @@ dependencies = [
     "tensorly>=0.8.1,<1.0",
     "opencv_contrib_python>=4.10.0.84,<5",
     "matplotlib>=3.8",
-    "scikit_learn>=1.5,<2",
     "scikit_image>=0.24",
     "pyyaml",
     "tqdm",
@@ -69,8 +68,6 @@ dependencies = [
     "tables>=3.10.1",
     "einops>=0.8",
     "torch>=2.3",
-    "torchvision",
-    "torchaudio",
     "nvidia_ml_py3",
     "py_cpuinfo",
     "GPUtil",
@@ -91,9 +88,9 @@ gui = [
     "ipympl",
 ]
 ## Extra packages used by the demo notebooks (not by the core package).
-notebooks = [
-    "openpyxl",
-]
+## Currently empty — kept as a stable extra name for users who pin
+## ``pip install face-rhythm[notebooks]`` in their environments.
+notebooks = []
 ## Test and lint tooling.
 dev = [
     "pytest",
@@ -129,7 +126,6 @@ all = [
     "myst-parser",
     "sphinx_copybutton",
     "romatch-roicat>=0.1.2.post1",
-    "openpyxl",
     "plotly>=6",
     "anywidget",
 ]
