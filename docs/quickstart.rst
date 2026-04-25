@@ -39,10 +39,23 @@ A ready-to-edit template lives at ``scripts/params_pipeline_basic.json``.
 3. Python API
 -------------
 
-.. include:: ../README.md
-   :start-after: <!-- start-quickstart -->
-   :end-before: <!-- end-quickstart -->
-   :parser: myst_parser.sphinx_
+.. code-block:: python
+
+   import json
+   import face_rhythm as fr
+
+   with open("params_pipeline_basic.json", "r") as f:
+       params = json.load(f)
+
+   params["project"]["directory_project"] = "/path/to/new/project/"
+   params["paths_videos"]["directory_videos"] = "/path/to/videos/"
+   params["ROIs"]["initialize"]["path_file"] = "/path/to/ROIs.h5"
+
+   results = fr.pipelines.pipeline_basic(params)
+
+Copy ``scripts/params_pipeline_basic.json`` as a template, edit the three
+paths, and run. Results land in the project directory as HDF5 files plus
+summary plots.
 
 For the full parameter contract, see
 :func:`face_rhythm.util.get_default_parameters`.

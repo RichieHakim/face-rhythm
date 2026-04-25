@@ -1,13 +1,67 @@
 Installation
 ============
 
-.. include:: ../README.md
-   :start-after: <!-- start-install -->
-   :end-before: <!-- end-install -->
-   :parser: myst_parser.sphinx_
+If you have any issues during installation, please open a
+`GitHub issue <https://github.com/RichieHakim/face-rhythm/issues>`_.
+
+0. Requirements
+---------------
+
+- `Anaconda <https://www.anaconda.com/distribution/>`_ or
+  `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ (any
+  modern install).
+
+1. Install face-rhythm
+----------------------
+
+**Linux / macOS** (recommended - torchcodec backend, all distros):
+
+.. code-block:: shell
+
+   conda create -n face_rhythm -c conda-forge python=3.12 'torchcodec=*=cpu*' ffmpeg libstdcxx-ng
+   conda activate face_rhythm
+   pip install face-rhythm
+
+On macOS, drop ``libstdcxx-ng`` from the command (it is Linux-only).
+
+For NVDEC GPU video decoding, swap ``cpu*`` for ``cuda126*``,
+``cuda129*``, or ``cuda130*`` to match your driver (Linux x86_64 only).
+
+**Windows** (decord backend):
+
+.. code-block:: shell
+
+   conda create -n face_rhythm python=3.12
+   conda activate face_rhythm
+   pip install face-rhythm
+
+torchcodec has no PyPI Windows wheels, so on Windows construct readers
+with ``BufferedVideoReader(..., backend='decord')`` explicitly. The
+torchcodec wrapper raises a helpful error pointing to this if you forget.
+
+You will need to activate the environment with
+``conda activate face_rhythm`` each time you want to use face-rhythm.
+
+**Why conda-forge for torchcodec?** The conda-forge torchcodec package
+bakes RPATH so FFmpeg is found automatically. The PyPI wheel does not,
+which causes load errors in many conda environments. Conda-forge avoids
+this entirely.
+
+- **Headless servers** (no display, e.g. compute clusters): after the
+  install above, run ``pip uninstall opencv_contrib_python`` and
+  ``pip install opencv_contrib_python_headless``.
+
+2. Clone the repo to get the notebooks
+--------------------------------------
+
+.. code-block:: shell
+
+   git clone https://github.com/RichieHakim/face-rhythm.git
+
+Then open the notebooks in ``face-rhythm/notebooks/``.
 
 Troubleshooting Installation
-============================
+----------------------------
 
 The recipe at the top of this page avoids the common pitfalls by
 construction. The notes below cover failure modes that still surface
