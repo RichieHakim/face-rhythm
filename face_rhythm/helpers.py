@@ -2559,7 +2559,7 @@ def gaussian(x=None, mu=0, sig=1, plot_pref=False):
         plt.figure()
         plt.plot(x , gaus)
         plt.xlabel('x')
-        plt.title(f'$\mu$={mu}, $\sigma$={sig}')
+        plt.title(f'mu={mu}, sigma={sig}')
 
     return gaus
 
