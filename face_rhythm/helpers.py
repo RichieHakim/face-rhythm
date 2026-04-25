@@ -25,6 +25,7 @@ import copy
 import re
 from typing import List, Optional, Tuple, Union, Dict, Any, Callable, MutableMapping
 import os
+import sys
 from functools import partial
 import warnings
 
@@ -1517,12 +1518,12 @@ class TorchCodecVideoReader:
             elif isinstance(key, slice):
                 indices = list(range(*key.indices(self._num_frames)))
                 if not indices:
-                    return torch.empty((0,), dtype=torch.uint8)
+                    return self._empty_batch()
                 return torch.stack([self._read_one(i) for i in indices])
             elif isinstance(key, (list, np.ndarray)):
                 indices = [int(i) for i in key]
                 if not indices:
-                    return torch.empty((0,), dtype=torch.uint8)
+                    return self._empty_batch()
                 return torch.stack([self._read_one(i) for i in indices])
             else:
                 raise TypeError(
@@ -1533,6 +1534,12 @@ class TorchCodecVideoReader:
     def get_avg_fps(self) -> float:
         """Return the average frame rate of the video."""
         return self._decoder.metadata.average_fps
+
+    def _empty_batch(self):
+        """Return a 4D NHWC empty tensor matching the decoder's frame shape."""
+        import torch
+        meta = self._decoder.metadata
+        return torch.empty((0, meta.height, meta.width, 3), dtype=torch.uint8)
 
 
 class BufferedVideoReader:
@@ -5106,9 +5113,10 @@ def play_video_cv2(
         try:
             import decord
         except ImportError as e:
+            _pkg = "eva_decord" if sys.platform.startswith("win") else "decord2"
             raise ImportError(
                 "decord is required when array=None. "
-                "Install with: pip install decord2"
+                f"Install with: pip install {_pkg}"
             ) from e
         movie = decord.VideoReader(path_video)
         flag_convert_to_gray = False
