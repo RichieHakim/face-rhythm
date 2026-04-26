@@ -5,21 +5,6 @@ This page documents the data structures and terminology used throughout
 face-rhythm: how a session is organized, what a pipeline run produces, and
 how to interpret the files written to disk.
 
-Session and Trial
------------------
-
-**Session.** A session corresponds to a specific continuous experiment, often
-captured across multiple consecutive video files. We assume that the videos
-can be ordered and that the last frame of one video is immediately followed
-by the first frame of the next. This is important for when we run tracking
-of points from frame to frame.
-
-**Trial.** Within a session, you might have multiple trials when the
-experimental subject is asked to perform different tasks. Trials are
-identified by index into the session's frame stream — the trial indices
-should be **absolute**, corresponding to the frame number with respect to
-all the frames in the entire session.
-
 Project layout on disk
 ----------------------
 
@@ -57,18 +42,8 @@ not held in memory. The keys are:
 * ``SEED`` (``int``) — random seed used for the run.
 * ``params`` (``dict``) — the full parameter dictionary that was executed.
 
-To work with the actual outputs (tracked points, spectrograms, TCA factors),
-load the relevant HDF5 file from ``analysis_files/`` with
-:func:`face_rhythm.h5_handling.simple_load`. That helper returns a nested
-``dict`` mirroring the file's group hierarchy.
-
 Pipeline stage outputs
 ----------------------
-
-The HDF5 files under ``analysis_files/`` follow a consistent schema: keys
-defined by each module's ``run_data`` dictionary. The most important fields
-per stage are summarized below; use
-:func:`face_rhythm.h5_handling.show_item_tree` to inspect a file in full.
 
 ``Dataset_videos.h5`` — :mod:`face_rhythm.data_importing`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,7 +74,7 @@ The face mask(s) and the seed grid of points to track.
 
 Output of optical-flow point tracking across all videos in the session.
 
-* ``points_tracked`` — dict keyed by video index (``"0"``, ``"1"``, ...);
+* ``points_tracked`` — point-tracking time series dict keyed by video index (``"0"``, ``"1"``, ...);
   each value is an array of shape ``(n_frames, n_points, 2)``.
 * ``violations`` — sparse COO arrays (``row``, ``col``, ``data``,
   ``shape``) per video flagging frames where displacements crossed the
