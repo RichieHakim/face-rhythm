@@ -145,7 +145,7 @@ def pipeline_basic(params):
     if 'ROIs' in params['steps']:
 
         ## Either select new ROIs (`select_mode='gui'`), or import existing ROIs (`path_file=path_to_ROIs.h5_file`).\
-        ## Typically, you should make 1 or 2 ROIs. One for defining where the face points should be and one for cropping the frame.
+        ## Make 2 ROIs: the first defines where the face tracking points are placed, and the second is used to mask out the background during point tracking. Both are required by this pipeline (see `rois[1]` use below).
 
         rois = fr.rois.ROIs(**params['ROIs']['initialize'])
 

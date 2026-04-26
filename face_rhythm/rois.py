@@ -308,7 +308,7 @@ class ROIs(FR_Module):
         if isinstance(index, int):
             index = list(self.mask_images.keys())[index]
         return self.mask_images[index]
-    def __len__(self): return len(self.maks_images)
+    def __len__(self): return len(self.mask_images)
     def __iter__(self): return iter(self.mask_images)
     def __next__(self): return next(self.mask_images)
 
