@@ -11,17 +11,16 @@
 - **Preprint:** [Hakim et al. (2025), *bioRxiv*](https://doi.org/10.1101/2025.09.10.675423)
 - **Issues / support:** [GitHub Issues](https://github.com/RichieHakim/face-rhythm/issues)
 
-## Rhythmic facial movements from video
+## What is face-rhythm
 
-A Python package that turns videos of facial or other behavior into a small
-set of interpretable behavioral components.
+A Python package that turns videos of facial or other behavior into a small set of interpretable behavioral components.
 
 **Why use face-rhythm?**
 - **Unsupervised.** No labels, no model zoo.
 - **Interpretable.** Each component is a (space × frequency × time) factor
   you can plot and read off directly.
 
-## How to use face-rhythm
+## How to use it
 
 **Interactive notebooks:**
 
@@ -44,15 +43,10 @@ python scripts/run_pipeline_basic.py --path_params params.json --directory_save 
 
 ## Installation
 
-<!-- start-install -->
-Requires [conda](https://docs.conda.io/en/latest/miniconda.html) or mamba.
-Run these commands in Terminal (Linux/macOS) or Anaconda Prompt (Windows).
-
 ### 0. Requirements
 
 - [Anaconda](https://www.anaconda.com/distribution/) or
-  [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
-- Windows users should use the `decord` video backend.
+  [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html)
 
 ### 1. Create a conda environment
 
@@ -77,7 +71,7 @@ conda install -c conda-forge 'torchcodec=*=cpu*' ffmpeg libstdcxx-ng
 conda install -c conda-forge 'torchcodec=*=cpu*' ffmpeg
 ```
 
-**Windows:** skip this step.
+**Windows:** skip this step. `torchcodec` doesn't explicitly support Windows. Installing it often works, but is not guaranteed. Unless you need ultrafast GPU speeds, just use the `'decord'` backend, instead.
 
 ### 3. Install face-rhythm
 
