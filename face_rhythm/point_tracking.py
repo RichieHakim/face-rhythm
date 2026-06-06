@@ -335,7 +335,10 @@ class PointTracker(FR_Module):
         ## Collapse masks into single mask
         print(f"FR: Collapsing mask ROI images into single mask") if self._verbose > 1 else None
         if rois_masks is None:
-            self.mask = torch.ones(buffered_video_reader[0][0].shape[:2], dtype=bool)
+            ## Use the reader's (H, W) metadata, not an indexed frame: ``buffered_video_reader[0][0]``
+            ## is a 3D frame (H, W, C) in 'continuous' mode but a 4D batch (1, H, W, C) in 'by_video'
+            ## mode (the standard pipeline mode), so ``shape[:2]`` would give a degenerate (1, H) mask.
+            self.mask = torch.ones(tuple(buffered_video_reader.frame_height_width), dtype=bool)
         else:
             self.mask = torch.as_tensor(np.stack((rois_masks), axis=0).all(axis=0)).type(torch.bool)
 
