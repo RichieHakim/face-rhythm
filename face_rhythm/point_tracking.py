@@ -9,7 +9,7 @@ and frames with any point displaced beyond a threshold halt and replay the
 surrounding region to suppress outlier streaks.
 """
 
-from typing import Union, Optional
+from typing import Union, Optional, List
 import time
 
 import numpy as np
@@ -19,7 +19,6 @@ import torch
 import scipy.sparse
 
 from .util import FR_Module
-from .rois import ROIs
 from .helpers import BufferedVideoReader
 from .visualization import FrameVisualizer
 
@@ -45,7 +44,7 @@ class PointTracker(FR_Module):
             are ``(x, y)``. Typically produced by ``fr.rois.ROIs`` via the
             ``ROIs.point_positions`` attribute. shape: *(n_points, 2)*,
             dtype: *float*.
-        rois_masks (Union[np.ndarray, List[np.ndarray], ROIs]):
+        rois_masks (Union[np.ndarray, List[np.ndarray]]):
             ROI mask(s) used to zero-out non-ROI pixels before tracking.
             A single 2D bool array (shape: *(H, W)*) or a list of such
             arrays. When a list is provided, the masks are intersected
@@ -170,7 +169,7 @@ class PointTracker(FR_Module):
         self,
         buffered_video_reader: BufferedVideoReader,
         point_positions: np.ndarray,
-        rois_masks: ROIs=None,
+        rois_masks: Optional[Union[np.ndarray, List[np.ndarray]]]=None,
         contiguous: bool=False,
         params_optical_flow: dict={
                         "method": "lucas_kanade", ## method for optical flow. Only "lucas_kanade" is supported for now.
@@ -335,7 +334,10 @@ class PointTracker(FR_Module):
         ## Collapse masks into single mask
         print(f"FR: Collapsing mask ROI images into single mask") if self._verbose > 1 else None
         if rois_masks is None:
-            self.mask = torch.ones(buffered_video_reader[0][0].shape[:2], dtype=bool)
+            ## Use the reader's (H, W) metadata, not an indexed frame: ``buffered_video_reader[0][0]``
+            ## is a 3D frame (H, W, C) in 'continuous' mode but a 4D batch (1, H, W, C) in 'by_video'
+            ## mode (the standard pipeline mode), so ``shape[:2]`` would give a degenerate (1, H) mask.
+            self.mask = torch.ones(tuple(buffered_video_reader.frame_height_width), dtype=bool)
         else:
             self.mask = torch.as_tensor(np.stack((rois_masks), axis=0).all(axis=0)).type(torch.bool)
 
