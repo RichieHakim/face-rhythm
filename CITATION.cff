@@ -10,7 +10,7 @@ authors:
   - family-names: Hakim
     given-names: Richard
     orcid: "https://orcid.org/0000-0002-6991-1801"
-version: 0.2.8
+version: 0.3.3
 repository-code: "https://github.com/RichieHakim/face-rhythm"
 url: "https://github.com/RichieHakim/face-rhythm"
 keywords:
