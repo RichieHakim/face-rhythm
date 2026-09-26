@@ -93,6 +93,10 @@ jobs:
       if: startsWith(matrix.platform, 'macos')
       run: |
         brew install ffmpeg
+        ## torchcodec's macOS wheels reference FFmpeg as @rpath/libavutil.*.dylib without an
+        ## LC_RPATH, so dyld cannot find Homebrew's libraries on its own. Point the fallback
+        ## search path at the Homebrew prefix for the remaining steps.
+        echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
 
     - name: Run pytest
       run: |
